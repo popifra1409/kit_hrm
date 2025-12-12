@@ -24,21 +24,44 @@ class OrganizationLevelResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
+                    ->label('Nom du niveau')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->placeholder('Ex: Directeur Général, Chef de Service'),
+
                 Forms\Components\TextInput::make('code')
+                    ->label('Code')
                     ->required()
-                    ->maxLength(255),
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255)
+                    ->placeholder('Ex: DG, CS'),
+
                 Forms\Components\TextInput::make('hierarchy_level')
+                    ->label('Niveau hiérarchique')
                     ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('branch')
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(20)
+                    ->helperText('1 = Niveau le plus élevé (ex: PCA), 2 = DG, etc.'),
+
+                Forms\Components\Select::make('branch')
+                    ->label('Branche')
+                    ->options([
+                        'executive' => 'Direction Exécutive',
+                        'medical' => 'Branche Médicale',
+                        'administrative' => 'Branche Administrative',
+                    ])
                     ->required()
-                    ->maxLength(255),
+                    ->native(false),
+
                 Forms\Components\Textarea::make('description')
+                    ->label('Description')
+                    ->maxLength(65535)
                     ->columnSpanFull(),
+
                 Forms\Components\Toggle::make('is_active')
-                    ->required(),
+                    ->label('Actif')
+                    ->default(true),
             ]);
     }
 
@@ -46,35 +69,55 @@ class OrganizationLevelResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('code')
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('hierarchy_level')
-                    ->numeric()
+                    ->label('Niveau')
+                    ->sortable()
+                    ->badge()
+                    ->color('success'),
+
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Nom')
+                    ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('branch')
+
+                Tables\Columns\TextColumn::make('code')
+                    ->label('Code')
                     ->searchable(),
+
+                Tables\Columns\BadgeColumn::make('branch')
+                    ->label('Branche')
+                    ->colors([
+                        'danger' => 'executive',
+                        'success' => 'medical',
+                        'warning' => 'administrative',
+                    ])
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'executive' => 'Direction Exécutive',
+                        'medical' => 'Branche Médicale',
+                        'administrative' => 'Branche Administrative',
+                        default => $state,
+                    }),
+
                 Tables\Columns\IconColumn::make('is_active')
+                    ->label('Actif')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('hierarchy_level', 'asc')
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('branch')
+                    ->label('Branche')
+                    ->options([
+                        'executive' => 'Direction Exécutive',
+                        'medical' => 'Branche Médicale',
+                        'administrative' => 'Branche Administrative',
+                    ]),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
                 ]),
             ]);
     }
@@ -111,6 +154,15 @@ class OrganizationLevelResource extends Resource
     }
 
     public static function getNavigationLabel(): string
+    {
+        return 'Niveaux Hiérarchiques';
+    }
+    public static function getModelLabel(): string
+    {
+        return 'Niveau Hiérarchique';
+    }
+
+    public static function getPluralModelLabel(): string
     {
         return 'Niveaux Hiérarchiques';
     }

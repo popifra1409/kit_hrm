@@ -31,13 +31,13 @@ class EmployeeResource extends Resource
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
 
-                        Forms\Components\TextInput::make('first_name')
-                            ->label('Prénom')
+                        Forms\Components\TextInput::make('last_name')
+                            ->label('Nom')
                             ->required()
                             ->maxLength(255),
 
-                        Forms\Components\TextInput::make('last_name')
-                            ->label('Nom')
+                        Forms\Components\TextInput::make('first_name')
+                            ->label('Prénom')
                             ->required()
                             ->maxLength(255),
 
@@ -102,6 +102,18 @@ class EmployeeResource extends Resource
                                 Forms\Components\TextInput::make('code')
                                     ->label('Code')
                                     ->required(),
+                                Forms\Components\Select::make('type')  // <-- AJOUTEZ CE CHAMP
+                                    ->label('Type')
+                                    ->options([
+                                        'medical' => 'Médical',
+                                        'administrative' => 'Administratif',
+                                    ])
+                                    ->required()
+                                    ->native(false),
+                                Forms\Components\TextInput::make('level')  // <-- AJOUTEZ CE CHAMP
+                                    ->label('Niveau hiérarchique')
+                                    ->numeric()
+                                    ->default(1),
                             ]),
 
                         Forms\Components\Select::make('current_service_id')
@@ -109,7 +121,45 @@ class EmployeeResource extends Resource
                             ->relationship('currentService', 'name')
                             ->searchable()
                             ->preload()
-                            ->nullable(),
+                            ->nullable()
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nom du service')
+                                    ->required(),
+
+                                Forms\Components\TextInput::make('code')
+                                    ->label('Code')
+                                    ->required(),
+
+                                Forms\Components\Select::make('type')
+                                    ->label('Type de service')
+                                    ->options([
+                                        'medical' => 'Service Médical',
+                                        'administrative' => 'Service Administratif',
+                                    ])
+                                    ->required()
+                                    ->reactive()
+                                    ->native(false),
+
+                                Forms\Components\Select::make('department_id')
+                                    ->label('Département Administratif')
+                                    ->options(function () {
+                                        return \App\Models\Department::where('type', 'administrative')
+                                            ->pluck('name', 'id');
+                                    })
+                                    ->searchable()
+                                    ->nullable()
+                                    ->visible(fn($get) => $get('type') === 'administrative'),
+
+                                Forms\Components\Select::make('medical_department_id')
+                                    ->label('Département Médical')
+                                    ->options(function () {
+                                        return \App\Models\MedicalDepartment::pluck('name', 'id');
+                                    })
+                                    ->searchable()
+                                    ->nullable()
+                                    ->visible(fn($get) => $get('type') === 'medical'),
+                            ]),
 
                         Forms\Components\Select::make('position_id')
                             ->label('Poste')
