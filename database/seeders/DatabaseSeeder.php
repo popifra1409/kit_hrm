@@ -13,7 +13,8 @@ class DatabaseSeeder extends Seeder
             ContractTypeSeeder::class,
             OrganizationLevelSeeder::class,
             DepartmentSeeder::class,
-            // ServiceSeeder::class, // On l'ajoutera après
+            PositionSeeder::class,
+            LeaveTypeSeeder::class,
         ]);
     }
 }

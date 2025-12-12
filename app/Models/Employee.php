@@ -115,6 +115,16 @@ class Employee extends Model
         return $this->hasOne(EmployeeHierarchy::class)->where('is_current', true);
     }
 
+    public function leaves()
+    {
+        return $this->hasMany(Leave::class);
+    }
+
+    public function leaveBalances()
+    {
+        return $this->hasMany(LeaveBalance::class);
+    }
+
     // Méthode pour calculer l'ancienneté
     public function getAncienneteAttribute()
     {
