@@ -24,26 +24,54 @@ class DepartmentResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
+                    ->label('Nom')
                     ->required()
                     ->maxLength(255),
+
                 Forms\Components\TextInput::make('code')
+                    ->label('Code')
                     ->required()
+                    ->unique(ignoreRecord: true)
                     ->maxLength(255),
-                Forms\Components\TextInput::make('type')
+
+                Forms\Components\Select::make('type')
+                    ->label('Type')
+                    ->options([
+                        'medical' => 'Médical',
+                        'administrative' => 'Administratif',
+                    ])
                     ->required()
-                    ->maxLength(255),
+                    ->native(false),
+
                 Forms\Components\Textarea::make('description')
+                    ->label('Description')
+                    ->maxLength(65535)
                     ->columnSpanFull(),
-                Forms\Components\TextInput::make('parent_department_id')
-                    ->numeric(),
-                Forms\Components\TextInput::make('director_id')
-                    ->numeric(),
+
+                Forms\Components\Select::make('parent_department_id')
+                    ->label('Département parent')
+                    ->relationship('parentDepartment', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->nullable(),
+
+                Forms\Components\Select::make('director_id')
+                    ->label('Directeur')
+                    ->relationship('director', 'last_name')
+                    ->searchable()
+                    ->preload()
+                    ->getOptionLabelFromRecordUsing(fn($record) => $record->full_name)
+                    ->nullable(),
+
                 Forms\Components\TextInput::make('level')
-                    ->required()
+                    ->label('Niveau hiérarchique')
                     ->numeric()
-                    ->default(1),
+                    ->default(1)
+                    ->minValue(1),
+
                 Forms\Components\Toggle::make('is_active')
-                    ->required(),
+                    ->label('Actif')
+                    ->default(true),
             ]);
     }
 
@@ -52,40 +80,45 @@ class DepartmentResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Nom')
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('code')
+                    ->label('Code')
+                    ->searchable()
+                    ->sortable(),
+
+                Tables\Columns\BadgeColumn::make('type')
+                    ->label('Type')
+                    ->colors([
+                        'success' => 'medical',
+                        'warning' => 'administrative',
+                    ])
+                    ->formatStateUsing(fn(string $state): string => $state === 'medical' ? 'Médical' : 'Administratif'),
+
+                Tables\Columns\TextColumn::make('director.full_name')
+                    ->label('Directeur')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('type')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('parent_department_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('director_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('level')
-                    ->numeric()
-                    ->sortable(),
+
                 Tables\Columns\IconColumn::make('is_active')
+                    ->label('Actif')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('type')
+                    ->label('Type')
+                    ->options([
+                        'medical' => 'Médical',
+                        'administrative' => 'Administratif',
+                    ]),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
                 ]),
             ]);
     }
@@ -122,6 +155,15 @@ class DepartmentResource extends Resource
     }
 
     public static function getNavigationLabel(): string
+    {
+        return 'Départements';
+    }
+    public static function getModelLabel(): string
+    {
+        return 'Département';
+    }
+
+    public static function getPluralModelLabel(): string
     {
         return 'Départements';
     }

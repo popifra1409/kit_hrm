@@ -23,34 +23,62 @@ class PositionResource extends Resource
     {
         return $form
             ->schema([
-                //
+                Forms\Components\TextInput::make('name')
+                    ->label('Nom du poste')
+                    ->required()
+                    ->maxLength(255),
+
+                Forms\Components\TextInput::make('code')
+                    ->label('Code')
+                    ->required()
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255),
+
+                Forms\Components\Textarea::make('description')
+                    ->label('Description')
+                    ->maxLength(65535)
+                    ->columnSpanFull(),
+
+                Forms\Components\Toggle::make('is_active')
+                    ->label('Actif')
+                    ->default(true),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([
-                //
-            ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+        ->columns([
+            Tables\Columns\TextColumn::make('name')
+                ->label('Nom')
+                ->searchable()
+                ->sortable(),
+            
+            Tables\Columns\TextColumn::make('code')
+                ->label('Code')
+                ->searchable()
+                ->sortable(),
+            
+            Tables\Columns\IconColumn::make('is_active')
+                ->label('Actif')
+                ->boolean(),
+            
+            Tables\Columns\TextColumn::make('employees_count')
+                ->label('Nombre d\'employés')
+                ->counts('employees')
+                ->sortable(),
+        ])
+        ->filters([
+            //
+        ])
+        ->actions([
+            Tables\Actions\EditAction::make()->label('Modifier'),
+        ])
+        ->bulkActions([
+            Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
+            ]),
+        ]);
     }
 
     public static function getRelations(): array
@@ -85,6 +113,15 @@ class PositionResource extends Resource
     }
 
     public static function getNavigationLabel(): string
+    {
+        return 'Postes';
+    }
+    public static function getModelLabel(): string
+    {
+        return 'Poste';
+    }
+
+    public static function getPluralModelLabel(): string
     {
         return 'Postes';
     }

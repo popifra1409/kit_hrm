@@ -24,17 +24,34 @@ class MedicalDepartmentResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
+                    ->label('Nom')
                     ->required()
                     ->maxLength(255),
+
                 Forms\Components\TextInput::make('code')
+                    ->label('Code')
                     ->required()
+                    ->unique(ignoreRecord: true)
                     ->maxLength(255),
+
                 Forms\Components\Textarea::make('description')
+                    ->label('Description')
+                    ->maxLength(65535)
                     ->columnSpanFull(),
-                Forms\Components\TextInput::make('head_of_department_id')
-                    ->numeric(),
+
+                Forms\Components\Select::make('head_of_department_id')
+                    ->label('Chef de Département')
+                    ->options(function () {
+                        return \App\Models\Employee::where('personnel_type', 'soignant')
+                            ->get()
+                            ->pluck('full_name', 'id');
+                    })
+                    ->searchable()
+                    ->nullable(),
+
                 Forms\Components\Toggle::make('is_active')
-                    ->required(),
+                    ->label('Actif')
+                    ->default(true),
             ]);
     }
 
@@ -43,32 +60,31 @@ class MedicalDepartmentResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('code')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('head_of_department_id')
-                    ->numeric()
+                    ->label('Nom')
+                    ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('code')
+                    ->label('Code')
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('headOfDepartment.full_name')
+                    ->label('Chef de Département')
+                    ->searchable(),
+
                 Tables\Columns\IconColumn::make('is_active')
+                    ->label('Actif')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
                 ]),
             ]);
     }
@@ -105,6 +121,15 @@ class MedicalDepartmentResource extends Resource
     }
 
     public static function getNavigationLabel(): string
+    {
+        return 'Départements Médicaux';
+    }
+    public static function getModelLabel(): string
+    {
+        return 'Département Médical';
+    }
+
+    public static function getPluralModelLabel(): string
     {
         return 'Départements Médicaux';
     }

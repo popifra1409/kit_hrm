@@ -24,21 +24,39 @@ class ContractTypeResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
+                    ->label('Nom')
                     ->required()
                     ->maxLength(255),
+
                 Forms\Components\TextInput::make('code')
+                    ->label('Code')
                     ->required()
+                    ->unique(ignoreRecord: true)
                     ->maxLength(255),
+
                 Forms\Components\Textarea::make('description')
+                    ->label('Description')
+                    ->maxLength(65535)
                     ->columnSpanFull(),
+
                 Forms\Components\Toggle::make('requires_end_date')
-                    ->required(),
+                    ->label('Requiert une date de fin')
+                    ->reactive()
+                    ->default(false),
+
                 Forms\Components\TextInput::make('max_duration_months')
-                    ->numeric(),
+                    ->label('Durée maximale (mois)')
+                    ->numeric()
+                    ->minValue(1)
+                    ->visible(fn($get) => $get('requires_end_date')),
+
                 Forms\Components\Toggle::make('renewable')
-                    ->required(),
+                    ->label('Renouvelable')
+                    ->default(false),
+
                 Forms\Components\Toggle::make('is_active')
-                    ->required(),
+                    ->label('Actif')
+                    ->default(true),
             ]);
     }
 
@@ -47,36 +65,39 @@ class ContractTypeResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('code')
-                    ->searchable(),
-                Tables\Columns\IconColumn::make('requires_end_date')
-                    ->boolean(),
-                Tables\Columns\TextColumn::make('max_duration_months')
-                    ->numeric()
+                    ->label('Nom')
+                    ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('code')
+                    ->label('Code')
+                    ->searchable(),
+
+                Tables\Columns\IconColumn::make('requires_end_date')
+                    ->label('Date de fin requise')
+                    ->boolean(),
+
+                Tables\Columns\TextColumn::make('max_duration_months')
+                    ->label('Durée max (mois)')
+                    ->sortable(),
+
                 Tables\Columns\IconColumn::make('renewable')
+                    ->label('Renouvelable')
                     ->boolean(),
+
                 Tables\Columns\IconColumn::make('is_active')
+                    ->label('Actif')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('Modifier'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
                 ]),
             ]);
     }
@@ -113,6 +134,15 @@ class ContractTypeResource extends Resource
     }
 
     public static function getNavigationLabel(): string
+    {
+        return 'Types de Contrat';
+    }
+    public static function getModelLabel(): string
+    {
+        return 'Type de Contrat';
+    }
+
+    public static function getPluralModelLabel(): string
     {
         return 'Types de Contrat';
     }
