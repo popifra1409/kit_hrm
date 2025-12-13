@@ -148,4 +148,19 @@ class Employee extends Model
             }
         });
     }
+
+    public function payrolls()
+    {
+        return $this->hasMany(Payroll::class);
+    }
+
+    // Méthode pour obtenir le salaire de base depuis la grille
+    public function getBaseSalaryFromGrid()
+    {
+        if (!$this->category_number || !$this->echelon_number) {
+            return 0;
+        }
+
+        return SalaryGrid::getBaseSalary($this->category_number, $this->echelon_number);
+    }
 }

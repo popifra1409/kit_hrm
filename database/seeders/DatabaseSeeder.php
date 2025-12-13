@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             PositionSeeder::class,
             LeaveTypeSeeder::class,
+            SalaryGridSeeder::class,     
+            PayrollItemSeeder::class,
         ]);
     }
 }

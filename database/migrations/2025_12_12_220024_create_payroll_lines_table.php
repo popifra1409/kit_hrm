@@ -6,20 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('payroll_lines', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('payroll_id');
+            $table->unsignedBigInteger('payroll_item_id');
+            $table->string('item_name'); // Nom de l'élément
+            $table->enum('type', ['gain', 'deduction']);
+            $table->boolean('is_taxable')->default(false);
+            $table->boolean('is_subject_to_cnps')->default(false);
+            $table->decimal('amount', 15, 2)->default(0);
+            $table->integer('display_order')->default(0);
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('payroll_lines');
