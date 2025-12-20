@@ -31,6 +31,13 @@ class Leave extends Model
         'children_score',
         'total_score',
         'notes',
+        'actual_return_date',
+        'has_returned',
+        'return_confirmed_at',
+        'return_confirmed_by',
+        'return_notes',
+        'is_late_return',
+        'late_days',
     ];
 
     protected $casts = [
@@ -44,6 +51,10 @@ class Leave extends Model
         'discipline_score' => 'decimal:2',
         'children_score' => 'decimal:2',
         'total_score' => 'decimal:2',
+        'actual_return_date' => 'date',
+        'return_confirmed_at' => 'date',
+        'has_returned' => 'boolean',
+        'is_late_return' => 'boolean',
     ];
 
     // Relations
@@ -72,6 +83,11 @@ class Leave extends Model
         return $this->belongsTo(User::class, 'rejected_by');
     }
 
+    public function returnConfirmedBy()
+    {
+        return $this->belongsTo(User::class, 'return_confirmed_by');
+    }
+
     // Calculer le score total selon les critères
     public function calculateScore()
     {
@@ -94,6 +110,26 @@ class Leave extends Model
         $this->total_score = $anciennete + $discipline + $children;
 
         //$this->save();
+    }
+
+    // Méthode pour confirmer le retour
+    public function confirmReturn($actualReturnDate = null, $notes = null)
+    {
+        $this->actual_return_date = $actualReturnDate ?? now();
+        $this->has_returned = true;
+        $this->return_confirmed_at = now();
+        $this->return_confirmed_by = auth()->id();
+        $this->return_notes = $notes;
+
+        // Vérifier si retard
+        if ($this->actual_return_date->isAfter($this->end_date)) {
+            $this->is_late_return = true;
+            $this->late_days = $this->end_date->diffInDays($this->actual_return_date);
+        }
+
+        $this->save();
+
+        return $this;
     }
 
     // Boot pour calculer automatiquement les jours

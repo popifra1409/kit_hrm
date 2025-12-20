@@ -163,6 +163,50 @@ class LeaveResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
+                Forms\Components\Section::make('Suivi du Retour')
+                    ->schema([
+                        Forms\Components\Toggle::make('has_returned')
+                            ->label('Employé de retour')
+                            ->reactive()
+                            ->disabled(fn($record) => !$record || $record->status !== 'approved'),
+
+                        Forms\Components\DatePicker::make('actual_return_date')
+                            ->label('Date de retour effective')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->default(fn($record) => $record?->end_date)
+                            ->visible(fn($get) => $get('has_returned'))
+                            ->required(fn($get) => $get('has_returned')),
+
+                        Forms\Components\Textarea::make('return_notes')
+                            ->label('Notes sur le retour')
+                            ->rows(2)
+                            ->visible(fn($get) => $get('has_returned'))
+                            ->placeholder('Ex: Retour anticipé, prolongation maladie, etc.'),
+
+                        Forms\Components\Placeholder::make('return_info')
+                            ->label('Informations')
+                            ->content(function ($record) {
+                                if (!$record || !$record->has_returned) {
+                                    return '';
+                                }
+
+                                $info = "Retour confirmé le " . $record->return_confirmed_at?->format('d/m/Y à H:i');
+                                if ($record->returnConfirmedBy) {
+                                    $info .= " par " . $record->returnConfirmedBy->name;
+                                }
+
+                                if ($record->is_late_return) {
+                                    $info .= "\n⚠️ Retour en retard de {$record->late_days} jour(s)";
+                                }
+
+                                return $info;
+                            })
+                            ->visible(fn($record) => $record && $record->has_returned),
+                    ])
+                    ->columns(2)
+                    ->visible(fn($record) => $record && $record->status === 'approved')
+                    ->collapsible(),
             ]);
     }
 
@@ -223,6 +267,42 @@ class LeaveResource extends Resource
                         'cancelled' => 'Annulé',
                         default => $state,
                     }),
+                Tables\Columns\IconColumn::make('has_returned')
+                    ->label('Retour')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('warning')
+                    ->tooltip(fn($record) => $record->has_returned
+                        ? 'Retour confirmé le ' . $record->return_confirmed_at?->format('d/m/Y')
+                        : 'En attente de retour')
+                    ->visible(fn($record) => $record && $record->status === 'approved'),
+
+                Tables\Columns\BadgeColumn::make('return_status')
+                    ->label('Statut Retour')
+                    ->formatStateUsing(function ($record) {
+                        if ($record->status !== 'approved') {
+                            return '—';
+                        }
+
+                        if ($record->has_returned) {
+                            return $record->is_late_return ? '⚠️ Retard' : '✅ À temps';
+                        }
+
+                        if (now()->isAfter($record->end_date)) {
+                            return '❌ En retard';
+                        }
+
+                        return '⏳ En cours';
+                    })
+                    ->colors([
+                        'success' => fn($record) => $record->has_returned && !$record->is_late_return,
+                        'warning' => fn($record) => $record->is_late_return,
+                        'danger' => fn($record) => !$record->has_returned && now()->isAfter($record->end_date),
+                        'gray' => fn($record) => $record->status !== 'approved',
+                    ])
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Demandé le')
@@ -339,6 +419,33 @@ class LeaveResource extends Resource
                         \Filament\Notifications\Notification::make()
                             ->title('Demande rejetée')
                             ->warning()
+                            ->send();
+                    }),
+                Tables\Actions\Action::make('confirm_return')
+                    ->label('Confirmer Retour')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn($record) => $record && $record->status === 'approved' && !$record->has_returned)
+                    ->form([
+                        Forms\Components\DatePicker::make('actual_return_date')
+                            ->label('Date de retour effective')
+                            ->required()
+                            ->default(now())
+                            ->native(false)
+                            ->displayFormat('d/m/Y'),
+
+                        Forms\Components\Textarea::make('return_notes')
+                            ->label('Notes')
+                            ->rows(3)
+                            ->placeholder('Observations éventuelles sur le retour...'),
+                    ])
+                    ->action(function ($record, array $data) {
+                        $record->confirmReturn($data['actual_return_date'], $data['return_notes'] ?? null);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Retour confirmé')
+                            ->success()
+                            ->body("Le retour de {$record->employee->full_name} a été enregistré.")
                             ->send();
                     }),
             ])
