@@ -210,6 +210,31 @@ class EmployeeResource extends Resource
                             ->maxValue(15),
                     ])
                     ->columns(4),
+                Forms\Components\Section::make('Avancement et Échelon')
+                    ->schema([
+                        Forms\Components\TextInput::make('current_echelon')
+                            ->label('Échelon Actuel')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(12)
+                            ->default(1)
+                            ->helperText('Échelon de 1 à 12'),
+
+                        Forms\Components\DatePicker::make('echelon_start_date')
+                            ->label('Date Début Échelon')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->helperText('Date de début dans l\'échelon actuel'),
+
+                        Forms\Components\DatePicker::make('last_advancement_date')
+                            ->label('Dernier Avancement')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->disabled()
+                            ->dehydrated(false),
+                    ])
+                    ->columns(3)
+                    ->collapsible(),
 
                 Forms\Components\Section::make('Dates Importantes')
                     ->schema([

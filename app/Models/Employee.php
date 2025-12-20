@@ -45,6 +45,9 @@ class Employee extends Model
         'disciplinary_notes',
         'status',
         'is_active',
+        'current_echelon',
+        'echelon_start_date',
+        'last_advancement_date',
     ];
 
     protected $casts = [
@@ -59,6 +62,9 @@ class Employee extends Model
         'children_under_6' => 'integer',
         'total_children' => 'integer',
         'disciplinary_points' => 'integer',
+        'current_echelon' => 'integer',
+        'echelon_start_date' => 'date',
+        'last_advancement_date' => 'date',
     ];
 
     // Accessor pour le nom complet
@@ -125,6 +131,17 @@ class Employee extends Model
         return $this->hasMany(LeaveBalance::class);
     }
 
+    // Relations pour l'historique
+    public function assignmentHistory()
+    {
+        return $this->hasMany(EmployeeAssignmentHistory::class)->orderBy('effective_date', 'desc');
+    }
+
+    public function advancementHistory()
+    {
+        return $this->hasMany(EmployeeAdvancementHistory::class)->orderBy('effective_date', 'desc');
+    }
+    
     // Méthode pour calculer l'ancienneté
     public function getAncienneteAttribute()
     {
