@@ -5,8 +5,10 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Employee;
 use App\Models\EmployeeAffectation;
+use App\Models\Leave;
 use App\Observers\EmployeeObserver;
 use App\Observers\EmployeeAffectationObserver;
+use App\Observers\LeaveObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,5 +28,6 @@ class AppServiceProvider extends ServiceProvider
         /// Enregistrer les observers
         Employee::observe(EmployeeObserver::class);
         EmployeeAffectation::observe(EmployeeAffectationObserver::class);
+         Leave::observe(LeaveObserver::class);  
     }
 }

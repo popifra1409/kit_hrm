@@ -93,7 +93,7 @@ class Leave extends Model
         // Score Total
         $this->total_score = $anciennete + $discipline + $children;
 
-        $this->save();
+        //$this->save();
     }
 
     // Boot pour calculer automatiquement les jours

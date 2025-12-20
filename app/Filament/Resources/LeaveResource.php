@@ -35,6 +35,7 @@ class LeaveResource extends Resource
                             ->searchable()
                             ->required()
                             ->reactive()
+                            ->preload()
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                 // Calculer automatiquement le score
                                 if ($state) {
@@ -55,7 +56,9 @@ class LeaveResource extends Resource
                             ->relationship('leaveType', 'name')
                             ->searchable()
                             ->required()
-                            ->reactive(),
+                            ->reactive()
+                            ->preload()
+                            ->native(false),
 
                         Forms\Components\DatePicker::make('start_date')
                             ->label('Date de début')
