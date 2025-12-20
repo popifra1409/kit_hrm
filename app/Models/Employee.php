@@ -23,6 +23,7 @@ class Employee extends Model
         'department_id',
         'position_id',
         'current_service_id',
+        'service_id', 
         'employment_type',
         'contract_type_id',
         'personnel_type',
@@ -91,6 +92,11 @@ class Employee extends Model
         return $this->belongsTo(Service::class, 'current_service_id');
     }
 
+     public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
+
     public function contractType()
     {
         return $this->belongsTo(ContractType::class);
@@ -141,7 +147,7 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeeAdvancementHistory::class)->orderBy('effective_date', 'desc');
     }
-    
+
     // Méthode pour calculer l'ancienneté
     public function getAncienneteAttribute()
     {

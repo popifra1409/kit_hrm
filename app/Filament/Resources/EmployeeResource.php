@@ -451,7 +451,8 @@ class EmployeeResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\AssignmentHistoryRelationManager::class,
+            RelationManagers\AdvancementHistoryRelationManager::class,
         ];
     }
 

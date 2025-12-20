@@ -9,6 +9,8 @@ class EmployeeAdvancementHistory extends Model
 {
     use HasFactory;
 
+    protected $table = 'employee_advancement_history';
+
     protected $fillable = [
         'employee_id',
         'advancement_type',
@@ -86,7 +88,7 @@ class EmployeeAdvancementHistory extends Model
     // Obtenir le libellé du type
     public function getTypeLabel(): string
     {
-        return match ($this->advancement_type) {
+        return match($this->advancement_type) {
             'echelon' => 'Avancement d\'Échelon',
             'category' => 'Changement de Catégorie',
             'grade' => 'Changement de Grade',

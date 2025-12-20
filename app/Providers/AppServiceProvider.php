@@ -3,6 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use App\Models\Employee;
+use App\Models\EmployeeAffectation;
+use App\Observers\EmployeeObserver;
+use App\Observers\EmployeeAffectationObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        /// Enregistrer les observers
+        Employee::observe(EmployeeObserver::class);
+        EmployeeAffectation::observe(EmployeeAffectationObserver::class);
     }
 }
