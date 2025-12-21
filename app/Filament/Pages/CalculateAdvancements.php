@@ -21,7 +21,7 @@ class CalculateAdvancements extends Page implements HasTable
     protected static ?string $navigationLabel = 'Calculer Avancements';
     protected static ?string $title = 'Calculer les Avancements Automatiques';
     protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     protected static string $view = 'filament.pages.calculate-advancements';
 
