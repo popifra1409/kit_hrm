@@ -14,6 +14,8 @@ class AdvancementHistoryRelationManager extends RelationManager
 
     protected static ?string $title = 'Historique des Avancements';
 
+    protected static ?int $navigationSort = 7;
+
     public function table(Table $table): Table
     {
         return $table
