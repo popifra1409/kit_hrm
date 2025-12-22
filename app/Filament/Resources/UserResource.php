@@ -91,7 +91,7 @@ class UserResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '⚙️ Administration';
+        return '🔧 Administration';
     }
 
     public static function getNavigationSort(): ?int

@@ -17,6 +17,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Navigation\NavigationGroup;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -55,6 +56,27 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+             ->navigationGroups([
+            NavigationGroup::make('🏢 Structure Organisationnelle')
+                ->collapsed(false),
+            NavigationGroup::make('👥 Gestion du Personnel')
+                ->collapsed(false),
+            NavigationGroup::make('🏖️ Congés & Absences')
+                ->collapsed(true),
+            NavigationGroup::make('📋 Contrats & Affectations')
+                ->collapsed(true),
+            NavigationGroup::make('📚 Gestion Documentaire')
+                ->collapsed(true),
+            NavigationGroup::make('💰 Gestion de la Paie')
+                ->collapsed(true),
+            NavigationGroup::make('🏗️ Marchés Publics')
+                ->collapsed(true),
+            NavigationGroup::make('⚙️ Paramétrage')
+                ->collapsed(true),
+            NavigationGroup::make('🔧 Administration')
+                ->collapsed(true),
+        ]);
+            
     }
 }
