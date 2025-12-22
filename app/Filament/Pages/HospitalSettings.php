@@ -88,16 +88,16 @@ class HospitalSettings extends Page implements HasForms
                                 Section::make()
                                     ->schema([
                                         TextInput::make('hospital_name')
-                                            ->label('Nom Complet de l\'Hôpital')
+                                            ->label('Nom Complet de la structure')
                                             ->required()
                                             ->maxLength(255)
-                                            ->placeholder('Ex: Centre Hospitalier et Universitaire de Yaoundé'),
+                                            ->placeholder('Ex: Kisin Information Technology'),
 
                                         TextInput::make('hospital_short_name')
                                             ->label('Nom Court / Sigle')
                                             ->required()
                                             ->maxLength(50)
-                                            ->placeholder('Ex: CHUY'),
+                                            ->placeholder('Ex: KIT'),
 
                                         TextInput::make('hospital_slogan')
                                             ->label('Slogan / Devise')
@@ -108,7 +108,7 @@ class HospitalSettings extends Page implements HasForms
                                             ->label('Description')
                                             ->rows(4)
                                             ->maxLength(1000)
-                                            ->placeholder('Brève description de l\'hôpital')
+                                            ->placeholder('Brève description de la strucutre')
                                             ->columnSpanFull(),
                                     ])
                                     ->columns(2),
@@ -123,7 +123,7 @@ class HospitalSettings extends Page implements HasForms
                                             ->label('Adresse Complète')
                                             ->rows(2)
                                             ->maxLength(500)
-                                            ->placeholder('Rue, Avenue, Quartier...')
+                                            ->placeholder('Ville, Quartier...')
                                             ->columnSpanFull(),
 
                                         TextInput::make('hospital_city')
@@ -161,7 +161,7 @@ class HospitalSettings extends Page implements HasForms
                                             ->label('Email Principal')
                                             ->email()
                                             ->maxLength(255)
-                                            ->placeholder('contact@chuy.cm'),
+                                            ->placeholder('contact@hospital.cm'),
 
                                         TextInput::make('hospital_website')
                                             ->label('Site Web')
@@ -201,7 +201,7 @@ class HospitalSettings extends Page implements HasForms
                                 Section::make()
                                     ->schema([
                                         FileUpload::make('hospital_logo')
-                                            ->label('Logo de l\'Hôpital')
+                                            ->label('Logo de la structure')
                                             ->image()
                                             ->directory('hospital')
                                             ->imageEditor()
@@ -209,6 +209,16 @@ class HospitalSettings extends Page implements HasForms
                                             ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/svg+xml'])
                                             ->helperText('Logo principal (format PNG transparent recommandé, max 2MB)')
                                             ->columnSpanFull(),
+
+                                        FileUpload::make('hospital_favicon')
+                                            ->label('Icône de la structure')
+                                            ->image()
+                                            ->directory('hopital')
+                                            ->maxSize(512)
+                                            ->default(fn() => \App\Models\SystemSetting::get('hospital_favicon'))
+                                            ->afterStateUpdated(fn($state) => \App\Models\SystemSetting::set('hospital_favicon', $state, 'identity', 'text'))
+                                            ->dehydrated(false)
+                                            ->helperText('Icône dans l\'onglet du navigateur (32x32px)'),
 
                                         FileUpload::make('hospital_stamp')
                                             ->label('Cachet Officiel')
