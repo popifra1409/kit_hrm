@@ -28,12 +28,12 @@ class AbsenceResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '📅 Congés & Absences';
+        return '🏖️ Congés & Absences';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 5    ;
     }
 
     public static function form(Form $form): Form

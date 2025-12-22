@@ -164,7 +164,7 @@ class LeaveTypeResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '🏖️ Gestion des Congés';
+        return '🏖️ Congés & Absences';
     }
 
     public static function getNavigationSort(): ?int
