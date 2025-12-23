@@ -118,7 +118,7 @@ class ReplacementResource extends Resource
 
                         Forms\Components\Select::make('temporary_position_id')
                             ->label('Poste Temporaire')
-                            ->relationship('temporaryPosition', 'title')
+                            ->relationship('temporaryPosition', 'name')
                             ->searchable()
                             ->preload()
                             ->native(false),

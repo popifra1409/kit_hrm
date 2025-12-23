@@ -70,7 +70,7 @@ class EmployeeAssignmentHistoryResource extends Resource
 
                 Forms\Components\Section::make('Ancienne Affectation')
                     ->schema([
-                        Forms\Components\TextInput::make('old_position_title')
+                        Forms\Components\TextInput::make('old_position_name')
                             ->label('Ancien Poste')
                             ->maxLength(255)
                             ->visible(fn($get) => in_array($get('assignment_type'), ['position'])),
@@ -93,7 +93,7 @@ class EmployeeAssignmentHistoryResource extends Resource
 
                 Forms\Components\Section::make('Nouvelle Affectation')
                     ->schema([
-                        Forms\Components\TextInput::make('new_position_title')
+                        Forms\Components\TextInput::make('new_position_')
                             ->label('Nouveau Poste')
                             ->required()
                             ->maxLength(255)
@@ -202,7 +202,7 @@ class EmployeeAssignmentHistoryResource extends Resource
                         if (!$record) return '—';
 
                         return match ($record->assignment_type) {
-                            'position' => $record->old_position_title ?? '—',
+                            'position' => $record->old_position_name ?? '—',
                             'service' => $record->old_service_name ?? '—',
                             'department' => $record->old_department_name ?? '—',
                             default => '—',
@@ -216,7 +216,7 @@ class EmployeeAssignmentHistoryResource extends Resource
                         if (!$record) return '—';
 
                         return match ($record->assignment_type) {
-                            'position' => $record->new_position_title ?? '—',
+                            'position' => $record->new_position_name ?? '—',
                             'service' => $record->new_service_name ?? '—',
                             'department' => $record->new_department_name ?? '—',
                             default => '—',

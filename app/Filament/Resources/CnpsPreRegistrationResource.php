@@ -69,7 +69,7 @@ class CnpsPreRegistrationResource extends Resource
                                         $set('gender', $employee->gender);
                                         $set('phone', $employee->phone);
                                         $set('email', $employee->email);
-                                        $set('position_title', $employee->position?->title);
+                                        $set('position_name', $employee->position?->name);
                                         $set('hire_date', $employee->hire_date);
                                         $set('address', $employee->address);
                                     }
@@ -220,7 +220,7 @@ class CnpsPreRegistrationResource extends Resource
 
                     Forms\Components\Wizard\Step::make('Informations Professionnelles')
                         ->schema([
-                            Forms\Components\TextInput::make('position_title')
+                            Forms\Components\TextInput::make('position_name')
                                 ->label('Poste Occupé')
                                 ->required()
                                 ->maxLength(255),
@@ -358,7 +358,7 @@ class CnpsPreRegistrationResource extends Resource
                     ->searchable()
                     ->default('—'),
 
-                Tables\Columns\TextColumn::make('position_title')
+                Tables\Columns\TextColumn::make('position_name')
                     ->label('Poste')
                     ->searchable()
                     ->toggleable(),

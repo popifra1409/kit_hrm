@@ -55,7 +55,7 @@ class SignatoryResource extends Resource
                                     $user = User::find($state);
                                     if ($user && $user->employee) {
                                         $set('full_name', $user->employee->full_name);
-                                        $set('position', $user->employee->qualification ?? $user->employee->position?->title);
+                                        $set('position', $user->employee->qualification ?? $user->employee->position?->name);
                                     }
                                 }
                             })
