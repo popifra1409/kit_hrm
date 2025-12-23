@@ -107,6 +107,7 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
                 fn(): HtmlString => new HtmlString('
         <div class="flex items-center gap-2 me-4">
+            <!-- Actions rapides existantes -->
             <a href="' . route('filament.admin.resources.employees.create') . '" 
                class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
                title="Nouvel Employé">
@@ -169,6 +170,19 @@ class AdminPanelProvider extends PanelProvider
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
+            </a>
+            
+            <!-- NOUVEAU : Bouton Vider le Cache -->
+            <div class="border-l border-gray-300 dark:border-gray-600 h-8 mx-2"></div>
+            
+            <a href="' . route('clear-cache') . '" 
+               class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition border border-red-200 dark:border-red-800"
+               title="Vider le Cache"
+               onclick="event.preventDefault(); if(confirm(\'Voulez-vous vraiment vider tout le cache ?\')) { window.location.href=this.href; }">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span class="hidden lg:inline">Cache</span>
             </a>
         </div>
     ')
