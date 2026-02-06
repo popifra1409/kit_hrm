@@ -19,6 +19,10 @@ class DatabaseSeeder extends Seeder
             PayrollItemSeeder::class,
             ProcurementTypeSeeder::class,
             SupplierSeeder::class,
+            DocumentCategorySeeder::class,
+            InitializeEmployeeEchelonsSeeder::class,
+            NotificationTemplateSeeder::class,
+            ServiceSeeder::class,
         ]);
     }
 }
