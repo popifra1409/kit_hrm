@@ -5,7 +5,7 @@ use App\Http\Controllers\PayrollPDFController;
 use App\Http\Controllers\ClearCacheController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('welcome-hrm');
 });
 
 Route::middleware(['auth'])->group(function () {
