@@ -85,7 +85,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make('🏢 Structure Organisationnelle')
-                    ->collapsed(false),
+                    ->collapsed(true),
                 NavigationGroup::make('👥 Gestion du Personnel')
                     ->collapsed(true),
                 NavigationGroup::make('🏖️ Congés & Absences')
