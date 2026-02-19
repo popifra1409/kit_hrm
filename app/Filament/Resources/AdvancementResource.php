@@ -247,7 +247,7 @@ class AdvancementResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
+        return 5;
     }
 
     public static function getNavigationIcon(): ?string

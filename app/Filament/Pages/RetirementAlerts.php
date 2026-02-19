@@ -19,7 +19,7 @@ class RetirementAlerts extends Page implements HasTable
     protected static ?string $navigationLabel = 'Alertes Retraites';
     protected static ?string $title = 'Alertes et Suivi des Retraites';
     protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 12;
 
     protected static string $view = 'filament.pages.retirement-alerts';
 

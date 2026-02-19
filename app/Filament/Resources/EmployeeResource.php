@@ -453,6 +453,7 @@ class EmployeeResource extends Resource
         return [
             RelationManagers\AssignmentHistoryRelationManager::class,
             RelationManagers\AdvancementHistoryRelationManager::class,
+            RelationManagers\DependentsRelationManager::class,
         ];
     }
 

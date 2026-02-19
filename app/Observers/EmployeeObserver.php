@@ -5,11 +5,24 @@ namespace App\Observers;
 use App\Models\Employee;
 use App\Models\EmployeeAdvancementHistory;
 use App\Services\NotificationService;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class EmployeeObserver
 {
     // Variable pour éviter les boucles infinies
     protected static $updating = false;
+    protected static $generatingQr = false;
+
+    /**
+     * Handle the Employee "created" event.
+     */
+    public function created(Employee $employee): void
+    {
+        // Générer le QR Code automatiquement à la création
+        $this->generateQrCode($employee);
+    }
 
     /**
      * Handle the Employee "updating" event (avant la modification).
@@ -42,6 +55,88 @@ class EmployeeObserver
         // Vérifier changement de catégorie
         if (isset($dirty['category']) && $original['category'] != $dirty['category']) {
             $this->recordCategoryChange($employee, $original, $dirty);
+        }
+    }
+
+    /**
+     * Handle the Employee "updated" event (après la modification).
+     */
+    public function updated(Employee $employee): void
+    {
+        // Régénérer le QR Code si matricule ou date de naissance changent
+        if ($employee->wasChanged(['matricule', 'birth_date'])) {
+            $this->generateQrCode($employee);
+        }
+    }
+
+    /**
+     * Générer le QR Code de l'employé
+     */
+    protected function generateQrCode(Employee $employee): void
+    {
+        // Éviter les boucles infinies
+        if (self::$generatingQr) {
+            return;
+        }
+
+        // Vérifier que les données nécessaires sont présentes
+        if (!$employee->matricule) {
+            Log::warning('Impossible de générer le QR Code : matricule manquant', [
+                'employee_id' => $employee->id
+            ]);
+            return;
+        }
+
+        try {
+            self::$generatingQr = true;
+
+            // Données à encoder dans le QR Code
+            $data = [
+                'type' => 'employee',
+                'matricule' => $employee->matricule,
+                'birth_date' => $employee->birth_date?->format('d/m/Y'),
+                'full_name' => $employee->full_name,
+                'hire_date' => $employee->hire_date?->format('d/m/Y'),
+                'department' => $employee->department?->name,
+                'service' => $employee->service?->name,
+                'position' => $employee->position?->name,
+                'generated_at' => now()->format('d/m/Y H:i:s'),
+            ];
+
+            // Encodage JSON des données
+            $jsonData = json_encode($data);
+
+            // Générer l'image QR Code
+            $filename = 'qrcodes/employee-' . $employee->matricule . '.png';
+
+            $qrCode = QrCode::format('png')
+                ->size(300)
+                ->margin(1)
+                ->errorCorrection('H') // Haute correction d'erreur
+                ->generate($jsonData);
+
+            // Sauvegarder l'image
+            Storage::disk('public')->put($filename, $qrCode);
+
+            // Mettre à jour l'employé avec saveQuietly pour éviter la récursion
+            $employee->qr_code_path = $filename;
+            $employee->qr_code_data = $jsonData;
+            $employee->saveQuietly();
+
+            Log::info('QR Code généré avec succès', [
+                'employee_id' => $employee->id,
+                'matricule' => $employee->matricule,
+                'qr_code_path' => $filename
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur génération QR Code: ' . $e->getMessage(), [
+                'employee_id' => $employee->id,
+                'matricule' => $employee->matricule,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        } finally {
+            self::$generatingQr = false;
         }
     }
 
@@ -156,7 +251,7 @@ class EmployeeObserver
                     'Voir les détails'
                 );
             } catch (\Exception $e) {
-                \Log::error('Erreur envoi notification: ' . $e->getMessage());
+                Log::error('Erreur envoi notification: ' . $e->getMessage());
             }
         }
     }

@@ -18,7 +18,7 @@ class ImportEmployees extends Page implements HasForms
     protected static ?string $navigationLabel = 'Importer Employés';
     protected static ?string $title = 'Importer des Employés depuis Excel';
     protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 2;
 
     protected static string $view = 'filament.pages.import-employees';
 

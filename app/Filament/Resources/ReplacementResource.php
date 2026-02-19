@@ -33,7 +33,7 @@ class ReplacementResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 8;
     }
 
     public static function form(Form $form): Form

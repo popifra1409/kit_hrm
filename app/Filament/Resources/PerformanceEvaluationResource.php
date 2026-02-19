@@ -33,7 +33,7 @@ class PerformanceEvaluationResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 8;
+        return 11;
     }
 
     public static function form(Form $form): Form
