@@ -65,6 +65,8 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 \App\Filament\Widgets\UserNotificationsWidget::class,
+                \App\Filament\Widgets\HealthCoverageStatsWidget::class,
+                //\App\Filament\Widgets\PendingReturnsWidget::class,
                 \App\Filament\Widgets\AdvancementAlertsWidget::class,
                 //Widgets\AccountWidget::class,
                 //Widgets\FilamentInfoWidget::class,

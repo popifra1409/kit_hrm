@@ -23,7 +23,7 @@ class Employee extends Model
         'department_id',
         'position_id',
         'current_service_id',
-        'service_id', 
+        'service_id',
         'employment_type',
         'contract_type_id',
         'personnel_type',
@@ -76,6 +76,39 @@ class Employee extends Model
         );
     }
 
+    // Relations pour le module assurance santé
+    public function dependents()
+    {
+        return $this->hasMany(Dependent::class);
+    }
+
+    public function employeeCards()
+    {
+        return $this->hasMany(EmployeeCard::class);
+    }
+
+    // Méthodes helper
+    public function hasActiveHealthCard(): bool
+    {
+        return $this->employeeCards()
+            ->where('card_type', 'health_coverage')
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    public function hasActiveProfessionalCard(): bool
+    {
+        return $this->employeeCards()
+            ->where('card_type', 'professional')
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    public function getActiveDependentsCount(): int
+    {
+        return $this->dependents()->where('is_active', true)->count();
+    }
+
     // Relations
     public function department()
     {
@@ -92,7 +125,7 @@ class Employee extends Model
         return $this->belongsTo(Service::class, 'current_service_id');
     }
 
-     public function service()
+    public function service()
     {
         return $this->belongsTo(Service::class);
     }

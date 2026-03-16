@@ -73,6 +73,50 @@ class EmployeeResource extends Resource
                     ])
                     ->columns(2),
 
+                Forms\Components\Section::make('QR Code & Biométrie')
+                    ->schema([
+                        Forms\Components\Placeholder::make('qr_code_preview')
+                            ->label('QR Code de l\'Employé')
+                            ->content(function ($record) {
+                                if ($record && $record->qr_code_path) {
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="flex flex-col items-center gap-3">
+                            <img src="' . \Storage::url($record->qr_code_path) . '" 
+                                 alt="QR Code" 
+                                 class="w-48 h-48 border-2 border-gray-300 rounded-lg shadow-sm">
+                            <div class="text-sm text-gray-600">
+                                <strong>Matricule:</strong> ' . $record->matricule . '<br>
+                                <strong>Généré le:</strong> ' . $record->updated_at->format('d/m/Y à H:i') . '
+                            </div>
+                        </div>'
+                                    );
+                                }
+                                return 'Le QR Code sera généré automatiquement lors de la création';
+                            })
+                            ->columnSpanFull(),
+
+                        Forms\Components\Textarea::make('qr_code_data')
+                            ->label('Données encodées')
+                            ->rows(3)
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn($record) => $record && $record->qr_code_data),
+
+                        Forms\Components\Toggle::make('fingerprint_enrolled')
+                            ->label('Empreintes digitales enregistrées')
+                            ->disabled()
+                            ->dehydrated(false),
+
+                        Forms\Components\Placeholder::make('fingerprint_enrolled_at')
+                            ->label('Date d\'enregistrement biométrique')
+                            ->content(fn($record) => $record && $record->fingerprint_enrolled_at
+                                ? $record->fingerprint_enrolled_at->format('d/m/Y à H:i')
+                                : 'Non enregistré'),
+                    ])
+                    ->columns(2)
+                    ->collapsible()
+                    ->visible(fn($context) => $context === 'edit'),
+
                 Forms\Components\Section::make('Informations Professionnelles')
                     ->schema([
                         Forms\Components\TextInput::make('qualification')
@@ -361,6 +405,13 @@ class EmployeeResource extends Resource
                     ->searchable(['first_name', 'last_name'])
                     ->sortable(),
 
+                Tables\Columns\ImageColumn::make('qr_code_path')
+                    ->label('QR Code')
+                    ->disk('public')
+                    ->width(40)
+                    ->height(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('qualification')
                     ->label('Qualification')
                     ->searchable()
@@ -438,6 +489,57 @@ class EmployeeResource extends Resource
                     ->relationship('currentService', 'name'),
             ])
             ->actions([
+                Tables\Actions\Action::make('generate_professional_card')
+                    ->label('Carte Pro')
+                    ->icon('heroicon-o-identification')
+                    ->color('info')
+                    ->visible(fn($record) => !$record->hasActiveProfessionalCard())
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $card = \App\Models\EmployeeCard::create([
+                            'employee_id' => $record->id,
+                            'card_type' => 'professional',
+                            'issue_date' => now(),
+                            'expiry_date' => now()->addYears(5),
+                            'status' => 'issued',
+                        ]);
+
+                        $card->generateCardNumber();
+                        $card->generateQrCode();
+                        $card->activate();
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Carte professionnelle créée')
+                            ->success()
+                            ->body('N° ' . $card->card_number)
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('generate_health_card')
+                    ->label('Carte Santé')
+                    ->icon('heroicon-o-heart')
+                    ->color('success')
+                    ->visible(fn($record) => !$record->hasActiveHealthCard())
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $card = \App\Models\EmployeeCard::create([
+                            'employee_id' => $record->id,
+                            'card_type' => 'health_coverage',
+                            'issue_date' => now(),
+                            'expiry_date' => now()->addYear(),
+                            'status' => 'issued',
+                        ]);
+
+                        $card->generateCardNumber();
+                        $card->generateQrCode();
+                        $card->activate();
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Carte de prise en charge créée')
+                            ->success()
+                            ->body('N° ' . $card->card_number)
+                            ->send();
+                    }),
                 Tables\Actions\ViewAction::make()->label('Voir'),
                 Tables\Actions\EditAction::make()->label('Modifier'),
             ])
