@@ -42,7 +42,7 @@ class SalaryGridResource extends Resource
                             ->required()
                             ->numeric()
                             ->prefix('FCFA')
-                            ->step(100),
+                            ->step(1),
                     ])
                     ->columns(3),
 
