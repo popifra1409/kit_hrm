@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -18,6 +20,15 @@ class RolesAndPermissionsSeeder extends Seeder
         // ============================================
 
         $permissions = [
+            // === SUPER ADMIN (permissions critiques) ===
+            ['name' => 'manage_super_admin', 'module' => 'system', 'description' => 'Gérer le super administrateur'],
+            ['name' => 'manage_admins', 'module' => 'system', 'description' => 'Gérer les administrateurs'],
+            ['name' => 'manage_all_roles', 'module' => 'system', 'description' => 'Gérer tous les rôles'],
+            ['name' => 'manage_all_permissions', 'module' => 'system', 'description' => 'Gérer toutes les permissions'],
+            ['name' => 'access_system_logs', 'module' => 'system', 'description' => 'Accéder aux logs système'],
+            ['name' => 'manage_database', 'module' => 'system', 'description' => 'Gérer la base de données'],
+            ['name' => 'manage_backups', 'module' => 'system', 'description' => 'Gérer les sauvegardes'],
+
             // === UTILISATEURS ===
             ['name' => 'view_users', 'module' => 'users', 'description' => 'Voir les utilisateurs'],
             ['name' => 'create_users', 'module' => 'users', 'description' => 'Créer des utilisateurs'],
@@ -89,6 +100,16 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'delete_contracts', 'module' => 'contracts', 'description' => 'Supprimer les contrats'],
             ['name' => 'renew_contracts', 'module' => 'contracts', 'description' => 'Renouveler les contrats'],
 
+            // === ASSURANCE SANTÉ & AYANTS DROIT ===
+            ['name' => 'view_dependents', 'module' => 'health', 'description' => 'Voir les ayants droit'],
+            ['name' => 'create_dependents', 'module' => 'health', 'description' => 'Créer des ayants droit'],
+            ['name' => 'edit_dependents', 'module' => 'health', 'description' => 'Modifier les ayants droit'],
+            ['name' => 'delete_dependents', 'module' => 'health', 'description' => 'Supprimer les ayants droit'],
+            ['name' => 'issue_health_cards', 'module' => 'health', 'description' => 'Émettre cartes santé'],
+            ['name' => 'activate_health_cards', 'module' => 'health', 'description' => 'Activer cartes santé'],
+            ['name' => 'view_employee_cards', 'module' => 'health', 'description' => 'Voir les cartes employés'],
+            ['name' => 'manage_employee_cards', 'module' => 'health', 'description' => 'Gérer les cartes employés'],
+
             // === RAPPORTS ===
             ['name' => 'view_reports', 'module' => 'reports', 'description' => 'Voir les rapports'],
             ['name' => 'generate_reports', 'module' => 'reports', 'description' => 'Générer des rapports'],
@@ -99,6 +120,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'edit_settings', 'module' => 'settings', 'description' => 'Modifier les paramètres'],
             ['name' => 'manage_roles', 'module' => 'settings', 'description' => 'Gérer les rôles'],
             ['name' => 'manage_permissions', 'module' => 'settings', 'description' => 'Gérer les permissions'],
+            ['name' => 'manage_cache', 'module' => 'settings', 'description' => 'Gérer le cache'],
 
             // === STRUCTURE ORGANISATIONNELLE ===
             ['name' => 'manage_departments', 'module' => 'structure', 'description' => 'Gérer les départements'],
@@ -121,13 +143,26 @@ class RolesAndPermissionsSeeder extends Seeder
         // CRÉATION DES RÔLES ET ATTRIBUTION
         // ============================================
 
-        // 1. ADMIN - Accès complet
+        // 0. SUPER ADMIN - Accès absolu (un seul dans le système)
+        $superAdmin = Role::firstOrCreate(['name' => 'super_admin'], ['guard_name' => 'web']);
+        $superAdmin->syncPermissions(Permission::all()); // TOUTES les permissions
+
+        // 1. ADMIN - Accès complet SAUF gestion super_admin
         $admin = Role::firstOrCreate(['name' => 'admin'], ['guard_name' => 'web']);
-        $admin->syncPermissions(Permission::all());
+        $adminPermissions = Permission::whereNotIn('name', [
+            'manage_super_admin',
+            'manage_admins',
+            'manage_all_roles',
+            'access_system_logs',
+            'manage_database',
+        ])->pluck('name')->toArray();
+        $admin->syncPermissions($adminPermissions);
 
         // 2. DRH - Directeur des Ressources Humaines
         $drh = Role::firstOrCreate(['name' => 'drh'], ['guard_name' => 'web']);
         $drh->syncPermissions([
+            // Utilisateurs (lecture seule)
+            'view_users',
             // Employés
             'view_employees',
             'create_employees',
@@ -164,6 +199,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'create_trainings',
             'edit_trainings',
             'manage_training_participants',
+            // Santé
+            'view_dependents',
+            'create_dependents',
+            'edit_dependents',
+            'issue_health_cards',
+            'activate_health_cards',
+            'view_employee_cards',
+            'manage_employee_cards',
             // Structure
             'manage_departments',
             'manage_services',
@@ -172,6 +215,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_reports',
             'generate_reports',
             'export_reports',
+            // Paramètres (limité)
+            'view_settings',
+            'manage_cache',
         ]);
 
         // 3. DAF - Directeur Administratif et Financier
@@ -261,8 +307,37 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_trainings',
         ]);
 
+        // ============================================
+        // CRÉATION DU SUPER ADMIN PAR DÉFAUT
+        // ============================================
+
+        $this->createSuperAdminUser();
+
         echo "✅ Rôles et permissions créés avec succès!\n";
-        echo "   - Rôles créés: admin, drh, daf, dg, chef_service, employee\n";
+        echo "   - Rôles créés: super_admin, admin, drh, daf, dg, chef_service, employee\n";
         echo "   - " . Permission::count() . " permissions créées\n";
+        echo "   - Super Admin créé: adminkit@gmail.com\n";
+    }
+
+    /**
+     * Créer l'utilisateur Super Admin par défaut
+     */
+    protected function createSuperAdminUser(): void
+    {
+        $superAdminUser = User::firstOrCreate(
+            ['email' => 'adminkit@gmail.com'],
+            [
+                'name' => 'Super Administrateur',
+                'password' => Hash::make('Admin@2025'), // Changez ce mot de passe!
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // Retirer tous les autres rôles et assigner super_admin
+        $superAdminUser->syncRoles(['super_admin']);
+
+        echo "   ⚠️  IMPORTANT: Changez le mot de passe du Super Admin!\n";
+        echo "   Email: adminkit@gmail.com\n";
+        echo "   Password: Admin@2025\n";
     }
 }

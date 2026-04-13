@@ -17,11 +17,13 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'is_super_admin',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'is_super_admin' => 'boolean',
     ];
 
     protected function casts(): array
@@ -35,5 +37,16 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         return true; // Pour le moment, on autorise tous les utilisateurs
+    }
+
+    // Méthodes helper
+    public function isSuperAdmin(): bool
+    {
+        return $this->is_super_admin || $this->hasRole('super_admin');
+    }
+
+    public function canManageAdmins(): bool
+    {
+        return $this->hasPermissionTo('manage_admins') || $this->isSuperAdmin();
     }
 }

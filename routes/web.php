@@ -17,7 +17,8 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['web', 'auth'])->group(function () {
+    // Route cache - seulement admin et drh
     Route::get('/clear-cache', ClearCacheController::class)
         ->name('clear-cache')
-        ->middleware('role:admin|drh');
+        ->middleware('can:manage_cache');
 });
