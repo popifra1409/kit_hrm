@@ -4,20 +4,13 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use App\Models\Direction;
-use App\Models\SubDirection;
 use App\Models\Department;
-use App\Models\Service;
-use App\Models\Sector;
-use App\Models\Employee;
 
 class Organigramme extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
-
     protected static string $view = 'filament.pages.organigramme';
-
     protected static ?string $navigationGroup = '🏢 Structure Organisationnelle';
-
     protected static ?int $navigationSort = 10;
 
     public static function getNavigationLabel(): string
@@ -25,22 +18,20 @@ class Organigramme extends Page
         return 'Organigramme';
     }
 
-    /**
-     * Préparer les données pour l'organigramme D3.js
-     */
     public function getOrgData(): array
     {
-        // Structure hiérarchique complète
+        // Racine : Hôpital CHUY
         $data = [
-            'name' => 'Direction Générale',
-            'title' => 'DG',
+            'name' => \App\Models\SystemSetting::get('hospital_name', 'CHUY'),
+            'title' => 'HÔPITAL',
+            'type' => 'root',
             'children' => [],
         ];
 
-        // 1. Charger les Directions
+        // 1. DIRECTIONS ADMINISTRATIVES
         $directions = Direction::with(['subDirections.services', 'director'])
             ->where('is_active', true)
-            ->orderBy('order')  // CHANGÉ ICI
+            ->orderBy('order')
             ->get();
 
         foreach ($directions as $direction) {
@@ -52,7 +43,7 @@ class Organigramme extends Page
                 'children' => [],
             ];
 
-            // 2. Sous-Directions
+            // Sous-Directions
             foreach ($direction->subDirections()->orderBy('order')->get() as $subDir) {
                 $subDirNode = [
                     'name' => $subDir->name,
@@ -62,7 +53,7 @@ class Organigramme extends Page
                     'children' => [],
                 ];
 
-                // 3. Services administratifs
+                // Services administratifs
                 foreach ($subDir->services()->orderBy('order')->get() as $service) {
                     $subDirNode['children'][] = [
                         'name' => $service->name,
@@ -78,10 +69,10 @@ class Organigramme extends Page
             $data['children'][] = $directionNode;
         }
 
-        // 4. Départements Médicaux
+        // 2. DÉPARTEMENTS MÉDICAUX (au même niveau que les directions)
         $departments = Department::with(['services', 'departmentHead'])
             ->where('is_active', true)
-            ->orderBy('order')  // CHANGÉ ICI
+            ->orderBy('order')
             ->get();
 
         foreach ($departments as $dept) {
@@ -109,13 +100,13 @@ class Organigramme extends Page
         return $data;
     }
 
-    /**
-     * Données pour le composant Livewire
-     */
     protected function getViewData(): array
     {
+        $orgData = $this->getOrgData();
+
         return [
-            'orgData' => json_encode($this->getOrgData()),
+            'orgData' => $orgData,
+            'rawData' => $orgData,
         ];
     }
 }
