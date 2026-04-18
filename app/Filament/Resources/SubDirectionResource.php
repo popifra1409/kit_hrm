@@ -2,28 +2,29 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DepartmentResource\Pages;
-use App\Models\Department;
+use App\Filament\Resources\SubDirectionResource\Pages;
+use App\Models\SubDirection;
+use App\Models\Direction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class DepartmentResource extends Resource
+class SubDirectionResource extends Resource
 {
-    protected static ?string $model = Department::class;
+    protected static ?string $model = SubDirection::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-building-library';
+    protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
     public static function getModelLabel(): string
     {
-        return 'Département Médical';
+        return 'Sous-Direction';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'Départements Médicaux';
+        return 'Sous-Directions';
     }
 
     public static function getNavigationGroup(): ?string
@@ -33,26 +34,33 @@ class DepartmentResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Départements Médicaux';
+        return 2;
     }
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
+                Forms\Components\Section::make('Rattachement')
+                    ->schema([
+                        Forms\Components\Select::make('direction_id')
+                            ->label('Direction')
+                            ->relationship('direction', 'name')
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->helperText('Direction de rattachement')
+                            ->columnSpanFull(),
+                    ]),
+
                 Forms\Components\Section::make('Identification')
-                    ->description('Un département médical est équivalent à une Sous-Direction')
                     ->schema([
                         Forms\Components\TextInput::make('name')
-                            ->label('Nom du Département')
+                            ->label('Nom de la Sous-Direction')
                             ->required()
                             ->maxLength(255)
-                            ->placeholder('Département de Médecine Interne')
+                            ->placeholder('Sous-Direction des Finances')
                             ->columnSpan(2),
 
                         Forms\Components\TextInput::make('code')
@@ -60,45 +68,28 @@ class DepartmentResource extends Resource
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(50)
-                            ->placeholder('DMI')
-                            ->helperText('Code unique du département'),
-                    ])
-                    ->columns(3),
+                            ->placeholder('SDF')
+                            ->helperText('Code unique'),
 
-                Forms\Components\Section::make('Type & Classification')
-                    ->schema([
-                        Forms\Components\Select::make('type')
-                            ->label('Type de Département')
-                            ->options([
-                                'medical' => '🏥 Médecine',
-                                'surgical' => '⚕️ Chirurgie',
-                                'diagnostic' => '🔬 Diagnostic',
-                                'support' => '🛠️ Support',
-                            ])
-                            ->default('medical')
-                            ->required()
-                            ->native(false)
-                            ->columnSpan(2),
-
-                        Forms\Components\Placeholder::make('hierarchical_level_label')
-                            ->label('Niveau Hiérarchique')
-                            ->content('Sous-Direction (Département Médical)')
-                            ->helperText('Les départements médicaux sont au niveau Sous-Direction'),
+                        Forms\Components\TextInput::make('acronym')
+                            ->label('Sigle/Acronyme')
+                            ->maxLength(20)
+                            ->placeholder('SDF'),
                     ])
                     ->columns(3),
 
                 Forms\Components\Section::make('Responsabilité')
                     ->schema([
-                        Forms\Components\Select::make('department_head_id')
-                            ->label('Chef de Département')
-                            ->relationship('departmentHead', 'matricule')
+                        Forms\Components\Select::make('sub_director_id')
+                            ->label('Sous-Directeur')
+                            ->relationship('subDirector', 'matricule')
                             ->searchable()
                             ->preload()
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) =>
                                 $record->full_name . ' (' . $record->matricule . ') - ' . ($record->position?->name ?? 'N/A')
                             )
-                            ->helperText('Chef de Département (équivalent Sous-Directeur)')
+                            ->helperText('Sélectionnez le Sous-Directeur responsable')
                             ->columnSpanFull(),
                     ]),
 
@@ -108,7 +99,7 @@ class DepartmentResource extends Resource
                             ->label('Description')
                             ->rows(3)
                             ->maxLength(65535)
-                            ->placeholder('Missions et attributions du département...')
+                            ->placeholder('Missions et attributions...')
                             ->columnSpanFull(),
                     ])
                     ->collapsible(),
@@ -128,7 +119,7 @@ class DepartmentResource extends Resource
                         Forms\Components\TextInput::make('location')
                             ->label('Localisation')
                             ->maxLength(255)
-                            ->placeholder('Pavillon X, Étage Y'),
+                            ->placeholder('Bâtiment B, Bureau 205'),
                     ])
                     ->columns(3)
                     ->collapsible(),
@@ -138,11 +129,10 @@ class DepartmentResource extends Resource
                         Forms\Components\TextInput::make('order')
                             ->label('Ordre d\'affichage')
                             ->numeric()
-                            ->default(0)
-                            ->helperText('Ordre de tri dans les listes'),
+                            ->default(0),
 
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Actif')
+                            ->label('Active')
                             ->default(true)
                             ->inline(false),
                     ])
@@ -155,13 +145,15 @@ class DepartmentResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('order')
-                    ->label('#')
+                Tables\Columns\TextColumn::make('direction.name')
+                    ->label('Direction')
+                    ->searchable()
                     ->sortable()
-                    ->width(50),
+                    ->badge()
+                    ->color('primary'),
 
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Département')
+                    ->label('Sous-Direction')
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
@@ -170,20 +162,10 @@ class DepartmentResource extends Resource
                     ->label('Code')
                     ->searchable()
                     ->badge()
-                    ->color('primary'),
+                    ->color('info'),
 
-                Tables\Columns\BadgeColumn::make('type')
-                    ->label('Type')
-                    ->formatStateUsing(fn($record) => $record->type_label)
-                    ->colors([
-                        'info' => 'medical',
-                        'danger' => 'surgical',
-                        'warning' => 'diagnostic',
-                        'success' => 'support',
-                    ]),
-
-                Tables\Columns\TextColumn::make('departmentHead.full_name')
-                    ->label('Chef de Département')
+                Tables\Columns\TextColumn::make('subDirector.full_name')
+                    ->label('Sous-Directeur')
                     ->searchable()
                     ->toggleable(),
 
@@ -193,45 +175,26 @@ class DepartmentResource extends Resource
                     ->badge()
                     ->color('success'),
 
-                Tables\Columns\TextColumn::make('total_employee_count')
-                    ->label('Employés')
-                    ->getStateUsing(fn($record) => $record->total_employee_count)
-                    ->badge()
-                    ->color('info')
-                    ->toggleable(),
-
-                Tables\Columns\TextColumn::make('total_bed_capacity')
-                    ->label('Capacité Lits')
-                    ->getStateUsing(fn($record) => $record->total_bed_capacity)
-                    ->suffix(' lits')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('phone')
+                    ->label('Téléphone')
+                    ->icon('heroicon-o-phone')
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Actif')
+                    ->label('Active')
                     ->boolean()
                     ->trueColor('success')
                     ->falseColor('danger'),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('type')
-                    ->label('Type')
-                    ->options([
-                        'medical' => 'Médecine',
-                        'surgical' => 'Chirurgie',
-                        'diagnostic' => 'Diagnostic',
-                        'support' => 'Support',
-                    ]),
+                Tables\Filters\SelectFilter::make('direction_id')
+                    ->label('Direction')
+                    ->relationship('direction', 'name')
+                    ->searchable()
+                    ->preload(),
 
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Actif')
-                    ->placeholder('Tous')
-                    ->trueLabel('Actifs uniquement')
-                    ->falseLabel('Inactifs uniquement'),
-
-                Tables\Filters\Filter::make('has_head')
-                    ->label('Avec Chef de Département')
-                    ->query(fn($query) => $query->whereNotNull('department_head_id')),
+                    ->label('Active'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Voir'),
@@ -246,19 +209,12 @@ class DepartmentResource extends Resource
             ->defaultSort('order');
     }
 
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
-    }
-
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDepartments::route('/'),
-            'create' => Pages\CreateDepartment::route('/create'),
-            'edit' => Pages\EditDepartment::route('/{record}/edit'),
+            'index' => Pages\ListSubDirections::route('/'),
+            'create' => Pages\CreateSubDirection::route('/create'),
+            'edit' => Pages\EditSubDirection::route('/{record}/edit'),
         ];
     }
 }

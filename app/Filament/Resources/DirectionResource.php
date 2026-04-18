@@ -2,28 +2,29 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DepartmentResource\Pages;
-use App\Models\Department;
+use App\Filament\Resources\DirectionResource\Pages;
+use App\Models\Direction;
+use App\Models\Employee;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class DepartmentResource extends Resource
+class DirectionResource extends Resource
 {
-    protected static ?string $model = Department::class;
+    protected static ?string $model = Direction::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-building-library';
+    protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
     public static function getModelLabel(): string
     {
-        return 'Département Médical';
+        return 'Direction';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'Départements Médicaux';
+        return 'Directions';
     }
 
     public static function getNavigationGroup(): ?string
@@ -33,12 +34,7 @@ class DepartmentResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Départements Médicaux';
+        return 1;
     }
 
     public static function form(Form $form): Form
@@ -46,13 +42,12 @@ class DepartmentResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Identification')
-                    ->description('Un département médical est équivalent à une Sous-Direction')
                     ->schema([
                         Forms\Components\TextInput::make('name')
-                            ->label('Nom du Département')
+                            ->label('Nom de la Direction')
                             ->required()
                             ->maxLength(255)
-                            ->placeholder('Département de Médecine Interne')
+                            ->placeholder('Direction des Ressources Humaines')
                             ->columnSpan(2),
 
                         Forms\Components\TextInput::make('code')
@@ -60,47 +55,42 @@ class DepartmentResource extends Resource
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(50)
-                            ->placeholder('DMI')
-                            ->helperText('Code unique du département'),
-                    ])
-                    ->columns(3),
+                            ->placeholder('DRH')
+                            ->helperText('Code unique pour identifier la direction'),
 
-                Forms\Components\Section::make('Type & Classification')
-                    ->schema([
-                        Forms\Components\Select::make('type')
-                            ->label('Type de Département')
-                            ->options([
-                                'medical' => '🏥 Médecine',
-                                'surgical' => '⚕️ Chirurgie',
-                                'diagnostic' => '🔬 Diagnostic',
-                                'support' => '🛠️ Support',
-                            ])
-                            ->default('medical')
-                            ->required()
-                            ->native(false)
-                            ->columnSpan(2),
-
-                        Forms\Components\Placeholder::make('hierarchical_level_label')
-                            ->label('Niveau Hiérarchique')
-                            ->content('Sous-Direction (Département Médical)')
-                            ->helperText('Les départements médicaux sont au niveau Sous-Direction'),
+                        Forms\Components\TextInput::make('acronym')
+                            ->label('Sigle/Acronyme')
+                            ->maxLength(20)
+                            ->placeholder('DRH'),
                     ])
                     ->columns(3),
 
                 Forms\Components\Section::make('Responsabilité')
                     ->schema([
-                        Forms\Components\Select::make('department_head_id')
-                            ->label('Chef de Département')
-                            ->relationship('departmentHead', 'matricule')
+                        Forms\Components\Select::make('director_id')
+                            ->label('Directeur')
+                            ->relationship('director', 'matricule')
                             ->searchable()
                             ->preload()
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) =>
                                 $record->full_name . ' (' . $record->matricule . ') - ' . ($record->position?->name ?? 'N/A')
                             )
-                            ->helperText('Chef de Département (équivalent Sous-Directeur)')
-                            ->columnSpanFull(),
-                    ]),
+                            ->helperText('Sélectionnez le Directeur responsable')
+                            ->columnSpan(2),
+
+                        Forms\Components\Select::make('type')
+                            ->label('Type')
+                            ->options([
+                                'administrative' => '🏢 Administrative',
+                                'technique' => '⚙️ Technique',
+                                'support' => '🛠️ Support',
+                            ])
+                            ->default('administrative')
+                            ->required()
+                            ->native(false),
+                    ])
+                    ->columns(3),
 
                 Forms\Components\Section::make('Description')
                     ->schema([
@@ -108,7 +98,7 @@ class DepartmentResource extends Resource
                             ->label('Description')
                             ->rows(3)
                             ->maxLength(65535)
-                            ->placeholder('Missions et attributions du département...')
+                            ->placeholder('Missions et attributions de la direction...')
                             ->columnSpanFull(),
                     ])
                     ->collapsible(),
@@ -128,7 +118,7 @@ class DepartmentResource extends Resource
                         Forms\Components\TextInput::make('location')
                             ->label('Localisation')
                             ->maxLength(255)
-                            ->placeholder('Pavillon X, Étage Y'),
+                            ->placeholder('Bâtiment A, 2ème étage'),
                     ])
                     ->columns(3)
                     ->collapsible(),
@@ -142,7 +132,7 @@ class DepartmentResource extends Resource
                             ->helperText('Ordre de tri dans les listes'),
 
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Actif')
+                            ->label('Active')
                             ->default(true)
                             ->inline(false),
                     ])
@@ -161,7 +151,7 @@ class DepartmentResource extends Resource
                     ->width(50),
 
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Département')
+                    ->label('Direction')
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
@@ -170,45 +160,45 @@ class DepartmentResource extends Resource
                     ->label('Code')
                     ->searchable()
                     ->badge()
-                    ->color('primary'),
+                    ->color('info'),
 
                 Tables\Columns\BadgeColumn::make('type')
                     ->label('Type')
-                    ->formatStateUsing(fn($record) => $record->type_label)
+                    ->formatStateUsing(fn($state) => match ($state) {
+                        'administrative' => '🏢 Administrative',
+                        'technique' => '⚙️ Technique',
+                        'support' => '🛠️ Support',
+                        default => $state,
+                    })
                     ->colors([
-                        'info' => 'medical',
-                        'danger' => 'surgical',
-                        'warning' => 'diagnostic',
+                        'primary' => 'administrative',
+                        'warning' => 'technique',
                         'success' => 'support',
                     ]),
 
-                Tables\Columns\TextColumn::make('departmentHead.full_name')
-                    ->label('Chef de Département')
+                Tables\Columns\TextColumn::make('director.full_name')
+                    ->label('Directeur')
                     ->searchable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('services_count')
-                    ->label('Services')
-                    ->counts('services')
+                Tables\Columns\TextColumn::make('sub_directions_count')
+                    ->label('Sous-Directions')
+                    ->counts('subDirections')
                     ->badge()
                     ->color('success'),
 
-                Tables\Columns\TextColumn::make('total_employee_count')
-                    ->label('Employés')
-                    ->getStateUsing(fn($record) => $record->total_employee_count)
-                    ->badge()
-                    ->color('info')
-                    ->toggleable(),
+                Tables\Columns\TextColumn::make('phone')
+                    ->label('Téléphone')
+                    ->icon('heroicon-o-phone')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('total_bed_capacity')
-                    ->label('Capacité Lits')
-                    ->getStateUsing(fn($record) => $record->total_bed_capacity)
-                    ->suffix(' lits')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('email')
+                    ->label('Email')
+                    ->icon('heroicon-o-envelope')
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Actif')
+                    ->label('Active')
                     ->boolean()
                     ->trueColor('success')
                     ->falseColor('danger'),
@@ -217,21 +207,16 @@ class DepartmentResource extends Resource
                 Tables\Filters\SelectFilter::make('type')
                     ->label('Type')
                     ->options([
-                        'medical' => 'Médecine',
-                        'surgical' => 'Chirurgie',
-                        'diagnostic' => 'Diagnostic',
+                        'administrative' => 'Administrative',
+                        'technique' => 'Technique',
                         'support' => 'Support',
                     ]),
 
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Actif')
-                    ->placeholder('Tous')
-                    ->trueLabel('Actifs uniquement')
-                    ->falseLabel('Inactifs uniquement'),
-
-                Tables\Filters\Filter::make('has_head')
-                    ->label('Avec Chef de Département')
-                    ->query(fn($query) => $query->whereNotNull('department_head_id')),
+                    ->label('Active')
+                    ->placeholder('Toutes')
+                    ->trueLabel('Actives uniquement')
+                    ->falseLabel('Inactives uniquement'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Voir'),
@@ -256,9 +241,9 @@ class DepartmentResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDepartments::route('/'),
-            'create' => Pages\CreateDepartment::route('/create'),
-            'edit' => Pages\EditDepartment::route('/{record}/edit'),
+            'index' => Pages\ListDirections::route('/'),
+            'create' => Pages\CreateDirection::route('/create'),
+            'edit' => Pages\EditDirection::route('/{record}/edit'),
         ];
     }
 }

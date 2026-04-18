@@ -11,7 +11,6 @@ class EmployeeHierarchy extends Model
 
     protected $fillable = [
         'employee_id',
-        'organization_level_id',
         'superior_id',
         'department_id',
         'medical_department_id',
@@ -33,10 +32,6 @@ class EmployeeHierarchy extends Model
         return $this->belongsTo(Employee::class);
     }
 
-    public function organizationLevel()
-    {
-        return $this->belongsTo(OrganizationLevel::class);
-    }
 
     public function superior()
     {

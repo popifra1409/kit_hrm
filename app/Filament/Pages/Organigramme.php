@@ -3,86 +3,119 @@
 namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
-use App\Models\Employee;
-use App\Models\EmployeeHierarchy;
-use App\Models\OrganizationLevel;
+use App\Models\Direction;
+use App\Models\SubDirection;
 use App\Models\Department;
 use App\Models\Service;
+use App\Models\Sector;
+use App\Models\Employee;
 
 class Organigramme extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
-    protected static ?string $navigationLabel = 'Organigramme';
-    protected static ?string $title = 'Organigramme de l\'Hôpital';
-    protected static ?string $navigationGroup = '🏢 Structure Organisationnelle';
-    protected static ?int $navigationSort = 10;
+    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static string $view = 'filament.pages.organigramme';
 
-    public function getOrgData()
-    {
-        // Récupérer les hiérarchies actuelles
-        $hierarchies = EmployeeHierarchy::where('is_current', true)
-            ->with(['employee', 'organizationLevel', 'superior'])
-            ->orderBy('organization_level_id')
-            ->get();
+    protected static ?string $navigationGroup = '🏢 Structure Organisationnelle';
 
-        // Construire l'arbre hiérarchique
-        $orgTree = [
-            'name' => 'Hôpital Général de Yaoundé',
-            'title' => 'Établissement',
-            'children' => []
+    protected static ?int $navigationSort = 10;
+
+    public static function getNavigationLabel(): string
+    {
+        return 'Organigramme';
+    }
+
+    /**
+     * Préparer les données pour l'organigramme D3.js
+     */
+    public function getOrgData(): array
+    {
+        // Structure hiérarchique complète
+        $data = [
+            'name' => 'Direction Générale',
+            'title' => 'DG',
+            'children' => [],
         ];
 
-        // Niveau 1 : PCA
-        $pca = $hierarchies->where('organizationLevel.hierarchy_level', 1)->first();
-        if ($pca && $pca->employee) {
-            $pcaNode = [
-                'name' => $pca->employee->full_name,
-                'title' => $pca->organizationLevel->name,
-                'children' => []
+        // 1. Charger les Directions
+        $directions = Direction::with(['subDirections.services', 'director'])
+            ->where('is_active', true)
+            ->orderBy('order')  // CHANGÉ ICI
+            ->get();
+
+        foreach ($directions as $direction) {
+            $directionNode = [
+                'name' => $direction->name,
+                'title' => $direction->code,
+                'type' => 'direction',
+                'director' => $direction->director?->full_name,
+                'children' => [],
             ];
 
-            // Niveau 2 : DG
-            $dg = $hierarchies->where('organizationLevel.hierarchy_level', 2)
-                ->where('superior_id', $pca->employee_id)
-                ->first();
-
-            if ($dg && $dg->employee) {
-                $dgNode = [
-                    'name' => $dg->employee->full_name,
-                    'title' => $dg->organizationLevel->name,
-                    'children' => []
+            // 2. Sous-Directions
+            foreach ($direction->subDirections()->orderBy('order')->get() as $subDir) {
+                $subDirNode = [
+                    'name' => $subDir->name,
+                    'title' => $subDir->code,
+                    'type' => 'sub_direction',
+                    'head' => $subDir->subDirector?->full_name,
+                    'children' => [],
                 ];
 
-                // Niveau 3 : DGA
-                $dga = $hierarchies->where('organizationLevel.hierarchy_level', 3)->first();
-                if ($dga && $dga->employee) {
-                    $dgNode['children'][] = [
-                        'name' => $dga->employee->full_name,
-                        'title' => $dga->organizationLevel->name,
+                // 3. Services administratifs
+                foreach ($subDir->services()->orderBy('order')->get() as $service) {
+                    $subDirNode['children'][] = [
+                        'name' => $service->name,
+                        'title' => $service->code,
+                        'type' => 'service',
+                        'head' => $service->serviceHead?->full_name,
                     ];
                 }
 
-                // Directeurs (niveau 4)
-                $directors = $hierarchies->where('organizationLevel.hierarchy_level', 4)->all();
-                foreach ($directors as $director) {
-                    if ($director->employee) {
-                        $dgNode['children'][] = [
-                            'name' => $director->employee->full_name,
-                            'title' => $director->organizationLevel->name .
-                                ($director->department ? ' - ' . $director->department->name : '') .
-                                ($director->medicalDepartment ? ' - ' . $director->medicalDepartment->name : ''),
-                        ];
-                    }
-                }
-
-                $pcaNode['children'][] = $dgNode;
+                $directionNode['children'][] = $subDirNode;
             }
 
-            $orgTree['children'][] = $pcaNode;
+            $data['children'][] = $directionNode;
         }
 
-        return json_encode($orgTree);
+        // 4. Départements Médicaux
+        $departments = Department::with(['services', 'departmentHead'])
+            ->where('is_active', true)
+            ->orderBy('order')  // CHANGÉ ICI
+            ->get();
+
+        foreach ($departments as $dept) {
+            $deptNode = [
+                'name' => $dept->name,
+                'title' => $dept->code,
+                'type' => 'department',
+                'head' => $dept->departmentHead?->full_name,
+                'children' => [],
+            ];
+
+            // Services médicaux
+            foreach ($dept->services()->orderBy('order')->get() as $service) {
+                $deptNode['children'][] = [
+                    'name' => $service->name,
+                    'title' => $service->code,
+                    'type' => 'service_medical',
+                    'head' => $service->serviceHead?->full_name,
+                ];
+            }
+
+            $data['children'][] = $deptNode;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Données pour le composant Livewire
+     */
+    protected function getViewData(): array
+    {
+        return [
+            'orgData' => json_encode($this->getOrgData()),
+        ];
     }
 }
