@@ -318,6 +318,25 @@ class EmployeeCardResource extends Resource
                             ->send();
                     }),
 
+                Tables\Actions\Action::make('generate_pdf')
+                    ->label('Générer PDF')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->visible(fn($record) => !$record->card_pdf_path && $record->qr_code_path)
+                    ->action(function ($record) {
+                        $pdfService = new \App\Services\CardPdfService();
+
+                        if ($record->card_type === 'professional') {
+                            $pdfPath = $pdfService->generateProfessionalCard($record);
+                        } else {
+                            $pdfPath = $pdfService->generateHealthCard($record);
+                        }
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('PDF généré')
+                            ->success()
+                            ->send();
+                    }),
                 Tables\Actions\Action::make('download_pdf')
                     ->label('PDF')
                     ->icon('heroicon-o-document-arrow-down')

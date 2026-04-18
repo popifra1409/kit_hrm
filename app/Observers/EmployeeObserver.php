@@ -106,13 +106,13 @@ class EmployeeObserver
             // Encodage JSON des données
             $jsonData = json_encode($data);
 
-            // Générer l'image QR Code
-            $filename = 'qrcodes/employee-' . $employee->matricule . '.png';
+            // Générer l'image QR Code en SVG (pas besoin ImageMagick)
+            $filename = 'qrcodes/employee-' . $employee->matricule . '.svg';
 
-            $qrCode = QrCode::format('png')
+            $qrCode = QrCode::format('svg')
                 ->size(300)
                 ->margin(1)
-                ->errorCorrection('H') // Haute correction d'erreur
+                ->errorCorrection('H')
                 ->generate($jsonData);
 
             // Sauvegarder l'image

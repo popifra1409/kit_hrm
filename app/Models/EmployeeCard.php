@@ -60,7 +60,17 @@ class EmployeeCard extends Model
     public function generateCardNumber(): string
     {
         $prefix = $this->card_type === 'professional' ? 'PROF' : 'SANTE';
-        $number = $prefix . '-' . $this->employee->matricule . '-' . date('Y');
+
+        // Générer un numéro unique : PREFIX-MATRICULE-YEAR-UNIQUEID
+        do {
+            $uniqueId = strtoupper(substr(uniqid(), -4)); // 4 caractères uniques
+            $number = $prefix . '-' . $this->employee->matricule . '-' . date('Y') . '-' . $uniqueId;
+
+            // Vérifier si le numéro existe déjà
+            $exists = self::where('card_number', $number)
+                ->where('id', '!=', $this->id)
+                ->exists();
+        } while ($exists);
 
         $this->card_number = $number;
         $this->save();
@@ -83,9 +93,11 @@ class EmployeeCard extends Model
 
         $this->qr_code_data = json_encode($data);
 
-        // Générer l'image QR
-        $filename = 'qrcodes/card-' . $this->card_number . '.png';
-        $qrCode = QrCode::format('png')
+        // Générer l'image QR avec GD (pas ImageMagick)
+        $filename = 'qrcodes/card-' . $this->card_number . '.svg';
+
+        // Utiliser SVG (pas besoin d'ImageMagick)
+        $qrCode = QrCode::format('svg')
             ->size(300)
             ->margin(1)
             ->generate($this->qr_code_data);
@@ -95,7 +107,6 @@ class EmployeeCard extends Model
         $this->qr_code_path = $filename;
         $this->save();
     }
-
     public function activate($userId = null): void
     {
         $this->is_active = true;

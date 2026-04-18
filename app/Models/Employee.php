@@ -49,6 +49,16 @@ class Employee extends Model
         'current_echelon',
         'echelon_start_date',
         'last_advancement_date',
+
+        // Nouveaux champs pour le module assurance santé et biométrie
+        'photo',
+        'qr_code_path',
+        'qr_code_data',
+        'fingerprint_data',
+        'fingerprint_enrolled',
+        'fingerprint_enrolled_at',
+
+        'id_card_number',
     ];
 
     protected $casts = [
@@ -66,6 +76,10 @@ class Employee extends Model
         'current_echelon' => 'integer',
         'echelon_start_date' => 'date',
         'last_advancement_date' => 'date',
+
+        // Nouveaux casts
+        'fingerprint_enrolled' => 'boolean',
+        'fingerprint_enrolled_at' => 'datetime',
     ];
 
     // Accessor pour le nom complet
@@ -76,40 +90,7 @@ class Employee extends Model
         );
     }
 
-    // Relations pour le module assurance santé
-    public function dependents()
-    {
-        return $this->hasMany(Dependent::class);
-    }
-
-    public function employeeCards()
-    {
-        return $this->hasMany(EmployeeCard::class);
-    }
-
-    // Méthodes helper
-    public function hasActiveHealthCard(): bool
-    {
-        return $this->employeeCards()
-            ->where('card_type', 'health_coverage')
-            ->where('is_active', true)
-            ->exists();
-    }
-
-    public function hasActiveProfessionalCard(): bool
-    {
-        return $this->employeeCards()
-            ->where('card_type', 'professional')
-            ->where('is_active', true)
-            ->exists();
-    }
-
-    public function getActiveDependentsCount(): int
-    {
-        return $this->dependents()->where('is_active', true)->count();
-    }
-
-    // Relations
+    // Relations de base
     public function department()
     {
         return $this->belongsTo(Department::class);
@@ -170,6 +151,11 @@ class Employee extends Model
         return $this->hasMany(LeaveBalance::class);
     }
 
+    public function payrolls()
+    {
+        return $this->hasMany(Payroll::class);
+    }
+
     // Relations pour l'historique
     public function assignmentHistory()
     {
@@ -179,6 +165,64 @@ class Employee extends Model
     public function advancementHistory()
     {
         return $this->hasMany(EmployeeAdvancementHistory::class)->orderBy('effective_date', 'desc');
+    }
+
+    // Relations pour le module assurance santé
+    public function dependents()
+    {
+        return $this->hasMany(Dependent::class);
+    }
+
+    public function employeeCards()
+    {
+        return $this->hasMany(EmployeeCard::class);
+    }
+
+    // Méthodes helper pour les cartes
+    public function hasActiveHealthCard(): bool
+    {
+        return $this->employeeCards()
+            ->where('card_type', 'health_coverage')
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    public function hasActiveProfessionalCard(): bool
+    {
+        return $this->employeeCards()
+            ->where('card_type', 'professional')
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    public function getActiveDependentsCount(): int
+    {
+        return $this->dependents()->where('is_active', true)->count();
+    }
+
+    // Méthodes helper pour les ayants droit
+    public function getSpouse()
+    {
+        return $this->dependents()
+            ->where('relationship', 'spouse')
+            ->where('is_alive', true)
+            ->first();
+    }
+
+    public function getChildren()
+    {
+        return $this->dependents()
+            ->where('relationship', 'child')
+            ->where('is_alive', true)
+            ->get();
+    }
+
+    public function getParents()
+    {
+        return $this->dependents()
+            ->whereIn('relationship', ['father', 'mother'])
+            ->where('is_alive', true)
+            ->get();
     }
 
     // Méthode pour calculer l'ancienneté
@@ -193,30 +237,46 @@ class Employee extends Model
         return $this->birth_date ? $this->birth_date->diffInYears(now()) : 0;
     }
 
-    // Boot method pour calculer automatiquement la date de retraite
+    // Méthode pour obtenir le salaire de base depuis la grille
+    public function getBaseSalaryFromGrid()
+    {
+        // Utiliser current_echelon et category_current en priorité
+        $category = $this->category_current ?? $this->category_number;
+        $echelon = $this->current_echelon ?? $this->echelon_number;
+
+        if (!$category || !$echelon) {
+            return 0;
+        }
+
+        return SalaryGrid::getBaseSalary($category, $echelon);
+    }
+
+    // Méthode pour vérifier si l'employé a des empreintes enregistrées
+    public function hasFingerprintEnrolled(): bool
+    {
+        return $this->fingerprint_enrolled && !empty($this->fingerprint_data);
+    }
+
+    // Méthode pour obtenir le QR Code URL
+    public function getQrCodeUrl(): ?string
+    {
+        if (!$this->qr_code_path) {
+            return null;
+        }
+
+        return \Storage::url($this->qr_code_path);
+    }
+
+    // Boot method
     protected static function boot()
     {
         parent::boot();
 
         static::saving(function ($employee) {
+            // Calculer automatiquement la date de retraite
             if ($employee->birth_date && $employee->retirement_age) {
                 $employee->retirement_date = $employee->birth_date->copy()->addYears($employee->retirement_age);
             }
         });
-    }
-
-    public function payrolls()
-    {
-        return $this->hasMany(Payroll::class);
-    }
-
-    // Méthode pour obtenir le salaire de base depuis la grille
-    public function getBaseSalaryFromGrid()
-    {
-        if (!$this->category_number || !$this->echelon_number) {
-            return 0;
-        }
-
-        return SalaryGrid::getBaseSalary($this->category_number, $this->echelon_number);
     }
 }
