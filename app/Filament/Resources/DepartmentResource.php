@@ -46,71 +46,72 @@ class DepartmentResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Identification')
-                    ->description('Un département médical est équivalent à une Sous-Direction')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->label('Nom du Département')
-                            ->required()
-                            ->maxLength(255)
-                            ->placeholder('Département de Médecine Interne')
-                            ->columnSpan(2),
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nom du Département')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->placeholder('Ex: Département de Médecine Interne'),
 
-                        Forms\Components\TextInput::make('code')
-                            ->label('Code')
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(50)
-                            ->placeholder('DMI')
-                            ->helperText('Code unique du département'),
-                    ])
-                    ->columns(3),
+                                Forms\Components\TextInput::make('code')
+                                    ->label('Code')
+                                    ->required()
+                                    ->unique(ignoreRecord: true)
+                                    ->maxLength(50)
+                                    ->placeholder('Ex: DMI'),
 
-                Forms\Components\Section::make('Type & Classification')
-                    ->schema([
-                        Forms\Components\Select::make('type')
-                            ->label('Type de Département')
-                            ->options([
-                                'medical' => '🏥 Médecine',
-                                'surgical' => '⚕️ Chirurgie',
-                                'diagnostic' => '🔬 Diagnostic',
-                                'support' => '🛠️ Support',
-                            ])
-                            ->default('medical')
-                            ->required()
-                            ->native(false)
-                            ->columnSpan(2),
+                                Forms\Components\TextInput::make('acronym')
+                                    ->label('Acronyme')
+                                    ->maxLength(50)
+                                    ->placeholder('Ex: DMI'),
+                            ]),
 
-                        Forms\Components\Placeholder::make('hierarchical_level_label')
-                            ->label('Niveau Hiérarchique')
-                            ->content('Sous-Direction (Département Médical)')
-                            ->helperText('Les départements médicaux sont au niveau Sous-Direction'),
-                    ])
-                    ->columns(3),
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                // NOUVEAU : Rattachement à une Direction
+                                Forms\Components\Select::make('direction_id')
+                                    ->label('Direction de Rattachement')
+                                    ->relationship('direction', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->native(false)
+                                    ->helperText('Direction administrative de tutelle')
+                                    ->createOptionForm([
+                                        Forms\Components\TextInput::make('name')
+                                            ->label('Nom de la Direction')
+                                            ->required(),
+                                        Forms\Components\TextInput::make('code')
+                                            ->label('Code')
+                                            ->required(),
+                                    ]),
 
-                Forms\Components\Section::make('Responsabilité')
-                    ->schema([
-                        Forms\Components\Select::make('department_head_id')
-                            ->label('Chef de Département')
-                            ->relationship('departmentHead', 'matricule')
-                            ->searchable()
-                            ->preload()
-                            ->getOptionLabelFromRecordUsing(
-                                fn($record) =>
-                                $record->full_name . ' (' . $record->matricule . ') - ' . ($record->position?->name ?? 'N/A')
-                            )
-                            ->helperText('Chef de Département (équivalent Sous-Directeur)')
-                            ->columnSpanFull(),
-                    ]),
+                                Forms\Components\Select::make('type')
+                                    ->label('Type de Département')
+                                    ->options([
+                                        'medical' => 'Médical',
+                                        'surgical' => 'Chirurgical',
+                                        'diagnostic' => 'Diagnostic',
+                                        'support' => 'Support',
+                                    ])
+                                    ->required()
+                                    ->native(false),
 
-                Forms\Components\Section::make('Description')
-                    ->schema([
+                                Forms\Components\TextInput::make('order')
+                                    ->label('Ordre d\'Affichage')
+                                    ->numeric()
+                                    ->default(1)
+                                    ->minValue(1),
+                            ]),
+
                         Forms\Components\Textarea::make('description')
                             ->label('Description')
-                            ->rows(3)
+                            ->rows(2)
                             ->maxLength(65535)
-                            ->placeholder('Missions et attributions du département...')
                             ->columnSpanFull(),
                     ])
+                    ->columns(3)
                     ->collapsible(),
 
                 Forms\Components\Section::make('Contact & Localisation')
@@ -159,6 +160,12 @@ class DepartmentResource extends Resource
                     ->label('#')
                     ->sortable()
                     ->width(50),
+
+                Tables\Columns\TextColumn::make('direction.name')
+                    ->label('Direction de Rattachement')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Département')

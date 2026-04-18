@@ -40,6 +40,14 @@ class Direction extends Model
         return $this->hasMany(SubDirection::class)->orderBy('order');
     }
 
+    /**
+     * Départements médicaux rattachés à cette direction
+     */
+    public function departments()
+    {
+        return $this->hasMany(Department::class);
+    }
+
     public function employees()
     {
         return $this->hasManyThrough(Employee::class, SubDirection::class, 'direction_id', 'current_service_id');

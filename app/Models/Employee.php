@@ -15,15 +15,18 @@ class Employee extends Model
         'matricule',
         'first_name',
         'last_name',
+        'gender',
         'category_recruitment',
         'category_current',
         'category_number',
         'echelon_number',
+        'indice',
         'qualification',
         'department_id',
         'position_id',
         'current_service_id',
         'service_id',
+        'sector_id',
         'employment_type',
         'contract_type_id',
         'personnel_type',
@@ -50,14 +53,13 @@ class Employee extends Model
         'echelon_start_date',
         'last_advancement_date',
 
-        // Nouveaux champs pour le module assurance santé et biométrie
+        // Champs assurance santé et biométrie
         'photo',
         'qr_code_path',
         'qr_code_data',
         'fingerprint_data',
         'fingerprint_enrolled',
         'fingerprint_enrolled_at',
-
         'id_card_number',
     ];
 
@@ -69,20 +71,22 @@ class Employee extends Model
         'is_active' => 'boolean',
         'category_number' => 'integer',
         'echelon_number' => 'integer',
+        'indice' => 'integer',
         'retirement_age' => 'integer',
         'children_under_6' => 'integer',
         'total_children' => 'integer',
-        'disciplinary_points' => 'integer',
+        'disciplinary_points' => 'decimal:2',
         'current_echelon' => 'integer',
         'echelon_start_date' => 'date',
         'last_advancement_date' => 'date',
-
-        // Nouveaux casts
         'fingerprint_enrolled' => 'boolean',
         'fingerprint_enrolled_at' => 'datetime',
     ];
 
-    // Accessor pour le nom complet
+    // ========================================
+    // ACCESSORS
+    // ========================================
+
     protected function fullName(): Attribute
     {
         return Attribute::make(
@@ -90,26 +94,107 @@ class Employee extends Model
         );
     }
 
-    // Relations de base
+    // ========================================
+    // RELATIONS - STRUCTURE ORGANISATIONNELLE
+    // ========================================
+
+    /**
+     * Département (médical uniquement)
+     */
     public function department()
     {
         return $this->belongsTo(Department::class);
     }
 
+    /**
+     * Position/Poste hiérarchique
+     */
     public function position()
     {
         return $this->belongsTo(Position::class);
     }
 
+    /**
+     * Service actuel (médical ou administratif)
+     */
     public function currentService()
     {
         return $this->belongsTo(Service::class, 'current_service_id');
     }
 
+    /**
+     * Service d'origine
+     */
     public function service()
     {
         return $this->belongsTo(Service::class);
     }
+
+    /**
+     * Secteur/Unité (nouveau niveau)
+     */
+    public function sector()
+    {
+        return $this->belongsTo(Sector::class);
+    }
+
+    /**
+     * Obtenir la Direction via le service actuel
+     */
+    public function getDirectionAttribute()
+    {
+        if ($this->currentService && $this->currentService->subDirection) {
+            return $this->currentService->subDirection->direction;
+        }
+        return null;
+    }
+
+    /**
+     * Obtenir la Sous-Direction via le service actuel
+     */
+    public function getSubDirectionAttribute()
+    {
+        if ($this->currentService) {
+            return $this->currentService->subDirection;
+        }
+        return null;
+    }
+
+    /**
+     * Chemin hiérarchique complet
+     */
+    public function getHierarchyPathAttribute()
+    {
+        $path = [];
+
+        // Si service administratif
+        if ($this->currentService && $this->currentService->subDirection) {
+            $direction = $this->currentService->subDirection->direction;
+            $path[] = $direction->name;
+            $path[] = $this->currentService->subDirection->name;
+            $path[] = $this->currentService->name;
+        }
+        // Si service médical
+        elseif ($this->currentService && $this->currentService->department) {
+            $path[] = $this->currentService->department->name;
+            $path[] = $this->currentService->name;
+        }
+        // Si département seul
+        elseif ($this->department) {
+            $path[] = $this->department->name;
+        }
+
+        // Ajouter le secteur si présent
+        if ($this->sector) {
+            $path[] = $this->sector->name;
+        }
+
+        return implode(' > ', $path);
+    }
+
+    // ========================================
+    // RELATIONS - RH & CONTRATS
+    // ========================================
 
     public function contractType()
     {
@@ -141,6 +226,10 @@ class Employee extends Model
         return $this->hasOne(EmployeeHierarchy::class)->where('is_current', true);
     }
 
+    // ========================================
+    // RELATIONS - CONGÉS & PAIE
+    // ========================================
+
     public function leaves()
     {
         return $this->hasMany(Leave::class);
@@ -156,7 +245,10 @@ class Employee extends Model
         return $this->hasMany(Payroll::class);
     }
 
-    // Relations pour l'historique
+    // ========================================
+    // RELATIONS - HISTORIQUES
+    // ========================================
+
     public function assignmentHistory()
     {
         return $this->hasMany(EmployeeAssignmentHistory::class)->orderBy('effective_date', 'desc');
@@ -167,7 +259,10 @@ class Employee extends Model
         return $this->hasMany(EmployeeAdvancementHistory::class)->orderBy('effective_date', 'desc');
     }
 
-    // Relations pour le module assurance santé
+    // ========================================
+    // RELATIONS - ASSURANCE SANTÉ
+    // ========================================
+
     public function dependents()
     {
         return $this->hasMany(Dependent::class);
@@ -178,7 +273,10 @@ class Employee extends Model
         return $this->hasMany(EmployeeCard::class);
     }
 
-    // Méthodes helper pour les cartes
+    // ========================================
+    // HELPERS - CARTES
+    // ========================================
+
     public function hasActiveHealthCard(): bool
     {
         return $this->employeeCards()
@@ -195,12 +293,15 @@ class Employee extends Model
             ->exists();
     }
 
+    // ========================================
+    // HELPERS - AYANTS DROIT
+    // ========================================
+
     public function getActiveDependentsCount(): int
     {
         return $this->dependents()->where('is_active', true)->count();
     }
 
-    // Méthodes helper pour les ayants droit
     public function getSpouse()
     {
         return $this->dependents()
@@ -225,22 +326,22 @@ class Employee extends Model
             ->get();
     }
 
-    // Méthode pour calculer l'ancienneté
+    // ========================================
+    // HELPERS - CALCULS
+    // ========================================
+
     public function getAncienneteAttribute()
     {
         return $this->recruitment_date ? $this->recruitment_date->diffInYears(now()) : 0;
     }
 
-    // Méthode pour calculer l'âge
     public function getAgeAttribute()
     {
         return $this->birth_date ? $this->birth_date->diffInYears(now()) : 0;
     }
 
-    // Méthode pour obtenir le salaire de base depuis la grille
     public function getBaseSalaryFromGrid()
     {
-        // Utiliser current_echelon et category_current en priorité
         $category = $this->category_current ?? $this->category_number;
         $echelon = $this->current_echelon ?? $this->echelon_number;
 
@@ -251,13 +352,15 @@ class Employee extends Model
         return SalaryGrid::getBaseSalary($category, $echelon);
     }
 
-    // Méthode pour vérifier si l'employé a des empreintes enregistrées
+    // ========================================
+    // HELPERS - BIOMÉTRIE & QR CODE
+    // ========================================
+
     public function hasFingerprintEnrolled(): bool
     {
         return $this->fingerprint_enrolled && !empty($this->fingerprint_data);
     }
 
-    // Méthode pour obtenir le QR Code URL
     public function getQrCodeUrl(): ?string
     {
         if (!$this->qr_code_path) {
@@ -267,7 +370,78 @@ class Employee extends Model
         return \Storage::url($this->qr_code_path);
     }
 
-    // Boot method
+    // ========================================
+    // HELPERS - HIÉRARCHIE
+    // ========================================
+
+    /**
+     * Vérifier si l'employé est dans la branche administrative
+     */
+    public function isAdministrative(): bool
+    {
+        return $this->currentService && $this->currentService->isAdministrative();
+    }
+
+    /**
+     * Vérifier si l'employé est dans la branche médicale
+     */
+    public function isMedical(): bool
+    {
+        return $this->currentService && $this->currentService->isMedical()
+            || $this->department !== null;
+    }
+
+    /**
+     * Obtenir le niveau hiérarchique
+     */
+    public function getHierarchicalLevelAttribute()
+    {
+        return $this->position?->hierarchical_level;
+    }
+
+    /**
+     * Obtenir le rang hiérarchique (1-10)
+     */
+    public function getLevelRankAttribute()
+    {
+        return $this->position?->level_rank;
+    }
+
+    /**
+     * Vérifier si c'est un poste de management
+     */
+    public function isManager(): bool
+    {
+        return $this->position?->is_managerial ?? false;
+    }
+
+    /**
+     * Obtenir tous les subordonnés (si manager)
+     */
+    public function getSubordinates()
+    {
+        if (!$this->isManager()) {
+            return collect([]);
+        }
+
+        // Si chef de service, retourner les employés du service
+        if ($this->hierarchical_level === 'chef_service' && $this->currentService) {
+            return $this->currentService->employees()->where('id', '!=', $this->id)->get();
+        }
+
+        // Si chef de secteur, retourner les employés du secteur
+        if ($this->hierarchical_level === 'chef_secteur' && $this->sector) {
+            return $this->sector->employees()->where('id', '!=', $this->id)->get();
+        }
+
+        // Pour les niveaux supérieurs, logique plus complexe
+        return collect([]);
+    }
+
+    // ========================================
+    // BOOT
+    // ========================================
+
     protected static function boot()
     {
         parent::boot();

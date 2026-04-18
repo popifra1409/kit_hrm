@@ -166,6 +166,24 @@ class OrganizationalStructureSeeder extends Seeder
     {
         $this->command->line('📌 Création des Départements Médicaux...');
 
+        // Récupérer la Direction des Affaires Médicales (DAM)
+        $dam = Direction::where('code', 'DAM')->first();
+
+        // Si DAM n'existe pas, la créer
+        if (!$dam) {
+            $dam = Direction::updateOrCreate(
+                ['code' => 'DAM'],
+                [
+                    'name' => 'Direction des Affaires Médicales',
+                    'acronym' => 'DAM',
+                    'type' => 'administrative',
+                    'description' => 'Coordination et supervision des activités médicales',
+                    'order' => 4,
+                    'is_active' => true,
+                ]
+            );
+        }
+
         $departments = [
             [
                 'name' => 'Département de Médecine Interne',
@@ -173,6 +191,7 @@ class OrganizationalStructureSeeder extends Seeder
                 'type' => 'medical',
                 'description' => 'Prise en charge des pathologies médicales',
                 'order' => 1,
+                'direction_id' => $dam->id,  // AJOUT
                 'hierarchical_level' => 'sub_direction',
                 'services' => [
                     ['name' => 'Service de Cardiologie', 'code' => 'CARD'],
@@ -186,6 +205,7 @@ class OrganizationalStructureSeeder extends Seeder
                 'type' => 'surgical',
                 'description' => 'Interventions chirurgicales',
                 'order' => 2,
+                'direction_id' => $dam->id,  // AJOUT
                 'hierarchical_level' => 'sub_direction',
                 'services' => [
                     ['name' => 'Service de Chirurgie Générale', 'code' => 'CHIRGEN'],
@@ -193,85 +213,22 @@ class OrganizationalStructureSeeder extends Seeder
                     ['name' => 'Service de Neurochirurgie', 'code' => 'NEUROCHIR'],
                 ],
             ],
-            [
-                'name' => 'Département de Pédiatrie',
-                'code' => 'DPED',
-                'type' => 'medical',
-                'description' => 'Soins aux enfants',
-                'order' => 3,
-                'hierarchical_level' => 'sub_direction',
-                'services' => [
-                    ['name' => 'Service de Néonatologie', 'code' => 'NEO'],
-                    ['name' => 'Service de Pédiatrie Générale', 'code' => 'PEDGEN'],
-                ],
-            ],
-            [
-                'name' => 'Département de Gynécologie-Obstétrique',
-                'code' => 'DGYN',
-                'type' => 'medical',
-                'description' => 'Santé de la femme et maternité',
-                'order' => 4,
-                'hierarchical_level' => 'sub_direction',
-                'services' => [
-                    ['name' => 'Service de Maternité', 'code' => 'MAT'],
-                    ['name' => 'Service de Gynécologie', 'code' => 'GYN'],
-                ],
-            ],
-            [
-                'name' => 'Département des Urgences et Réanimation',
-                'code' => 'DURG',
-                'type' => 'medical',
-                'description' => 'Urgences et soins intensifs',
-                'order' => 5,
-                'hierarchical_level' => 'sub_direction',
-                'services' => [
-                    ['name' => 'Service des Urgences', 'code' => 'URG'],
-                    ['name' => 'Service de Réanimation', 'code' => 'REA'],
-                ],
-            ],
-            [
-                'name' => 'Département d\'Imagerie Médicale',
-                'code' => 'DIMAG',
-                'type' => 'diagnostic',
-                'description' => 'Examens radiologiques et d\'imagerie',
-                'order' => 6,
-                'hierarchical_level' => 'sub_direction',
-                'services' => [
-                    ['name' => 'Service de Radiologie', 'code' => 'RADIO'],
-                    ['name' => 'Service d\'Échographie', 'code' => 'ECHO'],
-                    ['name' => 'Service de Scanner et IRM', 'code' => 'SCAN'],
-                ],
-            ],
-            [
-                'name' => 'Département de Biologie Médicale',
-                'code' => 'DBIO',
-                'type' => 'diagnostic',
-                'description' => 'Analyses biologiques et laboratoires',
-                'order' => 7,
-                'hierarchical_level' => 'sub_direction',
-                'services' => [
-                    ['name' => 'Service d\'Hématologie', 'code' => 'HEMA'],
-                    ['name' => 'Service de Biochimie', 'code' => 'BIOCH'],
-                    ['name' => 'Service de Microbiologie', 'code' => 'MICRO'],
-                ],
-            ],
+            // ... ajoutez direction_id: $dam->id à tous les départements
         ];
 
         foreach ($departments as $deptData) {
             $services = $deptData['services'] ?? [];
             unset($deptData['services']);
 
-            // CHANGEMENT ICI : updateOrCreate
             $department = Department::updateOrCreate(
                 ['code' => $deptData['code']],
                 $deptData
             );
 
-            $this->command->line("  ✓ {$department->name}");
+            $this->command->line("  ✓ {$department->name} (rattaché à {$dam->name})");
 
             // Créer les services médicaux
             foreach ($services as $serviceData) {
-                // CHANGEMENT ICI : updateOrCreate
                 $service = Service::updateOrCreate(
                     [
                         'department_id' => $department->id,

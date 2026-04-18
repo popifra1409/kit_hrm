@@ -20,6 +20,7 @@ class Department extends Model
         'type', // medical, surgical, diagnostic, support
 
         // Responsable (Chef de Département = rang Sous-Directeur)
+        'direction_id',
         'department_head_id',
 
         // Niveau hiérarchique (toujours "sub_direction" pour départements médicaux)
@@ -49,6 +50,14 @@ class Department extends Model
     // ========================================
     // RELATIONS PRINCIPALES
     // ========================================
+
+    /**
+     * Direction de rattachement
+     */
+    public function direction()
+    {
+        return $this->belongsTo(Direction::class);
+    }
 
     /**
      * Chef de département (équivalent Sous-Directeur niveau médical)
