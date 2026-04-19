@@ -40,10 +40,15 @@ return new class extends Migration
         });
 
         // Contrainte : un service doit appartenir SOIT à un department SOIT à une sub_direction
-        DB::statement('ALTER TABLE services ADD CONSTRAINT check_parent CHECK (
-            (department_id IS NOT NULL AND sub_direction_id IS NULL) OR 
-            (department_id IS NULL AND sub_direction_id IS NOT NULL)
-        )');
+        DB::statement("
+            ALTER TABLE services
+            ADD CONSTRAINT check_parent
+            CHECK (
+                (department_id IS NOT NULL AND sub_direction_id IS NULL) OR 
+                (department_id IS NULL AND sub_direction_id IS NOT NULL)
+            )
+            NOT VALID
+        ");
     }
 
     public function down(): void
