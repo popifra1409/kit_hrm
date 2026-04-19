@@ -10,10 +10,49 @@ return new class extends Migration
         DB::statement("
         DO $$
         BEGIN
-            IF NOT EXISTS (
+            -- 1. Supprimer ancienne contrainte si elle existe
+            IF EXISTS (
                 SELECT 1
                 FROM pg_constraint
                 WHERE conname = 'check_parent'
+            ) THEN
+                ALTER TABLE services DROP CONSTRAINT check_parent;
+            END IF;
+
+            -- 2. Ajouter nouvelle contrainte progressive
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'check_sub_direction'
+            ) THEN
+                ALTER TABLE services
+                ADD CONSTRAINT check_sub_direction
+                CHECK (
+                    sub_direction_id IS NOT NULL
+                    OR department_id IS NOT NULL
+                )
+                NOT VALID;
+            END IF;
+        END
+        $$;
+        ");
+    }
+
+    public function down()
+    {
+        DB::statement("
+        DO $$
+        BEGIN
+            -- Supprimer nouvelle contrainte
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'check_sub_direction'
+            ) THEN
+                ALTER TABLE services DROP CONSTRAINT check_sub_direction;
+            END IF;
+
+            -- Restaurer ancienne contrainte (optionnel)
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'check_parent'
             ) THEN
                 ALTER TABLE services
                 ADD CONSTRAINT check_parent
@@ -25,14 +64,6 @@ return new class extends Migration
             END IF;
         END
         $$;
-    ");
-    }
-
-    public function down()
-    {
-        DB::statement("
-            ALTER TABLE services
-            DROP CONSTRAINT IF EXISTS check_parent
         ");
     }
 };
