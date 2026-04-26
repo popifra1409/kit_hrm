@@ -182,10 +182,33 @@ class DirectionResource extends Resource
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('sub_directions_count')
-                    ->label('Sous-Directions')
+                    ->label('Sous-Dir.')
                     ->counts('subDirections')
                     ->badge()
-                    ->color('success'),
+                    ->color('info')
+                    ->tooltip('Sous-Directions Administratives')
+                    ->alignCenter(),
+
+                Tables\Columns\TextColumn::make('departments_count')
+                    ->label('Départements')
+                    ->counts('departments')
+                    ->badge()
+                    ->color('success')
+                    ->tooltip('Départements Médicaux')
+                    ->alignCenter(),
+
+                Tables\Columns\TextColumn::make('total_substructures')
+                    ->label('Total S-S')
+                    ->getStateUsing(
+                        fn(Direction $record) =>
+                        $record->subDirections()->count() + $record->departments()->count()
+                    )
+                    ->badge()
+                    ->color('primary')
+                    ->tooltip('Total: Sous-Directions + Départements')
+                    ->alignCenter(),
+
+                // === FIN NOUVELLES COLONNES ===
 
                 Tables\Columns\TextColumn::make('phone')
                     ->label('Téléphone')

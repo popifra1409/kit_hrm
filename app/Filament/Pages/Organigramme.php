@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use App\Models\Direction;
-use App\Models\Department;
 
 class Organigramme extends Page
 {
@@ -28,8 +27,12 @@ class Organigramme extends Page
             'children' => [],
         ];
 
-        // 1. DIRECTIONS ADMINISTRATIVES
-        $directions = Direction::with(['subDirections.services', 'director'])
+        // Charger les directions avec TOUTES leurs sous-structures
+        $directions = Direction::with([
+            'subDirections.services.serviceHead',    // Sous-directions administratives
+            'departments.services.serviceHead',       // Départements médicaux (AJOUTÉ)
+            'director'
+        ])
             ->where('is_active', true)
             ->orderBy('order')
             ->get();
@@ -43,12 +46,13 @@ class Organigramme extends Page
                 'children' => [],
             ];
 
-            // Sous-Directions
+            // 1. AJOUTER LES SOUS-DIRECTIONS ADMINISTRATIVES
             foreach ($direction->subDirections()->orderBy('order')->get() as $subDir) {
                 $subDirNode = [
                     'name' => $subDir->name,
                     'title' => $subDir->code,
                     'type' => 'sub_direction',
+                    'hierarchical_level' => 'Sous-Direction',
                     'head' => $subDir->subDirector?->full_name,
                     'children' => [],
                 ];
@@ -66,35 +70,32 @@ class Organigramme extends Page
                 $directionNode['children'][] = $subDirNode;
             }
 
-            $data['children'][] = $directionNode;
-        }
-
-        // 2. DÉPARTEMENTS MÉDICAUX (au même niveau que les directions)
-        $departments = Department::with(['services', 'departmentHead'])
-            ->where('is_active', true)
-            ->orderBy('order')
-            ->get();
-
-        foreach ($departments as $dept) {
-            $deptNode = [
-                'name' => $dept->name,
-                'title' => $dept->code,
-                'type' => 'department',
-                'head' => $dept->departmentHead?->full_name,
-                'children' => [],
-            ];
-
-            // Services médicaux
-            foreach ($dept->services()->orderBy('order')->get() as $service) {
-                $deptNode['children'][] = [
-                    'name' => $service->name,
-                    'title' => $service->code,
-                    'type' => 'service_medical',
-                    'head' => $service->serviceHead?->full_name,
+            // 2. AJOUTER LES DÉPARTEMENTS MÉDICAUX (même niveau que sous-directions)
+            foreach ($direction->departments()->orderBy('order')->get() as $dept) {
+                $deptNode = [
+                    'name' => $dept->name,
+                    'title' => $dept->code,
+                    'type' => 'department',
+                    'hierarchical_level' => 'Département (Sous-Direction Médicale)',
+                    'head' => $dept->departmentHead?->full_name,
+                    'children' => [],
                 ];
+
+                // Services médicaux
+                foreach ($dept->services()->orderBy('order')->get() as $service) {
+                    $deptNode['children'][] = [
+                        'name' => $service->name,
+                        'title' => $service->code,
+                        'type' => 'service_medical',
+                        'head' => $service->serviceHead?->full_name,
+                    ];
+                }
+
+                $directionNode['children'][] = $deptNode;
             }
 
-            $data['children'][] = $deptNode;
+            // Ajouter la direction à la racine
+            $data['children'][] = $directionNode;
         }
 
         return $data;

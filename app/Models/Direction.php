@@ -53,6 +53,24 @@ class Direction extends Model
         return $this->hasManyThrough(Employee::class, SubDirection::class, 'direction_id', 'current_service_id');
     }
 
+    /**
+     * Compte total des sous-directions (administratives + départements médicaux)
+     */
+    public function getTotalSubstructuresCountAttribute()
+    {
+        return $this->subDirections()->count() + $this->departments()->count();
+    }
+
+    /**
+     * Toutes les sous-structures (sous-directions + départements)
+     */
+    public function allSubstructures()
+    {
+        return collect()
+            ->merge($this->subDirections)
+            ->merge($this->departments);
+    }
+
     // Scopes
     public function scopeActive($query)
     {
