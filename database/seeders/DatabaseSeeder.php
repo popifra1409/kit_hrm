@@ -17,7 +17,6 @@ class DatabaseSeeder extends Seeder
             LeaveTypeSeeder::class,
             SalaryGridSeeder::class,
             PayrollItemSeeder::class,
-            ProcurementTypeSeeder::class,
             SupplierSeeder::class,
             DocumentCategorySeeder::class,
             InitializeEmployeeEchelonsSeeder::class,

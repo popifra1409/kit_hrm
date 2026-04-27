@@ -14,6 +14,7 @@ class ContractTypeSeeder extends Seeder
                 'name' => 'CDI',
                 'code' => 'CDI',
                 'description' => 'Contrat à Durée Indéterminée',
+                'is_active' => true,
                 'requires_end_date' => false,
                 'max_duration_months' => null,
                 'renewable' => false,
@@ -22,6 +23,7 @@ class ContractTypeSeeder extends Seeder
                 'name' => 'CDD',
                 'code' => 'CDD',
                 'description' => 'Contrat à Durée Déterminée',
+                'is_active' => true,
                 'requires_end_date' => true,
                 'max_duration_months' => 24,
                 'renewable' => true,
@@ -30,6 +32,7 @@ class ContractTypeSeeder extends Seeder
                 'name' => 'Temporaire',
                 'code' => 'TEMP',
                 'description' => 'Contrat Temporaire',
+                'is_active' => true,
                 'requires_end_date' => true,
                 'max_duration_months' => 6,
                 'renewable' => true,
@@ -38,6 +41,7 @@ class ContractTypeSeeder extends Seeder
                 'name' => 'Vacataire',
                 'code' => 'VAC',
                 'description' => 'Contrat Vacataire (missions ponctuelles)',
+                'is_active' => true,
                 'requires_end_date' => true,
                 'max_duration_months' => 3,
                 'renewable' => true,
@@ -46,6 +50,7 @@ class ContractTypeSeeder extends Seeder
                 'name' => 'Stage',
                 'code' => 'STAGE',
                 'description' => 'Convention de Stage',
+                'is_active' => true,
                 'requires_end_date' => true,
                 'max_duration_months' => 6,
                 'renewable' => false,
@@ -53,9 +58,12 @@ class ContractTypeSeeder extends Seeder
         ];
 
         foreach ($contractTypes as $type) {
-            ContractType::create($type);
+            ContractType::updateOrCreate(
+                ['code' => $type['code']],
+                $type
+            );
         }
 
-        echo "✅ Types de contrat créés!\n";
+        $this->command->info('✅ Types de contrat créés!');
     }
 }

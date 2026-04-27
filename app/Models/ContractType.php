@@ -13,26 +13,24 @@ class ContractType extends Model
         'name',
         'code',
         'description',
+        'is_active',
         'requires_end_date',
         'max_duration_months',
         'renewable',
-        'is_active',
     ];
 
     protected $casts = [
-        'requires_end_date' => 'boolean',
-        'renewable' => 'boolean',
         'is_active' => 'boolean',
+        'requires_end_date' => 'boolean',
         'max_duration_months' => 'integer',
+        'renewable' => 'boolean',
     ];
 
-    public function contracts()
-    {
-        return $this->hasMany(Contract::class);
-    }
-
+    /**
+     * Employés ayant ce type de contrat
+     */
     public function employees()
     {
-        return $this->hasMany(Employee::class);
+        return $this->hasMany(Employee::class, 'contract_type_id');
     }
 }

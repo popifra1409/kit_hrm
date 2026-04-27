@@ -493,26 +493,26 @@ class EditEmployee extends EditRecord
                         ]),
 
                     // TAB 8 : DISCIPLINE
-                    Forms\Components\Tabs\Tab::make('Discipline')
-                        ->icon('heroicon-o-shield-check')
-                        ->schema([
-                            Forms\Components\Grid::make(2)
-                                ->schema([
-                                    Forms\Components\TextInput::make('disciplinary_points')
-                                        ->label('Points Disciplinaires')
-                                        ->numeric()
-                                        ->default(0)
-                                        ->minValue(0)
-                                        ->step(0.5)
-                                        ->suffix('points'),
-                                ]),
+                    // Forms\Components\Tabs\Tab::make('Discipline')
+                    //     ->icon('heroicon-o-shield-check')
+                    //     ->schema([
+                    //         Forms\Components\Grid::make(2)
+                    //             ->schema([
+                    //                 Forms\Components\TextInput::make('disciplinary_points')
+                    //                     ->label('Points Disciplinaires')
+                    //                     ->numeric()
+                    //                     ->default(0)
+                    //                     ->minValue(0)
+                    //                     ->step(0.5)
+                    //                     ->suffix('points'),
+                    //             ]),
 
-                            Forms\Components\Textarea::make('disciplinary_notes')
-                                ->label('Notes Disciplinaires')
-                                ->rows(4)
-                                ->maxLength(65535)
-                                ->columnSpanFull(),
-                        ]),
+                    //         Forms\Components\Textarea::make('disciplinary_notes')
+                    //             ->label('Notes Disciplinaires')
+                    //             ->rows(4)
+                    //             ->maxLength(65535)
+                    //             ->columnSpanFull(),
+                    //     ]),
                 ])
                 ->columnSpanFull()
                 ->persistTabInQueryString(),

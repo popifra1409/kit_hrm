@@ -98,7 +98,7 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsed(true),
                 NavigationGroup::make('💰 Gestion de la Paie')
                     ->collapsed(true),
-                NavigationGroup::make('🏗️ Marchés Publics')
+                NavigationGroup::make('💰 Quote-Parts')
                     ->collapsed(true),
                 NavigationGroup::make('⚙️ Paramétrage')
                     ->collapsed(true),
