@@ -22,6 +22,6 @@ class DatabaseSeeder extends Seeder
             InitializeEmployeeEchelonsSeeder::class,
             NotificationTemplateSeeder::class,
             ServiceSeeder::class,
-        ]);
+            EvaluationCriterionSeeder::class,
     }
 }

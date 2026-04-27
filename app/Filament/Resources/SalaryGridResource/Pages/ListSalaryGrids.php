@@ -13,7 +13,14 @@ class ListSalaryGrids extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\Action::make('matrix_view')
+                ->label('Vue Matricielle')
+                ->icon('heroicon-o-table-cells')
+                ->color('info')
+                ->url(fn(): string => static::$resource::getUrl('matrix')),
+
+            Actions\CreateAction::make()
+                ->label('Créer'),
         ];
     }
 }
