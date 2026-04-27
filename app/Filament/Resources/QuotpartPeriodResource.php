@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
+use App\Services\QuotpartCalculationService;
 
 class QuotpartPeriodResource extends Resource
 {
@@ -275,13 +276,14 @@ class QuotpartPeriodResource extends Resource
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
 
+                    // ACTION VALIDATE
                     Tables\Actions\Action::make('validate')
                         ->label('Valider')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->visible(fn(QuotpartPeriod $record) => $record->status === 'draft')
-                        ->action(function (QuotpartPeriod $record) {
+                        ->visible(fn($record) => $record->status === 'draft')
+                        ->action(function ($record) {
                             $record->update([
                                 'status' => 'validated',
                                 'validated_at' => now(),
@@ -291,23 +293,39 @@ class QuotpartPeriodResource extends Resource
                             Notification::make()
                                 ->success()
                                 ->title('Période validée')
-                                ->body("La période {$record->full_name} a été validée avec succès.")
+                                ->body("La période {$record->code} a été validée.")
                                 ->send();
                         }),
 
+                    // ACTION CALCULATE
                     Tables\Actions\Action::make('calculate')
                         ->label('Calculer Quote-Parts')
                         ->icon('heroicon-o-calculator')
-                        ->color('info')
+                        ->color('warning')
                         ->requiresConfirmation()
-                        ->visible(fn(QuotpartPeriod $record) => $record->status === 'validated')
-                        ->action(function (QuotpartPeriod $record) {
-                            // TODO: Appeler le service de calcul
-                            Notification::make()
-                                ->info()
-                                ->title('Calcul en cours')
-                                ->body('Le calcul des quote-parts va démarrer...')
-                                ->send();
+                        ->modalHeading('Calculer les Quote-Parts')
+                        ->modalDescription(
+                            fn($record) =>
+                            "Voulez-vous lancer le calcul des quote-parts pour la période {$record->code} ({$record->getMonthNameAttribute()}) ?"
+                        )
+                        ->visible(fn($record) => $record->status === 'validated')
+                        ->action(function ($record) {
+                            $service = new QuotpartCalculationService();
+                            $result = $service->calculateForPeriod($record);
+
+                            if ($result['success']) {
+                                Notification::make()
+                                    ->success()
+                                    ->title('Calcul terminé')
+                                    ->body("Quote-parts calculées pour {$result['total_employees']} employés. Total points : {$result['total_points']}")
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Erreur de calcul')
+                                    ->body($result['message'])
+                                    ->send();
+                            }
                         }),
 
                     Tables\Actions\DeleteAction::make(),

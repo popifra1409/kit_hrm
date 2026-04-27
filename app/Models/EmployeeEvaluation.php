@@ -15,7 +15,7 @@ class EmployeeEvaluation extends Model
         'criterion_id',
         'evaluator_id',
         'score',
-        'comment',
+        'comments',
         'evaluated_at',
     ];
 
@@ -24,7 +24,15 @@ class EmployeeEvaluation extends Model
         'evaluated_at' => 'datetime',
     ];
 
-    // Relations
+    protected $appends = [
+        'weighted_score',
+        'score_percentage',
+    ];
+
+    // ========================================
+    // RELATIONS
+    // ========================================
+
     public function employee()
     {
         return $this->belongsTo(Employee::class);
@@ -45,14 +53,29 @@ class EmployeeEvaluation extends Model
         return $this->belongsTo(Employee::class, 'evaluator_id');
     }
 
-    // Helpers
+    // ========================================
+    // ACCESSORS
+    // ========================================
+
+    /**
+     * Score pondéré (score × poids du critère)
+     */
     public function getWeightedScoreAttribute()
     {
+        if (!$this->criterion) {
+            return 0;
+        }
         return $this->score * $this->criterion->weight;
     }
 
+    /**
+     * Pourcentage du score
+     */
     public function getScorePercentageAttribute()
     {
+        if (!$this->criterion || $this->criterion->max_score == 0) {
+            return 0;
+        }
         return ($this->score / $this->criterion->max_score) * 100;
     }
 }
