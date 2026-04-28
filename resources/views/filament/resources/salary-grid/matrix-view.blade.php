@@ -32,7 +32,7 @@
             <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-700">
                 @foreach($categories as $category)
                 <tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors duration-150">
-                    <td class="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-gray-400 dark:group-hover:text-white bg-gray-100 dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors duration-150">
+                    <td class="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-gray-400 dark:group-hover:text-amber-400 bg-gray-100 dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors duration-150">
                         C{{ $category }}
                     </td>
                     @foreach($echelons as $echelon)
@@ -82,8 +82,9 @@
                         <span class="inline-block w-4 h-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded"></span>
                         <span>Pas de grille définie</span>
                     </li>
-                    <li class="mt-2 text-xs italic">
+                    <li class="mt-2 text-xs italic flex items-center gap-1">
                         ✨ Survolez une ligne pour mettre en évidence les valeurs
+                        <span class="inline-block px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded font-medium">(catégories en jaune)</span>
                     </li>
                 </ul>
             </div>

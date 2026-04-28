@@ -13,7 +13,14 @@ class ListDependents extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\Action::make('tree_view')
+                ->label('Vue Arborescente')
+                ->icon('heroicon-o-folder-open')
+                ->color('info')
+                ->url(fn(): string => static::$resource::getUrl('tree')),
+
+            Actions\CreateAction::make()
+                ->label('Créer'),
         ];
     }
 }
