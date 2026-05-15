@@ -12,9 +12,12 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Filament\Traits\HasAuthorization;
 
 class EmployeeResource extends Resource
 {
+    use HasAuthorization;
+
     protected static ?string $model = Employee::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
@@ -234,12 +237,12 @@ class EmployeeResource extends Resource
                             ->body('N° ' . $card->card_number)
                             ->send();
                     }),
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
+                Tables\Actions\ViewAction::make()->label('Voir')->visible(fn($record) => static::can('view', $record)),
+                Tables\Actions\EditAction::make()->label('Modifier')->visible(fn($record) => static::can('update', $record)),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer')->visible(fn($record) => static::can('delete', $record)),
                 ]),
             ]);
     }

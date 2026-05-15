@@ -10,9 +10,11 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
+use App\Filament\Traits\HasAuthorization;
 
 class ContractResource extends Resource
 {
+    use HasAuthorization;
     protected static ?string $model = Contract::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
@@ -385,15 +387,19 @@ class ContractResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\ViewAction::make(),
-                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\ViewAction::make()->visible(fn($record) => static::can('view', $record)),
+                    Tables\Actions\EditAction::make()->visible(fn($record) => static::can('update', $record)),
 
                     Tables\Actions\Action::make('validate')
                         ->label('Valider')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->visible(fn(Contract $record) => $record->status === 'draft')
+                        ->visible(
+                            fn(Contract $record) =>
+                            $record->status === 'draft' &&
+                                auth()->user()->can('validate', $record)
+                        )
                         ->action(function (Contract $record) {
                             $record->validate();
 
@@ -408,7 +414,11 @@ class ContractResource extends Resource
                         ->label('Renouveler')
                         ->icon('heroicon-o-arrow-path')
                         ->color('info')
-                        ->visible(fn(Contract $record) => $record->canBeRenewed())
+                        ->visible(
+                            fn(Contract $record) =>
+                            $record->canBeRenewed() &&
+                                auth()->user()->can('renew', $record)
+                        )
                         ->form([
                             Forms\Components\DatePicker::make('new_end_date')
                                 ->label('Nouvelle Date de Fin')
@@ -441,7 +451,11 @@ class ContractResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
-                        ->visible(fn(Contract $record) => $record->status === 'active')
+                        ->visible(
+                            fn(Contract $record) =>
+                            $record->status === 'active' &&
+                                auth()->user()->can('terminate', $record)
+                        )
                         ->form([
                             Forms\Components\DatePicker::make('termination_date')
                                 ->label('Date de Résiliation')
@@ -468,7 +482,7 @@ class ContractResource extends Resource
                                 ->send();
                         }),
 
-                    Tables\Actions\DeleteAction::make(),
+                    Tables\Actions\DeleteAction::make()->visible(fn($record) => static::can('delete', $record)),
                 ]),
             ])
             ->bulkActions([

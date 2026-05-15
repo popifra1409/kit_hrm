@@ -85,14 +85,6 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'delete_trainings', 'module' => 'trainings', 'description' => 'Supprimer les formations'],
             ['name' => 'manage_training_participants', 'module' => 'trainings', 'description' => 'Gérer les participants'],
 
-            // === MARCHÉS PUBLICS ===
-            ['name' => 'view_procurement', 'module' => 'procurement', 'description' => 'Voir les marchés'],
-            ['name' => 'create_procurement', 'module' => 'procurement', 'description' => 'Créer des marchés'],
-            ['name' => 'edit_procurement', 'module' => 'procurement', 'description' => 'Modifier les marchés'],
-            ['name' => 'delete_procurement', 'module' => 'procurement', 'description' => 'Supprimer les marchés'],
-            ['name' => 'approve_procurement', 'module' => 'procurement', 'description' => 'Approuver les marchés'],
-            ['name' => 'manage_bids', 'module' => 'procurement', 'description' => 'Gérer les soumissions'],
-
             // === CONTRATS ===
             ['name' => 'view_contracts', 'module' => 'contracts', 'description' => 'Voir les contrats'],
             ['name' => 'create_contracts', 'module' => 'contracts', 'description' => 'Créer des contrats'],
@@ -126,6 +118,34 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'manage_departments', 'module' => 'structure', 'description' => 'Gérer les départements'],
             ['name' => 'manage_services', 'module' => 'structure', 'description' => 'Gérer les services'],
             ['name' => 'manage_positions', 'module' => 'structure', 'description' => 'Gérer les postes'],
+
+            // === GRILLE SALARIALE ===
+            ['name' => 'view_salary_grids', 'module' => 'payroll', 'description' => 'Voir la grille salariale'],
+            ['name' => 'create_salary_grids', 'module' => 'payroll', 'description' => 'Créer grille salariale'],
+            ['name' => 'edit_salary_grids', 'module' => 'payroll', 'description' => 'Modifier grille salariale'],
+            ['name' => 'delete_salary_grids', 'module' => 'payroll', 'description' => 'Supprimer grille salariale'],
+
+            // === QUOTE-PARTS ===
+            ['name' => 'view_quotparts', 'module' => 'payroll', 'description' => 'Voir les quote-parts'],
+            ['name' => 'create_quotparts', 'module' => 'payroll', 'description' => 'Créer quote-parts'],
+            ['name' => 'edit_quotparts', 'module' => 'payroll', 'description' => 'Modifier quote-parts'],
+            ['name' => 'calculate_quotparts', 'module' => 'payroll', 'description' => 'Calculer quote-parts'],
+            ['name' => 'approve_quotparts', 'module' => 'payroll', 'description' => 'Approuver quote-parts'],
+            ['name' => 'distribute_quotparts', 'module' => 'payroll', 'description' => 'Distribuer quote-parts'],
+
+            // === ÉVALUATIONS EMPLOYÉS (pour quote-parts) ===
+            ['name' => 'create_employee_evaluations', 'module' => 'evaluations', 'description' => 'Créer évaluations employés'],
+            ['name' => 'edit_employee_evaluations', 'module' => 'evaluations', 'description' => 'Modifier évaluations'],
+            ['name' => 'approve_employee_evaluations', 'module' => 'evaluations', 'description' => 'Approuver évaluations'],
+
+            // === ACTIVITÉS MÉDICALES ===
+            ['name' => 'view_medical_activities', 'module' => 'payroll', 'description' => 'Voir activités médicales'],
+            ['name' => 'create_medical_activities', 'module' => 'payroll', 'description' => 'Créer activités médicales'],
+            ['name' => 'validate_medical_activities', 'module' => 'payroll', 'description' => 'Valider activités médicales'],
+
+            // === TYPES DE CONTRATS ===
+            ['name' => 'view_contract_types', 'module' => 'contracts', 'description' => 'Voir types de contrats'],
+            ['name' => 'manage_contract_types', 'module' => 'contracts', 'description' => 'Gérer types de contrats'],
         ];
 
         foreach ($permissions as $permissionData) {
