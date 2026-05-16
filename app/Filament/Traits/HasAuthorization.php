@@ -61,21 +61,63 @@ trait HasAuthorization
         $modelClass = static::getModel();
         $modelName = class_basename($modelClass);
 
-        // Conversion simple au pluriel
         $plurals = [
+            // Employés
             'Employee' => 'employees',
-            'Dependent' => 'dependents',
-            'Contract' => 'contracts',
-            'ContractType' => 'contract_types',
-            'SalaryGrid' => 'salary_grids',
-            'Leave' => 'leaves',
-            'PerformanceEvaluation' => 'evaluations',
-            'Training' => 'trainings',
-            'Document' => 'documents',
-            'User' => 'users',
+            'EmployeeAdvancementHistory' => 'employees',
+            'EmployeeAssignmentHistory' => 'employees',
+            'EmployeeAffectation' => 'employees',
+            'EmployeeCard' => 'employee_cards',
+
+            // Structure
             'Department' => 'departments',
             'Service' => 'services',
             'Position' => 'positions',
+            'Direction' => 'departments',
+            'SubDirection' => 'services',
+            'Sector' => 'services',
+            'MedicalDepartment' => 'departments',
+
+            // Contrats
+            'Contract' => 'contracts',
+            'ContractType' => 'contract_types',
+
+            // Congés
+            'Leave' => 'leaves',
+            'LeaveType' => 'leaves',
+            'LeaveBalance' => 'leaves',
+            'Absence' => 'absences',
+            'Replacement' => 'absences',
+            'Attendance' => 'attendances',
+
+            // Paie
+            'SalaryGrid' => 'salary_grids',
+            'Payroll' => 'payrolls',
+            'PayrollItem' => 'payrolls',
+
+            // Quote-Parts
+            'RevenueDeclaration' => 'quotparts',
+            'QuotpartPeriod' => 'quotparts',
+            'QuotpartDistribution' => 'quotparts',
+            'QuotpartDeductionType' => 'quotparts',
+            'QuotpartParameter' => 'quotparts',
+            'MedicalActivity' => 'medical_activities',
+
+            // Évaluations
+            'PerformanceEvaluation' => 'evaluations',
+            'EvaluationCriterion' => 'evaluations',
+
+            // Autres
+            'Training' => 'trainings',
+            'Document' => 'documents',
+            'DocumentCategory' => 'documents',
+            'Dependent' => 'dependents',
+            'Advancement' => 'employees',
+            'CnpsPreRegistration' => 'employees',
+            'Signatory' => 'settings',
+            'SystemSetting' => 'settings',
+            'NotificationTemplate' => 'settings',
+            'User' => 'users',
         ];
 
         return $plurals[$modelName] ?? strtolower($modelName) . 's';

@@ -315,8 +315,8 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
 
         // 6. EMPLOYEE - Employé standard
-        $employee = Role::firstOrCreate(['name' => 'employee'], ['guard_name' => 'web']);
-        $employee->syncPermissions([
+        $standardUser = Role::firstOrCreate(['name' => 'standard_user'], ['guard_name' => 'web']);
+        $standardUser->syncPermissions([
             // Congés (ses propres demandes)
             'create_leaves',
             'view_leaves',

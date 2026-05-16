@@ -7,59 +7,38 @@ use App\Models\User;
 
 class RevenueDeclarationPolicy
 {
-    /**
-     * Voir la liste
-     */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf', 'drh']);
     }
 
-    /**
-     * Voir un élément spécifique
-     */
     public function view(User $user, RevenueDeclaration $revenueDeclaration): bool
     {
-        return $user->can('view_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf', 'drh']);
     }
 
-    /**
-     * Créer
-     */
     public function create(User $user): bool
     {
-        return $user->can('create_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf']);
     }
 
-    /**
-     * Modifier
-     */
     public function update(User $user, RevenueDeclaration $revenueDeclaration): bool
     {
-        return $user->can('edit_quotparts');
+        // Ne peut pas modifier si validée
+        if ($revenueDeclaration->status === 'validated') {
+            return false;
+        }
+
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf']);
     }
 
-    /**
-     * Supprimer
-     */
     public function delete(User $user, RevenueDeclaration $revenueDeclaration): bool
     {
-        return $user->can('delete_quotparts');
+        return $user->hasRole(['super_admin', 'admin']);
     }
 
-    /**
-     * Restaurer
-     */
-    public function restore(User $user, RevenueDeclaration $revenueDeclaration): bool
+    public function validate(User $user, RevenueDeclaration $revenueDeclaration): bool
     {
-        return $user->can('edit_quotparts');
-    }
-
-    /**
-     * Supprimer définitivement
-     */
-    public function forceDelete(User $user, RevenueDeclaration $revenueDeclaration): bool
-    {
-        return $user->hasRole('super_admin') && $user->can('delete_quotparts');
+        return $user->hasAnyRole(['super_admin', 'daf', 'dg']);
     }
 }

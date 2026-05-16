@@ -7,59 +7,48 @@ use App\Models\User;
 
 class QuotpartDistributionPolicy
 {
-    /**
-     * Voir la liste
-     */
     public function viewAny(User $user): bool
     {
-        return $user->can('distribute_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf', 'drh', 'dg']);
     }
 
-    /**
-     * Voir un élément spécifique
-     */
     public function view(User $user, QuotpartDistribution $quotpartDistribution): bool
     {
-        return $user->can('distribute_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf', 'drh', 'dg']);
     }
 
-    /**
-     * Créer
-     */
     public function create(User $user): bool
     {
-        return $user->can('distribute_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf']);
     }
 
-    /**
-     * Modifier
-     */
     public function update(User $user, QuotpartDistribution $quotpartDistribution): bool
     {
-        return $user->can('distribute_quotparts');
+        // Ne peut pas modifier si approuvée
+        if ($quotpartDistribution->status === 'approved') {
+            return false;
+        }
+
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf']);
     }
 
-    /**
-     * Supprimer
-     */
     public function delete(User $user, QuotpartDistribution $quotpartDistribution): bool
     {
-        return $user->can('distribute_quotparts');
+        return $user->hasRole(['super_admin', 'admin']);
     }
 
-    /**
-     * Restaurer
-     */
-    public function restore(User $user, QuotpartDistribution $quotpartDistribution): bool
+    public function approve(User $user, QuotpartDistribution $quotpartDistribution): bool
     {
-        return $user->can('distribute_quotparts');
+        return $user->hasAnyRole(['super_admin', 'dg', 'daf']);
     }
 
-    /**
-     * Supprimer définitivement
-     */
-    public function forceDelete(User $user, QuotpartDistribution $quotpartDistribution): bool
+    public function distribute(User $user, QuotpartDistribution $quotpartDistribution): bool
     {
-        return $user->hasRole('super_admin') && $user->can('distribute_quotparts');
+        // Seulement si approuvée
+        if ($quotpartDistribution->status !== 'approved') {
+            return false;
+        }
+
+        return $user->hasAnyRole(['super_admin', 'daf']);
     }
 }

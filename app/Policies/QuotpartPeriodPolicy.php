@@ -7,59 +7,38 @@ use App\Models\User;
 
 class QuotpartPeriodPolicy
 {
-    /**
-     * Voir la liste
-     */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf', 'drh']);
     }
 
-    /**
-     * Voir un élément spécifique
-     */
     public function view(User $user, QuotpartPeriod $quotpartPeriod): bool
     {
-        return $user->can('view_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf', 'drh']);
     }
 
-    /**
-     * Créer
-     */
     public function create(User $user): bool
     {
-        return $user->can('create_quotparts');
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf']);
     }
 
-    /**
-     * Modifier
-     */
     public function update(User $user, QuotpartPeriod $quotpartPeriod): bool
     {
-        return $user->can('edit_quotparts');
+        // Ne peut pas modifier si clôturée
+        if ($quotpartPeriod->status === 'closed') {
+            return false;
+        }
+
+        return $user->hasAnyRole(['super_admin', 'admin', 'daf']);
     }
 
-    /**
-     * Supprimer
-     */
     public function delete(User $user, QuotpartPeriod $quotpartPeriod): bool
     {
-        return $user->can('delete_quotparts');
+        return $user->hasRole(['super_admin', 'admin']);
     }
 
-    /**
-     * Restaurer
-     */
-    public function restore(User $user, QuotpartPeriod $quotpartPeriod): bool
+    public function close(User $user, QuotpartPeriod $quotpartPeriod): bool
     {
-        return $user->can('edit_quotparts');
-    }
-
-    /**
-     * Supprimer définitivement
-     */
-    public function forceDelete(User $user, QuotpartPeriod $quotpartPeriod): bool
-    {
-        return $user->hasRole('super_admin') && $user->can('delete_quotparts');
+        return $user->hasAnyRole(['super_admin', 'daf', 'dg']);
     }
 }
