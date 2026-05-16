@@ -16,6 +16,12 @@ class PermissionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
 
+    protected static ?string $navigationLabel = 'Permissions';
+
+    protected static ?string $navigationGroup = '🔧 Administration';
+
+    protected static ?int $navigationSort = 2;
+
     public static function getModelLabel(): string
     {
         return 'Permission';
@@ -24,16 +30,6 @@ class PermissionResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return 'Permissions';
-    }
-
-    public static function getNavigationGroup(): ?string
-    {
-        return '🔧 Administration';
-    }
-
-    public static function getNavigationSort(): ?int
-    {
-        return 2;
     }
 
     public static function form(Form $form): Form
@@ -47,30 +43,36 @@ class PermissionResource extends Resource
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(255)
-                            ->placeholder('Ex: view_employees, create_payrolls')
-                            ->helperText('Format: action_module (ex: view_employees, create_leaves)'),
+                            ->placeholder('Ex: view_employees, create_contracts')
+                            ->helperText('Format: action_module (ex: view_employees, create_leaves)')
+                            ->columnSpanFull(),
 
                         Forms\Components\Select::make('module')
                             ->label('Module')
                             ->options([
-                                'employees' => 'Gestion du Personnel',
-                                'leaves' => 'Congés & Absences',
-                                'payroll' => 'Paie',
-                                'documents' => 'Documents',
-                                'settings' => 'Paramètres',
-                                'reports' => 'Rapports',
-                                'evaluations' => 'Évaluations',
-                                'trainings' => 'Formations',
-                                'procurement' => 'Marchés Publics',
+                                'system' => '⚙️ Système',
+                                'users' => '👤 Utilisateurs',
+                                'employees' => '👥 Gestion du Personnel',
+                                'health' => '🏥 Assurance Santé & Ayants Droit',
+                                'contracts' => '📄 Contrats',
+                                'leaves' => '🏖️ Congés & Absences',
+                                'payroll' => '💰 Paie & Rémunération',
+                                'evaluations' => '⭐ Évaluations',
+                                'documents' => '📂 Documents',
+                                'reports' => '📊 Rapports',
+                                'settings' => '⚙️ Paramètres',
+                                'structure' => '🏢 Structure Organisationnelle',
                             ])
                             ->searchable()
+                            ->required()
                             ->helperText('Catégorie de la permission'),
 
                         Forms\Components\Textarea::make('description')
                             ->label('Description')
-                            ->rows(2)
+                            ->rows(3)
                             ->maxLength(500)
-                            ->placeholder('Décrivez ce que cette permission permet de faire'),
+                            ->placeholder('Décrivez ce que cette permission permet de faire')
+                            ->columnSpanFull(),
 
                         Forms\Components\Hidden::make('guard_name')
                             ->default('web'),
@@ -83,9 +85,19 @@ class PermissionResource extends Resource
                             ->label('Attribuer aux Rôles')
                             ->relationship('roles', 'name')
                             ->columns(3)
-                            ->gridDirection('row'),
+                            ->gridDirection('row')
+                            ->options([
+                                'super_admin' => '🔴 Super Admin',
+                                'admin' => '🔵 Admin',
+                                'drh' => '👔 DRH',
+                                'daf' => '💼 DAF',
+                                'dg' => '🎯 DG',
+                                'chef_service' => '👨‍💼 Chef de Service',
+                                'employee' => '👤 Employé',
+                            ]),
                     ])
-                    ->collapsible(),
+                    ->collapsible()
+                    ->collapsed(false),
             ]);
     }
 
@@ -98,41 +110,84 @@ class PermissionResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->copyable()
-                    ->copyMessage('Permission copiée'),
+                    ->copyMessage('Permission copiée')
+                    ->weight('bold')
+                    ->icon('heroicon-o-key'),
 
                 Tables\Columns\BadgeColumn::make('module')
                     ->label('Module')
                     ->colors([
+                        'danger' => 'system',
+                        'info' => 'users',
                         'primary' => 'employees',
-                        'success' => 'leaves',
-                        'warning' => 'payroll',
-                        'info' => 'documents',
-                        'danger' => 'settings',
-                        'secondary' => fn($state) => in_array($state, ['reports', 'evaluations', 'trainings', 'procurement']),
+                        'success' => 'health',
+                        'warning' => 'contracts',
+                        'purple' => 'leaves',
+                        'orange' => 'payroll',
+                        'pink' => 'evaluations',
+                        'cyan' => 'documents',
+                        'indigo' => 'reports',
+                        'gray' => 'settings',
+                        'lime' => 'structure',
                     ])
-                    ->searchable(),
+                    ->formatStateUsing(fn($state) => match ($state) {
+                        'system' => '⚙️ Système',
+                        'users' => '👤 Utilisateurs',
+                        'employees' => '👥 Personnel',
+                        'health' => '🏥 Santé',
+                        'contracts' => '📄 Contrats',
+                        'leaves' => '🏖️ Congés',
+                        'payroll' => '💰 Paie',
+                        'evaluations' => '⭐ Évaluations',
+                        'documents' => '📂 Documents',
+                        'reports' => '📊 Rapports',
+                        'settings' => '⚙️ Paramètres',
+                        'structure' => '🏢 Structure',
+                        default => $state,
+                    })
+                    ->searchable()
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('description')
                     ->label('Description')
-                    ->limit(50)
+                    ->limit(60)
                     ->tooltip(fn($record) => $record->description)
-                    ->toggleable(),
+                    ->toggleable()
+                    ->wrap(),
 
                 Tables\Columns\TextColumn::make('roles.name')
                     ->label('Rôles')
                     ->badge()
-                    ->separator(',')
+                    ->separator(', ')
                     ->colors([
-                        'danger' => 'admin',
+                        'danger' => 'super_admin',
+                        'primary' => 'admin',
                         'success' => 'drh',
                         'warning' => 'daf',
                         'info' => 'dg',
-                        'primary' => 'chef_service',
-                        'secondary' => 'employee',
-                    ]),
+                        'purple' => 'chef_service',
+                        'gray' => 'employee',
+                    ])
+                    ->formatStateUsing(fn($state) => match ($state) {
+                        'super_admin' => '🔴 Super Admin',
+                        'admin' => '🔵 Admin',
+                        'drh' => '👔 DRH',
+                        'daf' => '💼 DAF',
+                        'dg' => '🎯 DG',
+                        'chef_service' => '👨‍💼 Chef Service',
+                        'employee' => '👤 Employé',
+                        default => $state,
+                    })
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Créée le')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('updated_at')
+                    ->label('Modifiée le')
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -141,33 +196,64 @@ class PermissionResource extends Resource
                 Tables\Filters\SelectFilter::make('module')
                     ->label('Module')
                     ->options([
-                        'employees' => 'Gestion du Personnel',
-                        'leaves' => 'Congés & Absences',
-                        'payroll' => 'Paie',
-                        'documents' => 'Documents',
-                        'settings' => 'Paramètres',
-                        'reports' => 'Rapports',
-                        'evaluations' => 'Évaluations',
-                        'trainings' => 'Formations',
-                        'procurement' => 'Marchés Publics',
-                    ]),
+                        'system' => '⚙️ Système',
+                        'users' => '👤 Utilisateurs',
+                        'employees' => '👥 Gestion du Personnel',
+                        'health' => '🏥 Assurance Santé & Ayants Droit',
+                        'contracts' => '📄 Contrats',
+                        'leaves' => '🏖️ Congés & Absences',
+                        'payroll' => '💰 Paie & Rémunération',
+                        'evaluations' => '⭐ Évaluations',
+                        'documents' => '📂 Documents',
+                        'reports' => '📊 Rapports',
+                        'settings' => '⚙️ Paramètres',
+                        'structure' => '🏢 Structure Organisationnelle',
+                    ])
+                    ->multiple(),
 
                 Tables\Filters\SelectFilter::make('roles')
                     ->label('Rôle')
                     ->relationship('roles', 'name')
-                    ->multiple(),
+                    ->multiple()
+                    ->options([
+                        'super_admin' => '🔴 Super Admin',
+                        'admin' => '🔵 Admin',
+                        'drh' => '👔 DRH',
+                        'daf' => '💼 DAF',
+                        'dg' => '🎯 DG',
+                        'chef_service' => '👨‍💼 Chef de Service',
+                        'employee' => '👤 Employé',
+                    ]),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()
+                        ->label('Voir')
+                        ->icon('heroicon-o-eye'),
+
+                    Tables\Actions\EditAction::make()
+                        ->label('Modifier')
+                        ->icon('heroicon-o-pencil'),
+
+                    Tables\Actions\DeleteAction::make()
+                        ->label('Supprimer')
+                        ->icon('heroicon-o-trash')
+                        ->requiresConfirmation(),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Supprimer sélection')
+                        ->requiresConfirmation(),
                 ]),
             ])
-            ->defaultSort('name');
+            ->defaultSort('module', 'asc')
+            ->groups([
+                Tables\Grouping\Group::make('module')
+                    ->label('Par Module')
+                    ->collapsible(),
+            ]);
     }
 
     public static function getPages(): array
@@ -177,5 +263,20 @@ class PermissionResource extends Resource
             'create' => Pages\CreatePermission::route('/create'),
             'edit' => Pages\EditPermission::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Désactiver la navigation pour les non-admins
+     */
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        // Super Admin et Admin uniquement
+        return $user->hasAnyRole(['super_admin', 'admin']);
     }
 }
