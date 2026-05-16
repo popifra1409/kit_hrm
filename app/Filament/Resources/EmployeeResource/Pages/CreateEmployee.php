@@ -349,9 +349,9 @@ class CreateEmployee extends CreateRecord
                                         ->label('Indice')
                                         ->numeric()
                                         ->minValue(100)
-                                        ->maxValue(1200)
+                                        ->maxValue(1600)
                                         ->placeholder('Ex: 350, 450, 600')
-                                        ->helperText('100 à 1200')
+                                        ->helperText('100 à 1600')
                                         ->reactive()
                                         ->live(),
                                 ]),
@@ -520,44 +520,6 @@ class CreateEmployee extends CreateRecord
                         ])
                         ->collapsible(),
                 ]),
-
-            // ========================================
-            // ÉTAPE 7 : DISCIPLINE & STATUT
-            // ========================================
-            // Wizard\Step::make('Discipline & Statut')
-            //     ->description('Points disciplinaires et statut')
-            //     ->icon('heroicon-o-shield-check')
-            //     ->schema([
-            //         Forms\Components\Grid::make(2)
-            //             ->schema([
-            //                 Forms\Components\TextInput::make('disciplinary_points')
-            //                     ->label('Points Disciplinaires')
-            //                     ->numeric()
-            //                     ->default(0)
-            //                     ->minValue(0)
-            //                     ->suffix('points')
-            //                     ->helperText('0 = Aucune sanction'),
-
-            //                 Forms\Components\Select::make('status')
-            //                     ->label('Statut de l\'Employé')
-            //                     ->options([
-            //                         'active' => 'Actif',
-            //                         'on_leave' => 'En Congé',
-            //                         'retired' => 'Retraité',
-            //                         'suspended' => 'Suspendu',
-            //                         'terminated' => 'Contrat Résilié',
-            //                     ])
-            //                     ->default('active')
-            //                     ->native(false),
-            //             ]),
-
-            //         Forms\Components\Textarea::make('disciplinary_notes')
-            //             ->label('Notes Disciplinaires')
-            //             ->rows(3)
-            //             ->maxLength(65535)
-            //             ->placeholder('Historique des sanctions ou observations...')
-            //             ->columnSpanFull(),
-            //     ]),
         ];
     }
 

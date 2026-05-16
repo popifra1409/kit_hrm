@@ -314,8 +314,8 @@ class EditEmployee extends EditRecord
                                                 ->label('Catégorie')
                                                 ->numeric()
                                                 ->minValue(1)
-                                                ->maxValue(12)  // CHANGÉ
-                                                ->suffix('/ 12')  // CHANGÉ
+                                                ->maxValue(12)  
+                                                ->suffix('/ 12') 
                                                 ->reactive()
                                                 ->live(),
 
@@ -323,8 +323,8 @@ class EditEmployee extends EditRecord
                                                 ->label('Échelon')
                                                 ->numeric()
                                                 ->minValue(1)
-                                                ->maxValue(12)  // CHANGÉ
-                                                ->suffix('/ 12')  // CHANGÉ
+                                                ->maxValue(12)
+                                                ->suffix('/ 12')
                                                 ->reactive()
                                                 ->live(),
 
@@ -332,7 +332,7 @@ class EditEmployee extends EditRecord
                                                 ->label('Indice')
                                                 ->numeric()
                                                 ->minValue(100)
-                                                ->maxValue(1200)
+                                                ->maxValue(1600)
                                                 ->placeholder('Ex: 350, 450')
                                                 ->reactive()
                                                 ->live(),

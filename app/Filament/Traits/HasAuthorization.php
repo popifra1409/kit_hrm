@@ -69,6 +69,13 @@ trait HasAuthorization
             'ContractType' => 'contract_types',
             'SalaryGrid' => 'salary_grids',
             'Leave' => 'leaves',
+            'PerformanceEvaluation' => 'evaluations',
+            'Training' => 'trainings',
+            'Document' => 'documents',
+            'User' => 'users',
+            'Department' => 'departments',
+            'Service' => 'services',
+            'Position' => 'positions',
         ];
 
         return $plurals[$modelName] ?? strtolower($modelName) . 's';

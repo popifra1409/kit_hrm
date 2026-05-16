@@ -20,9 +20,49 @@ class EmployeeResource extends Resource
 
     protected static ?string $model = Employee::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-users';
 
+    protected static ?string $navigationLabel = 'Employés';
 
+    protected static ?string $navigationGroup = '👥 Gestion du Personnel';
+
+    protected static ?int $navigationSort = 1;
+
+    public static function getModelLabel(): string
+    {
+        return 'Employé';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'Employés';
+    }
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                // Ajoutez votre formulaire ici
+                Forms\Components\Section::make('Informations Générales')
+                    ->schema([
+                        Forms\Components\TextInput::make('matricule')
+                            ->label('Matricule')
+                            ->required()
+                            ->unique(ignoreRecord: true),
+
+                        Forms\Components\TextInput::make('first_name')
+                            ->label('Prénom')
+                            ->required(),
+
+                        Forms\Components\TextInput::make('last_name')
+                            ->label('Nom')
+                            ->required(),
+
+                        // Ajoutez les autres champs...
+                    ])
+                    ->columns(2),
+            ]);
+    }
 
     public static function table(Table $table): Table
     {
@@ -31,12 +71,16 @@ class EmployeeResource extends Resource
                 Tables\Columns\TextColumn::make('matricule')
                     ->label('Matricule')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->weight('bold')
+                    ->copyable()
+                    ->copyMessage('Matricule copié'),
 
                 Tables\Columns\TextColumn::make('full_name')
                     ->label('Nom complet')
                     ->searchable(['first_name', 'last_name'])
-                    ->sortable(),
+                    ->sortable()
+                    ->weight('medium'),
 
                 Tables\Columns\TextColumn::make('gender')
                     ->label('Sexe')
@@ -130,7 +174,9 @@ class EmployeeResource extends Resource
                         'non_soignant' => 'Personnel Non-Soignant',
                         'paramedical' => 'Personnel Paramédical',
                         'autres' => 'Autres',
-                    ]),
+                    ])
+                    ->multiple(),
+
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Statut')
                     ->options([
@@ -139,112 +185,141 @@ class EmployeeResource extends Resource
                         'retired' => 'Retraité',
                         'suspended' => 'Suspendu',
                         'terminated' => 'Résilié',
-                    ]),
+                    ])
+                    ->multiple(),
 
                 Tables\Filters\SelectFilter::make('current_service_id')
                     ->label('Service')
-                    ->relationship('currentService', 'name'),
+                    ->relationship('currentService', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\TrashedFilter::make()
+                    ->label('Archivés'),
             ])
             ->actions([
-                Tables\Actions\Action::make('generate_professional_card')
-                    ->label('Carte Pro')
-                    ->icon('heroicon-o-identification')
-                    ->color('info')
-                    ->visible(fn($record) => !$record->hasActiveProfessionalCard())
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        try {
-                            // Vérifier carte existante
-                            $existingCard = \App\Models\EmployeeCard::where('employee_id', $record->id)
-                                ->where('card_type', 'professional')
-                                ->where('is_active', true)
-                                ->first();
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('generate_professional_card')
+                        ->label('Carte Pro')
+                        ->icon('heroicon-o-identification')
+                        ->color('info')
+                        ->visible(
+                            fn($record) =>
+                            !$record->hasActiveProfessionalCard() &&
+                                static::checkCan('update', $record) // ✅ Correction
+                        )
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            try {
+                                // Vérifier carte existante
+                                $existingCard = \App\Models\EmployeeCard::where('employee_id', $record->id)
+                                    ->where('card_type', 'professional')
+                                    ->where('is_active', true)
+                                    ->first();
 
-                            if ($existingCard) {
+                                if ($existingCard) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Carte déjà existante')
+                                        ->warning()
+                                        ->body('Carte N° ' . $existingCard->card_number)
+                                        ->send();
+                                    return;
+                                }
+
+                                // Créer la carte
+                                $card = \App\Models\EmployeeCard::create([
+                                    'employee_id' => $record->id,
+                                    'card_type' => 'professional',
+                                    'issue_date' => now(),
+                                    'expiry_date' => now()->addYears(5),
+                                    'status' => 'issued',
+                                ]);
+
+                                $card->generateCardNumber();
+                                $card->generateQrCode();
+
+                                // Générer le PDF
+                                $pdfService = new \App\Services\CardPdfService();
+                                $pdfPath = $pdfService->generateProfessionalCard($card);
+
+                                $card->activate();
+
                                 \Filament\Notifications\Notification::make()
-                                    ->title('Carte déjà existante')
-                                    ->warning()
-                                    ->body('Carte N° ' . $existingCard->card_number)
+                                    ->title('Carte professionnelle créée')
+                                    ->success()
+                                    ->body('N° ' . $card->card_number)
+                                    ->actions([
+                                        \Filament\Notifications\Actions\Action::make('download')
+                                            ->label('Télécharger PDF')
+                                            ->url(\Storage::url($pdfPath))
+                                            ->openUrlInNewTab(),
+                                    ])
                                     ->send();
-                                return;
-                            }
+                            } catch (\Exception $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Erreur')
+                                    ->danger()
+                                    ->body($e->getMessage())
+                                    ->send();
 
-                            // Créer la carte
+                                \Log::error('Erreur création carte', [
+                                    'employee_id' => $record->id,
+                                    'error' => $e->getMessage()
+                                ]);
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('generate_health_card')
+                        ->label('Carte Santé')
+                        ->icon('heroicon-o-heart')
+                        ->color('success')
+                        ->visible(
+                            fn($record) =>
+                            !$record->hasActiveHealthCard() &&
+                                static::checkCan('update', $record) // ✅ Correction
+                        )
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
                             $card = \App\Models\EmployeeCard::create([
                                 'employee_id' => $record->id,
-                                'card_type' => 'professional',
+                                'card_type' => 'health_coverage',
                                 'issue_date' => now(),
-                                'expiry_date' => now()->addYears(5),
+                                'expiry_date' => now()->addYear(),
                                 'status' => 'issued',
                             ]);
 
                             $card->generateCardNumber();
                             $card->generateQrCode();
-
-                            // Générer le PDF
-                            $pdfService = new \App\Services\CardPdfService();
-                            $pdfPath = $pdfService->generateProfessionalCard($card);
-
                             $card->activate();
 
                             \Filament\Notifications\Notification::make()
-                                ->title('Carte professionnelle créée')
+                                ->title('Carte de prise en charge créée')
                                 ->success()
                                 ->body('N° ' . $card->card_number)
-                                ->actions([
-                                    \Filament\Notifications\Actions\Action::make('download')
-                                        ->label('Télécharger PDF')
-                                        ->url(\Storage::url($pdfPath))
-                                        ->openUrlInNewTab(),
-                                ])
                                 ->send();
-                        } catch (\Exception $e) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Erreur')
-                                ->danger()
-                                ->body($e->getMessage())
-                                ->send();
+                        }),
 
-                            \Log::error('Erreur création carte', [
-                                'employee_id' => $record->id,
-                                'error' => $e->getMessage()
-                            ]);
-                        }
-                    }),
+                    Tables\Actions\ViewAction::make()
+                        ->label('Voir')
+                        ->visible(fn($record) => static::checkCan('view', $record)), // ✅ Correction
 
-                Tables\Actions\Action::make('generate_health_card')
-                    ->label('Carte Santé')
-                    ->icon('heroicon-o-heart')
-                    ->color('success')
-                    ->visible(fn($record) => !$record->hasActiveHealthCard())
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $card = \App\Models\EmployeeCard::create([
-                            'employee_id' => $record->id,
-                            'card_type' => 'health_coverage',
-                            'issue_date' => now(),
-                            'expiry_date' => now()->addYear(),
-                            'status' => 'issued',
-                        ]);
+                    Tables\Actions\EditAction::make()
+                        ->label('Modifier')
+                        ->visible(fn($record) => static::checkCan('update', $record)), // ✅ Correction
 
-                        $card->generateCardNumber();
-                        $card->generateQrCode();
-                        $card->activate();
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Carte de prise en charge créée')
-                            ->success()
-                            ->body('N° ' . $card->card_number)
-                            ->send();
-                    }),
-                Tables\Actions\ViewAction::make()->label('Voir')->visible(fn($record) => static::can('view', $record)),
-                Tables\Actions\EditAction::make()->label('Modifier')->visible(fn($record) => static::can('update', $record)),
+                    Tables\Actions\DeleteAction::make()
+                        ->label('Supprimer')
+                        ->visible(fn($record) => static::checkCan('delete', $record)), // ✅ Correction
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer')->visible(fn($record) => static::can('delete', $record)),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Supprimer sélection')
+                        ->visible(fn() => static::canDeleteAny()), // ✅ Correction - Pas de $record
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array
@@ -266,35 +341,11 @@ class EmployeeResource extends Resource
         ];
     }
 
-    public static function getModelLabel(): string
+    public static function getEloquentQuery(): Builder
     {
-        return 'Employé';
-    }
-
-    public static function getPluralModelLabel(): string
-    {
-        return 'Employés';
-    }
-
-    // Après la classe, ajoutez ces méthodes statiques
-
-    public static function getNavigationGroup(): ?string
-    {
-        return '👥 Gestion du Personnel';
-    }
-
-    public static function getNavigationSort(): ?int
-    {
-        return 1;
-    }
-
-    public static function getNavigationIcon(): ?string
-    {
-        return 'heroicon-o-users';
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Employés';
+        return parent::getEloquentQuery()
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
+            ]);
     }
 }
