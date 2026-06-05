@@ -12,13 +12,13 @@ class DepartmentSeeder extends Seeder
     {
         // Départements Administratifs
         $adminDepts = [
-            ['name' => 'Direction Générale', 'code' => 'DG', 'type' => 'administrative', 'level' => 1],
-            ['name' => 'Direction Administrative et Financière', 'code' => 'DAF', 'type' => 'administrative', 'level' => 2],
-            ['name' => 'Direction des Ressources Humaines', 'code' => 'DRH', 'type' => 'administrative', 'level' => 2],
-            ['name' => 'Direction des Approvisionnements', 'code' => 'DA', 'type' => 'administrative', 'level' => 2],
-            ['name' => 'Direction de la Comptabilité', 'code' => 'DCOMPT', 'type' => 'administrative', 'level' => 2],
-            ['name' => 'Service Informatique', 'code' => 'SI', 'type' => 'administrative', 'level' => 3],
-            ['name' => 'Service Communication', 'code' => 'SCOM', 'type' => 'administrative', 'level' => 3],
+            ['name' => 'Direction Générale', 'code' => 'DG', 'type' => 'support', 'level' => 1],
+            ['name' => 'Direction Administrative et Financière', 'code' => 'DAF', 'type' => 'support', 'level' => 2],
+            ['name' => 'Direction des Ressources Humaines', 'code' => 'DRH', 'type' => 'support', 'level' => 2],
+            ['name' => 'Direction des Approvisionnements', 'code' => 'DA', 'type' => 'support', 'level' => 2],
+            ['name' => 'Direction de la Comptabilité', 'code' => 'DCOMPT', 'type' => 'support', 'level' => 2],
+            ['name' => 'Service Informatique', 'code' => 'SI', 'type' => 'support', 'level' => 3],
+            ['name' => 'Service Communication', 'code' => 'SCOM', 'type' => 'support', 'level' => 3],
         ];
 
         foreach ($adminDepts as $dept) {

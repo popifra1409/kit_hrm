@@ -17,11 +17,12 @@ class DatabaseSeeder extends Seeder
             LeaveTypeSeeder::class,
             SalaryGridSeeder::class,
             PayrollItemSeeder::class,
-            SupplierSeeder::class,
+            // SupplierSeeder::class,
             DocumentCategorySeeder::class,
             InitializeEmployeeEchelonsSeeder::class,
             NotificationTemplateSeeder::class,
             ServiceSeeder::class,
             EvaluationCriterionSeeder::class,
+        ]);
     }
 }

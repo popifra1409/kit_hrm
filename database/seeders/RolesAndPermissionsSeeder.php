@@ -252,12 +252,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'calculate_payrolls',
             'generate_payslips',
             'export_payrolls',
-            // Marchés Publics (complet)
-            'view_procurement',
-            'create_procurement',
-            'edit_procurement',
-            'approve_procurement',
-            'manage_bids',
             // Documents
             'view_documents',
             'download_documents',
@@ -285,9 +279,6 @@ class RolesAndPermissionsSeeder extends Seeder
             // Évaluations (validation)
             'view_evaluations',
             'validate_evaluations',
-            // Marchés (approbation)
-            'view_procurement',
-            'approve_procurement',
             // Rapports
             'view_reports',
             'generate_reports',
