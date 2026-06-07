@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SalaryGridResource\Pages;
 
 use App\Filament\Resources\SalaryGridResource;
 use App\Models\SalaryGrid;
+use App\Enums\EmployeeClassification;
 use Filament\Actions;
 use Filament\Resources\Pages\Page;
 
@@ -33,16 +34,29 @@ class MatrixView extends Page
 
     public function getViewData(): array
     {
-        $grids = SalaryGrid::where('is_active', true)
+        // ✅ GRILLES CAMEROUNAISES (A1, A2, B1, etc.)
+        $cameroonGrids = SalaryGrid::where('classification_type', 'cameroon')
+            ->where('is_active', true)
+            ->orderBy('category')
+            ->orderBy('echelon')
+            ->get()
+            ->groupBy('category');
+
+        // ✅ GRILLES NUMÉRIQUES (1-12)
+        $numericGrids = SalaryGrid::where('classification_type', 'numeric')
+            ->where('is_active', true)
             ->orderBy('category')
             ->orderBy('echelon')
             ->get()
             ->groupBy('category');
 
         return [
-            'grids' => $grids,
-            'categories' => range(1, 12),
-            'echelons' => range(1, 12),
+            'cameroonGrids' => $cameroonGrids,
+            'numericGrids' => $numericGrids,
+            'cameroonCategories' => array_keys(EmployeeClassification::getCategoryOptions()),
+            'cameroonEchelons' => array_keys(EmployeeClassification::getEchelonOptions()),
+            'numericCategories' => range(1, 12),
+            'numericEchelons' => range(1, 12),
         ];
     }
 }

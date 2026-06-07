@@ -5,6 +5,7 @@ namespace App\Filament\Resources\SalaryGridResource\Pages;
 use App\Filament\Resources\SalaryGridResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Builder;
 
 class ListSalaryGrids extends ListRecords
 {

@@ -306,25 +306,38 @@ class EditEmployee extends EditRecord
                                         ->maxLength(255),
                                 ]),
 
-                            Forms\Components\Fieldset::make('Classification Salariale')
+                            Forms\Components\Section::make('Classification Salariale')
                                 ->schema([
+                                    // Sélecteur Type de Classification
+                                    Forms\Components\Radio::make('classification_type')
+                                        ->label('Type de Classification')
+                                        ->options([
+                                            'cameroon' => '🇨🇲 Nomenclature Camerounaise (Fonctionnaires)',
+                                            'numeric' => '🔢 Classification Numérique 1-12 (Contractuels)',
+                                        ])
+                                        ->default('cameroon')
+                                        ->reactive()
+                                        ->live()
+                                        ->inline(),
+
+                                    // ✅ OPTION 1 : NOMENCLATURE CAMEROUNAISE (A1, A2, B1, etc.)
+                                    Forms\Components\Hidden::make('classification_format')
+                                        ->default('cameroon'),
+
                                     Forms\Components\Grid::make(3)
+                                        ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                                         ->schema([
-                                            Forms\Components\TextInput::make('category_number')
+                                            Forms\Components\Select::make('category_number')
                                                 ->label('Catégorie')
-                                                ->numeric()
-                                                ->minValue(1)
-                                                ->maxValue(12)  
-                                                ->suffix('/ 12') 
+                                                ->options(\App\Enums\EmployeeClassification::getCategoryOptions())
+                                                ->searchable()
                                                 ->reactive()
                                                 ->live(),
 
-                                            Forms\Components\TextInput::make('echelon_number')
+                                            Forms\Components\Select::make('echelon_number')
                                                 ->label('Échelon')
-                                                ->numeric()
-                                                ->minValue(1)
-                                                ->maxValue(12)
-                                                ->suffix('/ 12')
+                                                ->options(\App\Enums\EmployeeClassification::getEchelonOptions())
+                                                ->searchable()
                                                 ->reactive()
                                                 ->live(),
 
@@ -332,40 +345,112 @@ class EditEmployee extends EditRecord
                                                 ->label('Indice')
                                                 ->numeric()
                                                 ->minValue(100)
-                                                ->maxValue(1600)
-                                                ->placeholder('Ex: 350, 450')
+                                                ->placeholder('Ex: 350')
                                                 ->reactive()
                                                 ->live(),
                                         ]),
 
+                                    Forms\Components\Placeholder::make('classification_cameroon_display')
+                                        ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                                        ->label('📋 Classification')
+                                        ->content(function (Forms\Get $get) {
+                                            $category = $get('category_number');
+                                            $echelon = $get('echelon_number');
+
+                                            if ($category && $echelon) {
+                                                $classification = "{$category}{$echelon}";
+                                                $label = \App\Enums\EmployeeClassification::getLabel($classification);
+
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                    <p class="text-lg font-bold text-blue-900">' . $classification . '</p>
+                                    <p class="text-sm text-blue-700">' . $label . '</p>
+                                    ' . ($get('indice') ? '<p class="text-sm text-blue-700 mt-1">🔢 Indice: ' . $get('indice') . '</p>' : '') . '
+                                </div>'
+                                                );
+                                            }
+
+                                            return 'Sélectionnez catégorie et échelon';
+                                        })
+                                        ->columnSpanFull(),
+
+                                    // ✅ OPTION 2 : CLASSIFICATION NUMÉRIQUE (1-12)
+                                    Forms\Components\Grid::make(3)
+                                        ->visible(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
+                                        ->schema([
+                                            Forms\Components\Select::make('category_number')
+                                                ->label('Catégorie')
+                                                ->options(array_combine(range(1, 12), range(1, 12)))
+                                                ->searchable()
+                                                ->reactive()
+                                                ->live()
+                                                ->helperText('Numéro de 1 à 12'),
+
+                                            Forms\Components\Select::make('echelon_number')
+                                                ->label('Échelon')
+                                                ->options(array_combine(range(1, 12), range(1, 12)))
+                                                ->searchable()
+                                                ->reactive()
+                                                ->live()
+                                                ->helperText('Numéro de 1 à 12'),
+
+                                            Forms\Components\TextInput::make('indice')
+                                                ->label('Indice')
+                                                ->numeric()
+                                                ->minValue(100)
+                                                ->placeholder('Ex: 450')
+                                                ->reactive()
+                                                ->live(),
+                                        ]),
+
+                                    Forms\Components\Placeholder::make('classification_numeric_display')
+                                        ->visible(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
+                                        ->label('📋 Classification')
+                                        ->content(function (Forms\Get $get) {
+                                            $category = $get('category_number');
+                                            $echelon = $get('echelon_number');
+
+                                            if ($category && $echelon) {
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                    <p class="text-lg font-bold text-purple-900">Cat. ' . $category . ' / Éch. ' . $echelon . '</p>
+                                    <p class="text-sm text-purple-700">Classification numérique (Contractuel)</p>
+                                    ' . ($get('indice') ? '<p class="text-sm text-purple-700 mt-1">🔢 Indice: ' . $get('indice') . '</p>' : '') . '
+                                </div>'
+                                                );
+                                            }
+
+                                            return 'Sélectionnez catégorie et échelon';
+                                        })
+                                        ->columnSpanFull(),
+
+                                    // ✅ AFFICHAGE DU SALAIRE (Peu importe la nomenclature)
                                     Forms\Components\Placeholder::make('salary_display')
                                         ->label('💰 Salaire de Base')
                                         ->content(function (Forms\Get $get) {
                                             $category = $get('category_number');
                                             $echelon = $get('echelon_number');
-                                            $indice = $get('indice');
 
                                             if ($category && $echelon) {
                                                 try {
                                                     $baseSalary = \App\Models\SalaryGrid::getBaseSalary($category, $echelon);
 
-                                                    $html = '<div class="p-3 bg-green-50 rounded-lg">
-                                    <p class="text-lg font-bold text-green-900">' .
-                                                        number_format($baseSalary, 0, ',', ' ') . ' FCFA</p>
-                                    <p class="text-sm text-green-700">Cat. ' . $category .
-                                                        ' / Éch. ' . $echelon;
+                                                    $classification = $get('classification_type') === 'cameroon'
+                                                        ? $category . $echelon
+                                                        : "Cat. {$category} / Éch. {$echelon}";
 
-                                                    if ($indice) {
-                                                        $html .= ' / Ind. ' . $indice;
-                                                    }
-
-                                                    $html .= '</p></div>';
-
-                                                    return new \Illuminate\Support\HtmlString($html);
+                                                    return new \Illuminate\Support\HtmlString(
+                                                        '<div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                                        <p class="text-lg font-bold text-green-900">' .
+                                                            number_format($baseSalary, 0, ',', ' ') . ' FCFA</p>
+                                        <p class="text-sm text-green-700">Classification: ' . $classification . '</p>
+                                    </div>'
+                                                    );
                                                 } catch (\Exception $e) {
-                                                    return 'Non disponible';
+                                                    return '<div class="p-3 bg-yellow-50 rounded-lg text-yellow-700">⚠️ Grille salariale non trouvée</div>';
                                                 }
                                             }
+
                                             return 'Sélectionnez catégorie et échelon';
                                         })
                                         ->columnSpanFull(),

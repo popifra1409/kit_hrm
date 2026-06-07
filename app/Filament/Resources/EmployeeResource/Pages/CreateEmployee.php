@@ -306,13 +306,13 @@ class CreateEmployee extends CreateRecord
                             Forms\Components\TextInput::make('category_recruitment')
                                 ->label('Catégorie de Recrutement')
                                 ->maxLength(50)
-                                ->placeholder('Ex: A1, B2, C3')
+                                ->placeholder('Ex: A1, B2 ou 1, 2')
                                 ->helperText('Classification initiale'),
 
                             Forms\Components\TextInput::make('category_current')
                                 ->label('Catégorie Actuelle')
                                 ->maxLength(50)
-                                ->placeholder('Ex: A1, B2, C3')
+                                ->placeholder('Ex: A1, B2 ou 1, 2')
                                 ->helperText('Classification actuelle'),
 
                             Forms\Components\TextInput::make('qualification')
@@ -321,29 +321,100 @@ class CreateEmployee extends CreateRecord
                                 ->placeholder('Ex: Médecin Spécialiste, IDE, Comptable'),
                         ]),
 
-                    Forms\Components\Fieldset::make('Grille Salariale')
+                    Forms\Components\Section::make('Grille Salariale')
                         ->schema([
-                            Forms\Components\Grid::make(3)
-                                ->schema([
-                                    Forms\Components\TextInput::make('category_number')
-                                        ->label('Catégorie (Grille)')
-                                        ->numeric()
-                                        ->minValue(1)
-                                        ->maxValue(12)  // CHANGÉ : 12 au lieu de 11
-                                        ->suffix('/ 12')  // CHANGÉ
-                                        ->helperText('1 à 12')  // CHANGÉ
-                                        ->reactive()
-                                        ->live(),
+                            // 🎯 SÉLECTEUR TYPE DE CLASSIFICATION
+                            Forms\Components\Radio::make('classification_type')
+                                ->label('Type de Classification')
+                                ->options([
+                                    'cameroon' => '🇨🇲 Nomenclature Camerounaise (Fonctionnaires: A1, B2, C3, etc.)',
+                                    'numeric' => '🔢 Classification Numérique (Contractuels: 1-12)',
+                                ])
+                                ->default('cameroon')
+                                ->reactive()
+                                ->live()
+                                ->inline()
+                                ->required(),
 
-                                    Forms\Components\TextInput::make('echelon_number')
+                            // ✅ OPTION 1 : NOMENCLATURE CAMEROUNAISE
+                            Forms\Components\Grid::make(3)
+                                ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                                ->schema([
+                                    Forms\Components\Select::make('category_number')
+                                        ->label('Catégorie')
+                                        ->options(\App\Enums\EmployeeClassification::getCategoryOptions())
+                                        ->searchable()
+                                        ->reactive()
+                                        ->live()
+                                        ->helperText('A, B, C, D, E')
+                                        ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon'),
+
+                                    Forms\Components\Select::make('echelon_number')
                                         ->label('Échelon')
+                                        ->options(\App\Enums\EmployeeClassification::getEchelonOptions())
+                                        ->searchable()
+                                        ->reactive()
+                                        ->live()
+                                        ->helperText('1 à 8')
+                                        ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon'),
+
+                                    Forms\Components\TextInput::make('indice')
+                                        ->label('Indice')
                                         ->numeric()
-                                        ->minValue(1)
-                                        ->maxValue(12)  // CHANGÉ : 12 au lieu de 15
-                                        ->suffix('/ 12')  // CHANGÉ
-                                        ->helperText('1 à 12')  // CHANGÉ
+                                        ->minValue(100)
+                                        ->placeholder('Ex: 350, 450, 600')
+                                        ->helperText('100 à 1600')
                                         ->reactive()
                                         ->live(),
+                                ]),
+
+                            Forms\Components\Placeholder::make('classification_cameroon_display')
+                                ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                                ->label('📋 Classification Camerounaise')
+                                ->content(function (Forms\Get $get) {
+                                    $category = $get('category_number');
+                                    $echelon = $get('echelon_number');
+
+                                    if ($category && $echelon) {
+                                        $classification = "{$category}{$echelon}";
+                                        $label = \App\Enums\EmployeeClassification::getLabel($classification);
+
+                                        return new \Illuminate\Support\HtmlString(
+                                            '<div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
+                                    <p class="text-xl font-bold text-blue-900">' . $classification . '</p>
+                                    <p class="text-sm text-blue-700">' . $label . '</p>
+                                    ' . ($get('indice') ? '<p class="text-sm text-blue-700 mt-2">🔢 Indice: ' . $get('indice') . '</p>' : '') . '
+                                </div>'
+                                        );
+                                    }
+
+                                    return '<p class="text-gray-500">Sélectionnez catégorie et échelon</p>';
+                                })
+                                ->columnSpanFull(),
+
+                            // ✅ OPTION 2 : CLASSIFICATION NUMÉRIQUE (1-12)
+                            Forms\Components\Grid::make(3)
+                                ->visible(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
+                                ->schema([
+                                    Forms\Components\Select::make('category_number')
+                                        ->label('Catégorie')
+                                        ->options(array_combine(range(1, 12), range(1, 12)))
+                                        ->searchable()
+                                        ->reactive()
+                                        ->live()
+                                        ->suffix('/ 12')
+                                        ->helperText('1 à 12')
+                                        ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric'),
+
+                                    Forms\Components\Select::make('echelon_number')
+                                        ->label('Échelon')
+                                        ->options(array_combine(range(1, 12), range(1, 12)))
+                                        ->searchable()
+                                        ->reactive()
+                                        ->live()
+                                        ->suffix('/ 12')
+                                        ->helperText('1 à 12')
+                                        ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric'),
 
                                     Forms\Components\TextInput::make('indice')
                                         ->label('Indice')
@@ -356,25 +427,26 @@ class CreateEmployee extends CreateRecord
                                         ->live(),
                                 ]),
 
-                            Forms\Components\Placeholder::make('classification_display')
-                                ->label('📊 Classification Complète')
+                            Forms\Components\Placeholder::make('classification_numeric_display')
+                                ->visible(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
+                                ->label('📋 Classification Numérique')
                                 ->content(function (Forms\Get $get) {
                                     $category = $get('category_number');
                                     $echelon = $get('echelon_number');
-                                    $indice = $get('indice');
 
-                                    if ($category && $echelon && $indice) {
+                                    if ($category && $echelon) {
                                         return new \Illuminate\Support\HtmlString(
-                                            '<div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
-                                    <p class="text-xl font-bold text-blue-900">
-                                        Catégorie ' . $category . ' / Échelon ' . $echelon . ' / Indice ' . $indice . '
+                                            '<div class="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg">
+                                    <p class="text-xl font-bold text-purple-900">
+                                        Catégorie ' . $category . ' / Échelon ' . $echelon . '
                                     </p>
+                                    <p class="text-sm text-purple-700">Classification numérique (Contractuel)</p>
+                                    ' . ($get('indice') ? '<p class="text-sm text-purple-700 mt-2">🔢 Indice: ' . $get('indice') . '</p>' : '') . '
                                 </div>'
                                         );
-                                    } elseif ($category && $echelon) {
-                                        return 'Catégorie ' . $category . ' / Échelon ' . $echelon . ' (Indice manquant)';
                                     }
-                                    return 'Saisissez la catégorie, l\'échelon et l\'indice';
+
+                                    return '<p class="text-gray-500">Sélectionnez catégorie et échelon</p>';
                                 })
                                 ->columnSpanFull(),
                         ]),
@@ -394,23 +466,29 @@ class CreateEmployee extends CreateRecord
                                 ->helperText('Dernière promotion/avancement'),
                         ]),
 
+                    // 💰 AFFICHAGE DU SALAIRE (Peu importe la nomenclature)
                     Forms\Components\Placeholder::make('salary_info')
                         ->label('💰 Informations Salariales')
                         ->content(function (Forms\Get $get) {
                             $category = $get('category_number');
                             $echelon = $get('echelon_number');
                             $indice = $get('indice');
+                            $type = $get('classification_type');
 
                             if ($category && $echelon) {
                                 try {
                                     $baseSalary = \App\Models\SalaryGrid::getBaseSalary($category, $echelon);
+
+                                    $classification = $type === 'cameroon'
+                                        ? $category . $echelon
+                                        : "Cat. {$category} / Éch. {$echelon}";
 
                                     $html = '<div class="p-4 bg-green-50 border border-green-200 rounded-lg space-y-2">
                             <p class="text-lg font-bold text-green-900">
                                 💵 Salaire de Base : ' . number_format($baseSalary, 0, ',', ' ') . ' FCFA
                             </p>
                             <p class="text-sm text-green-700">
-                                📊 Catégorie ' . $category . ' - Échelon ' . $echelon;
+                                📊 ' . $classification;
 
                                     if ($indice) {
                                         $html .= ' - Indice ' . $indice;
@@ -420,10 +498,13 @@ class CreateEmployee extends CreateRecord
 
                                     return new \Illuminate\Support\HtmlString($html);
                                 } catch (\Exception $e) {
-                                    return 'Grille salariale non disponible';
+                                    return '<div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700">
+                            ⚠️ Grille salariale non disponible pour cette classification
+                        </div>';
                                 }
                             }
-                            return 'Sélectionnez une catégorie et un échelon pour voir le salaire de base';
+
+                            return '<p class="text-gray-500">Sélectionnez une catégorie et un échelon pour voir le salaire de base</p>';
                         })
                         ->columnSpanFull(),
                 ]),

@@ -34,34 +34,106 @@ class SalaryGridResource extends Resource
     {
         return $form
             ->schema([
+                Forms\Components\Section::make('Type de Classification')
+                    ->schema([
+                        Forms\Components\Radio::make('classification_type')
+                            ->label('Type de Classification')
+                            ->options([
+                                'cameroon' => '🇨🇲 Nomenclature Camerounaise (Fonctionnaires)',
+                                'numeric' => '🔢 Classification Numérique (Contractuels)',
+                            ])
+                            ->default('numeric')
+                            ->reactive()
+                            ->live()
+                            ->inline()
+                            ->required(),
+                    ])
+                    ->icon('heroicon-o-tag')
+                    ->collapsed(),
+
                 Forms\Components\Section::make('Catégorie et Échelon')
                     ->schema([
                         Forms\Components\Grid::make(3)
+                            ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                            ->schema([
+                                Forms\Components\Select::make('category')
+                                    ->label('Catégorie')
+                                    ->options(\App\Enums\EmployeeClassification::getCategoryOptions())
+                                    ->searchable()
+                                    ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                                    ->native(false),
+
+                                Forms\Components\Select::make('echelon')
+                                    ->label('Échelon')
+                                    ->options(\App\Enums\EmployeeClassification::getEchelonOptions())
+                                    ->searchable()
+                                    ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                                    ->native(false),
+
+                                Forms\Components\Placeholder::make('classification_display')
+                                    ->label('📋 Classification')
+                                    ->content(function (Forms\Get $get) {
+                                        $category = $get('category');
+                                        $echelon = $get('echelon');
+
+                                        if ($category && $echelon) {
+                                            $classification = "{$category}{$echelon}";
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="p-2 bg-blue-100 text-blue-900 rounded font-bold">' . $classification . '</div>'
+                                            );
+                                        }
+                                        return 'Sélectionnez catégorie et échelon';
+                                    }),
+                            ]),
+
+                        Forms\Components\Grid::make(3)
+                            ->visible(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
                             ->schema([
                                 Forms\Components\Select::make('category')
                                     ->label('Catégorie')
                                     ->options(array_combine(range(1, 12), range(1, 12)))
-                                    ->required()
+                                    ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
                                     ->native(false)
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->suffix('/ 12'),
 
                                 Forms\Components\Select::make('echelon')
                                     ->label('Échelon')
                                     ->options(array_combine(range(1, 12), range(1, 12)))
-                                    ->required()
+                                    ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
                                     ->native(false)
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->suffix('/ 12'),
 
-                                Forms\Components\TextInput::make('base_salary')
-                                    ->label('Salaire de Base')
-                                    ->required()
-                                    ->numeric()
-                                    ->prefix('FCFA')
-                                    ->step(1000)
-                                    ->helperText('Montant en FCFA'),
+                                Forms\Components\Placeholder::make('classification_numeric_display')
+                                    ->label('📋 Classification')
+                                    ->content(function (Forms\Get $get) {
+                                        $category = $get('category');
+                                        $echelon = $get('echelon');
+
+                                        if ($category && $echelon) {
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="p-2 bg-purple-100 text-purple-900 rounded font-bold">Cat. ' . $category . ' / Éch. ' . $echelon . '</div>'
+                                            );
+                                        }
+                                        return 'Sélectionnez catégorie et échelon';
+                                    }),
                             ]),
                     ])
                     ->icon('heroicon-o-currency-dollar'),
+
+                Forms\Components\Section::make('Salaire de Base')
+                    ->schema([
+                        Forms\Components\TextInput::make('base_salary')
+                            ->label('Salaire de Base')
+                            ->required()
+                            ->numeric()
+                            ->prefix('FCFA')
+                            ->step(1000)
+                            ->helperText('Montant en FCFA')
+                            ->columnSpanFull(),
+                    ])
+                    ->icon('heroicon-o-banknotes'),
 
                 Forms\Components\Section::make('Période d\'Application')
                     ->schema([
@@ -110,11 +182,19 @@ class SalaryGridResource extends Resource
     {
         return $table
             ->modifyQueryUsing(
-                fn(Builder $query) =>
-                $query->orderBy('category', 'asc')
+                fn(Builder $query) => $query
+                    ->orderBy('classification_type', 'asc')
+                    ->orderBy('category', 'asc')
                     ->orderBy('echelon', 'asc')
             )
             ->columns([
+                Tables\Columns\TextColumn::make('classification_type')
+                    ->label('Type')
+                    ->formatStateUsing(fn($state) => $state === 'cameroon' ? '🇨🇲 Cameroun' : '🔢 Numérique')
+                    ->badge()
+                    ->color(fn($state) => $state === 'cameroon' ? 'info' : 'warning')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('category')
                     ->label('Catégorie')
                     ->sortable()
@@ -135,16 +215,26 @@ class SalaryGridResource extends Resource
 
                 Tables\Columns\TextColumn::make('indice')
                     ->label('Indice')
-                    ->getStateUsing(
-                        fn(SalaryGrid $record) =>
-                        'C' . $record->category . 'E' . $record->echelon
-                    )
+                    ->getStateUsing(function (SalaryGrid $record) {
+                        if ($record->classification_type === 'cameroon') {
+                            return "{$record->category}{$record->echelon}";
+                        }
+                        return "C{$record->category}E{$record->echelon}";
+                    })
                     ->badge()
                     ->color('info')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where(function ($q) use ($search) {
-                            if (preg_match('/C?(\d+)[_\-\s]*E?(\d+)/i', $search, $matches)) {
-                                $q->where('category', $matches[1])
+                            // Recherche par nomenclature camerounaise (A1, B2, etc.)
+                            if (preg_match('/^([A-E])([1-8])$/i', $search, $matches)) {
+                                $q->where('classification_type', 'cameroon')
+                                    ->where('category', strtoupper($matches[1]))
+                                    ->where('echelon', $matches[2]);
+                            }
+                            // Recherche par numérique (C1E2, etc.)
+                            elseif (preg_match('/C?(\d+)[_\-\s]*E?(\d+)/i', $search, $matches)) {
+                                $q->where('classification_type', 'numeric')
+                                    ->where('category', $matches[1])
                                     ->where('echelon', $matches[2]);
                             }
                         });
@@ -198,81 +288,45 @@ class SalaryGridResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                // ... tous vos filtres restent identiques
+                // ✅ FILTRE SIMPLE PAR TYPE
+                Tables\Filters\SelectFilter::make('classification_type')
+                    ->label('Type de Classification')
+                    ->options([
+                        'cameroon' => '🇨🇲 Nomenclature Camerounaise',
+                        'numeric' => '🔢 Classification Numérique',
+                    ]),
+
+                // ✅ FILTRE SIMPLE PAR CATÉGORIE (tous les types)
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Catégorie')
-                    ->options(array_combine(range(1, 12), range(1, 12)))
-                    ->multiple()
+                    ->options(function () {
+                        $cameroon = \App\Enums\EmployeeClassification::getCategoryOptions();
+                        $numeric = array_combine(range(1, 12), range(1, 12));
+                        return array_merge($cameroon, $numeric);
+                    })
                     ->searchable(),
 
+                // ✅ FILTRE SIMPLE PAR ÉCHELON
                 Tables\Filters\SelectFilter::make('echelon')
                     ->label('Échelon')
                     ->options(array_combine(range(1, 12), range(1, 12)))
-                    ->multiple()
                     ->searchable(),
 
-                Filter::make('salary_range')
-                    ->form([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('min_salary')
-                                    ->label('Salaire minimum')
-                                    ->numeric()
-                                    ->prefix('FCFA')
-                                    ->placeholder('Ex: 100000'),
-
-                                Forms\Components\TextInput::make('max_salary')
-                                    ->label('Salaire maximum')
-                                    ->numeric()
-                                    ->prefix('FCFA')
-                                    ->placeholder('Ex: 500000'),
-                            ]),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when(
-                                $data['min_salary'],
-                                fn(Builder $query, $min): Builder => $query->where('base_salary', '>=', $min),
-                            )
-                            ->when(
-                                $data['max_salary'],
-                                fn(Builder $query, $max): Builder => $query->where('base_salary', '<=', $max),
-                            );
-                    })
-                    ->indicateUsing(function (array $data): array {
-                        $indicators = [];
-                        if ($data['min_salary'] ?? null) {
-                            $indicators[] = Tables\Filters\Indicator::make('Salaire min: ' . number_format($data['min_salary'], 0, ',', ' ') . ' FCFA')
-                                ->removeField('min_salary');
-                        }
-                        if ($data['max_salary'] ?? null) {
-                            $indicators[] = Tables\Filters\Indicator::make('Salaire max: ' . number_format($data['max_salary'], 0, ',', ' ') . ' FCFA')
-                                ->removeField('max_salary');
-                        }
-                        return $indicators;
-                    }),
-
+                // ✅ FILTRE STATUT
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Statut')
                     ->placeholder('Tous')
                     ->trueLabel('Actifs uniquement')
                     ->falseLabel('Inactifs uniquement'),
-
-                Tables\Filters\TernaryFilter::make('in_effect')
-                    ->label('En Vigueur')
-                    ->placeholder('Tous')
-                    ->trueLabel('En vigueur')
-                    ->falseLabel('Archivés')
-                    ->queries(
-                        true: fn(Builder $query): Builder => $query->whereNull('end_date')->orWhere('end_date', '>', now()),
-                        false: fn(Builder $query): Builder => $query->whereNotNull('end_date')->where('end_date', '<=', now()),
-                    ),
             ])
             ->actions([
-                // ... vos actions restent identiques
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
-                // ... vos bulk actions restent identiques
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
             ])
             ->emptyStateActions([
                 Tables\Actions\CreateAction::make()

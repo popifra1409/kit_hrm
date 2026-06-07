@@ -2,14 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SalaryGrid extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
+        'classification_type',
         'category',
         'echelon',
         'base_salary',
@@ -20,27 +18,28 @@ class SalaryGrid extends Model
     ];
 
     protected $casts = [
-        'category' => 'integer',
-        'echelon' => 'integer',
-        'base_salary' => 'decimal:2',
         'effective_date' => 'date',
         'end_date' => 'date',
         'is_active' => 'boolean',
+        // ❌ N'PAS caster category et echelon en integer
+        // ✅ Les laisser comme string/varchar
     ];
 
-    // Méthode statique pour obtenir le salaire de base
-    public static function getBaseSalary($category, $echelon, $date = null)
+    /**
+     * Récupérer le salaire de base
+     */
+    public static function getBaseSalary($category, $echelon): float
     {
-        $date = $date ?? now();
-
-        return self::where('category', $category)
-            ->where('echelon', $echelon)
-            ->where('effective_date', '<=', $date)
-            ->where(function ($query) use ($date) {
-                $query->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $date);
-            })
+        $salary = self::where('category', (string) $category)
+            ->where('echelon', (string) $echelon)
             ->where('is_active', true)
-            ->value('base_salary') ?? 0;
+            ->latest('effective_date')
+            ->first();
+
+        if (!$salary) {
+            throw new \Exception("Grille salariale non trouvée pour {$category}/{$echelon}");
+        }
+
+        return (float) $salary->base_salary;
     }
 }
