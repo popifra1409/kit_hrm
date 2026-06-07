@@ -14,19 +14,133 @@ class EditEmployee extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
-
-            Actions\Action::make('view_qr_code')
-                ->label('Voir QR Code')
+            // ✅ BOUTON GÉNÉRATION - ACTIF SEULEMENT SI PAS DE QR CODE
+            Actions\Action::make('generate_qr_code')
+                ->label('🔄 Générer QR Code Manquant')
                 ->icon('heroicon-o-qr-code')
-                ->color('info')
-                ->visible(fn($record) => $record->qr_code_path)
-                ->modalContent(fn($record) => view('filament.modals.qr-code-view', [
-                    'employee' => $record
-                ]))
-                ->modalSubmitAction(false)
-                ->modalCancelActionLabel('Fermer'),
+                ->color('warning')
+                ->visible(fn() => !$this->record->qr_code_path)
+                ->requiresConfirmation()
+                ->modalHeading('Générer le QR Code')
+                ->modalDescription('Êtes-vous sûr de vouloir générer le QR code pour cet employé ?')
+                ->action(function () {
+                    try {
+                        $employee = $this->record;
+
+                        // 1. Créer le contenu du QR code
+                        $qrContent = json_encode([
+                            'matricule' => $employee->matricule,
+                            'nom' => $employee->full_name,
+                            'id' => $employee->id,
+                            'timestamp' => now()->toIso8601String(),
+                        ]);
+
+                        // 2. Générer l'image QR code en PNG
+                        $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
+                            ->size(300)
+                            ->margin(1)
+                            ->generate($qrContent);
+
+                        // 3. Créer le dossier s'il n'existe pas
+                        if (!file_exists(storage_path('app/public/qrcodes'))) {
+                            mkdir(storage_path('app/public/qrcodes'), 0755, true);
+                        }
+
+                        // 4. Sauvegarder le fichier
+                        $filename = 'qrcodes/employee-' . $employee->id . '.png';
+                        $filePath = storage_path('app/public/' . $filename);
+
+                        file_put_contents($filePath, $qrCode);
+
+                        // 5. Vérifier que le fichier a été créé
+                        if (!file_exists($filePath)) {
+                            throw new \Exception('Impossible de créer le fichier QR code');
+                        }
+
+                        // 6. Mettre à jour l'employé
+                        $employee->update([
+                            'qr_code_path' => $filename,
+                        ]);
+
+                        // 7. Notification de succès
+                        \Filament\Notifications\Notification::make()
+                            ->title('✅ QR Code généré avec succès !')
+                            ->success()
+                            ->body('Le QR code est maintenant disponible.')
+                            ->duration(5)
+                            ->send();
+
+                        // 8. Rafraîchir la page
+                        $this->redirect($this->getResource()::getUrl('edit', ['record' => $employee->id]));
+                    } catch (\Exception $e) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('❌ Erreur lors de la génération')
+                            ->danger()
+                            ->body('Détail: ' . $e->getMessage())
+                            ->send();
+
+                        \Log::error('QR Code generation error', [
+                            'employee_id' => $employee->id ?? null,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }),
+
+            // ✅ BADGE INFO - AFFICHE SI QR CODE EXISTE
+            Actions\Action::make('qr_code_exists')
+                ->label('✅ QR Code Existant')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn() => $this->record->qr_code_path)
+                ->disabled()
+                ->tooltip('Le QR code existe déjà'),
+
+            Actions\DeleteAction::make(),
         ];
+    }
+
+    // ✅ AJOUTER : Récupérer les données avant remplissage du formulaire
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // S'assurer que les champs sont bien des strings
+        $data['category_number'] = (string) ($data['category_number'] ?? '');
+        $data['echelon_number'] = (string) ($data['echelon_number'] ?? '');
+
+        // ✅ DÉTERMINER LA BRANCHE CORRECTEMENT
+        // Si le record a un department_id → médical
+        // Sinon → administratif
+        if ($this->record && $this->record->department_id) {
+            $data['branch_type'] = 'medical';
+        } else {
+            $data['branch_type'] = 'administrative';
+        }
+
+        // Déterminer le type de classification s'il n'existe pas
+        if (!isset($data['classification_type']) || !$data['classification_type']) {
+            // Si category_number est une lettre (A, B, C, etc.) → cameroon
+            $data['classification_type'] = preg_match('/^[A-E]$/', $data['category_number'] ?? '') ? 'cameroon' : 'numeric';
+        }
+
+        return $data;
+    }
+
+    // ✅ AJOUTER : Préparer les données avant sauvegarde
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        // S'assurer que category_number et echelon_number restent des strings
+        $data['category_number'] = (string) $data['category_number'];
+        $data['echelon_number'] = (string) $data['echelon_number'];
+
+        // S'assurer que classification_type a une valeur
+        if (!isset($data['classification_type']) || !$data['classification_type']) {
+            $data['classification_type'] = 'numeric';
+        }
+
+        // ⚠️ IMPORTANT : Ne pas sauvegarder branch_type (ce n'est pas une colonne BD)
+        // On la supprime pour éviter les erreurs
+        unset($data['branch_type']);
+
+        return $data;
     }
 
     public function form(Forms\Form $form): Forms\Form
@@ -308,6 +422,10 @@ class EditEmployee extends EditRecord
 
                             Forms\Components\Section::make('Classification Salariale')
                                 ->schema([
+                                    // ✅ AJOUTER : Champ Hidden pour classification_type
+                                    Forms\Components\Hidden::make('classification_type')
+                                        ->default('numeric'),
+
                                     // Sélecteur Type de Classification
                                     Forms\Components\Radio::make('classification_type')
                                         ->label('Type de Classification')
@@ -315,15 +433,12 @@ class EditEmployee extends EditRecord
                                             'cameroon' => '🇨🇲 Nomenclature Camerounaise (Fonctionnaires)',
                                             'numeric' => '🔢 Classification Numérique 1-12 (Contractuels)',
                                         ])
-                                        ->default('cameroon')
                                         ->reactive()
                                         ->live()
-                                        ->inline(),
+                                        ->inline()
+                                        ->required(),
 
                                     // ✅ OPTION 1 : NOMENCLATURE CAMEROUNAISE (A1, A2, B1, etc.)
-                                    Forms\Components\Hidden::make('classification_format')
-                                        ->default('cameroon'),
-
                                     Forms\Components\Grid::make(3)
                                         ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                                         ->schema([
@@ -543,23 +658,40 @@ class EditEmployee extends EditRecord
                     Forms\Components\Tabs\Tab::make('QR Code & Biométrie')
                         ->icon('heroicon-o-qr-code')
                         ->schema([
+                            // ✅ SI PAS DE QR CODE : Afficher bouton génération
+                            Forms\Components\Placeholder::make('no_qr_code')
+                                ->label('⚠️ Pas de QR Code')
+                                ->content(fn() => new \Illuminate\Support\HtmlString(
+                                    '<div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <p class="text-yellow-700 mb-3">Aucun QR code n\'a été généré pour cet employé.</p>
+                    <button type="button" onclick="document.querySelector(\'[data-action=generate_qr]\')?.click()"
+                        class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition">
+                        🔄 Générer le QR Code Maintenant
+                    </button>
+                </div>'
+                                ))
+                                ->visible(fn($record) => !$record?->qr_code_path)
+                                ->columnSpanFull(),
+
+                            // ✅ SI QR CODE EXISTE : Afficher l'image
                             Forms\Components\Placeholder::make('qr_code_preview')
-                                ->label('QR Code')
+                                ->label('✅ QR Code Généré')
                                 ->content(function ($record) {
                                     if ($record && $record->qr_code_path) {
                                         return new \Illuminate\Support\HtmlString(
                                             '<div class="flex flex-col items-center gap-3">
-                                                <img src="' . \Storage::url($record->qr_code_path) . '" 
-                                                     alt="QR Code" 
-                                                     class="w-64 h-64 border-2 border-gray-300 rounded-lg shadow">
-                                                <div class="text-sm text-gray-600">
-                                                    <strong>Matricule:</strong> ' . $record->matricule . '
-                                                </div>
-                                            </div>'
+                            <img src="' . \Storage::url($record->qr_code_path) . '" 
+                                 alt="QR Code" 
+                                 class="w-64 h-64 border-2 border-green-300 rounded-lg shadow bg-white p-2">
+                            <div class="text-sm text-gray-600">
+                                <strong>Matricule:</strong> ' . $record->matricule . '
+                            </div>
+                        </div>'
                                         );
                                     }
-                                    return 'QR Code non généré';
+                                    return '';
                                 })
+                                ->visible(fn($record) => $record?->qr_code_path)
                                 ->columnSpanFull(),
 
                             Forms\Components\Grid::make(2)
@@ -576,28 +708,6 @@ class EditEmployee extends EditRecord
                                             : 'Non enregistré'),
                                 ]),
                         ]),
-
-                    // TAB 8 : DISCIPLINE
-                    // Forms\Components\Tabs\Tab::make('Discipline')
-                    //     ->icon('heroicon-o-shield-check')
-                    //     ->schema([
-                    //         Forms\Components\Grid::make(2)
-                    //             ->schema([
-                    //                 Forms\Components\TextInput::make('disciplinary_points')
-                    //                     ->label('Points Disciplinaires')
-                    //                     ->numeric()
-                    //                     ->default(0)
-                    //                     ->minValue(0)
-                    //                     ->step(0.5)
-                    //                     ->suffix('points'),
-                    //             ]),
-
-                    //         Forms\Components\Textarea::make('disciplinary_notes')
-                    //             ->label('Notes Disciplinaires')
-                    //             ->rows(4)
-                    //             ->maxLength(65535)
-                    //             ->columnSpanFull(),
-                    //     ]),
                 ])
                 ->columnSpanFull()
                 ->persistTabInQueryString(),

@@ -158,11 +158,10 @@ class ViewEmployee extends ViewRecord
                         Infolists\Components\TextEntry::make('personnel_type')
                             ->label('Type de Personnel')
                             ->formatStateUsing(fn($state) => match ($state) {
-                                'medical' => '👨‍⚕️ Médical',
+                                'soignant' => '👨‍⚕️ Soignant',
+                                'non_soignant' => '💼 Non-Soignant',
                                 'paramedical' => '🩺 Paramédical',
-                                'administrative' => '💼 Administratif',
-                                'technical' => '🔧 Technique',
-                                'support' => '🛠️ Support',
+                                'autres' => '🔧 Autres',
                                 default => $state,
                             })
                             ->badge(),
@@ -183,30 +182,74 @@ class ViewEmployee extends ViewRecord
                     ])
                     ->columns(3),
 
+                // ✅ SECTION CLASSIFICATION SALARIALE - ADAPTÉE
                 Infolists\Components\Section::make('Classification Salariale')
                     ->schema([
-                        Infolists\Components\TextEntry::make('category_number')
-                            ->label('Catégorie')
-                            ->suffix(' / 11')
+                        Infolists\Components\TextEntry::make('classification_type')
+                            ->label('Type de Classification')
+                            ->formatStateUsing(fn($state) => $state === 'cameroon' ? '🇨🇲 Nomenclature Camerounaise' : '🔢 Classification Numérique')
                             ->badge()
-                            ->color('primary'),
+                            ->color(fn($state) => $state === 'cameroon' ? 'info' : 'warning'),
 
-                        Infolists\Components\TextEntry::make('echelon_number')
-                            ->label('Échelon')
-                            ->suffix(' / 15')
-                            ->badge()
-                            ->color('success'),
+                        // ✅ AFFICHAGE CAMEROUNAIS
+                        Infolists\Components\Group::make([
+                            Infolists\Components\TextEntry::make('category_number')
+                                ->label('Catégorie')
+                                ->badge()
+                                ->color('primary')
+                                ->size('lg')
+                                ->weight('bold'),
 
-                        Infolists\Components\TextEntry::make('indice')
-                            ->label('Indice')
-                            ->badge()
-                            ->color('warning'),
+                            Infolists\Components\TextEntry::make('echelon_number')
+                                ->label('Échelon')
+                                ->badge()
+                                ->color('success')
+                                ->size('lg')
+                                ->weight('bold'),
+
+                            Infolists\Components\TextEntry::make('indice')
+                                ->label('Indice')
+                                ->badge()
+                                ->color('warning'),
+                        ])
+                            ->visible(fn($record) => $record->classification_type === 'cameroon')
+                            ->columns(3),
+
+                        // ✅ AFFICHAGE NUMÉRIQUE
+                        Infolists\Components\Group::make([
+                            Infolists\Components\TextEntry::make('category_number')
+                                ->label('Catégorie')
+                                ->suffix(' / 12')
+                                ->badge()
+                                ->color('primary')
+                                ->size('lg')
+                                ->weight('bold'),
+
+                            Infolists\Components\TextEntry::make('echelon_number')
+                                ->label('Échelon')
+                                ->suffix(' / 12')
+                                ->badge()
+                                ->color('success')
+                                ->size('lg')
+                                ->weight('bold'),
+
+                            Infolists\Components\TextEntry::make('indice')
+                                ->label('Indice')
+                                ->badge()
+                                ->color('warning'),
+                        ])
+                            ->visible(fn($record) => $record->classification_type === 'numeric')
+                            ->columns(3),
 
                         Infolists\Components\TextEntry::make('category_recruitment')
                             ->label('Catégorie de Recrutement'),
 
                         Infolists\Components\TextEntry::make('echelon_start_date')
                             ->label('Début Échelon Actuel')
+                            ->date('d/m/Y'),
+
+                        Infolists\Components\TextEntry::make('last_advancement_date')
+                            ->label('Dernier Avancement')
                             ->date('d/m/Y'),
                     ])
                     ->columns(3),
@@ -230,12 +273,10 @@ class ViewEmployee extends ViewRecord
                             ->label('Ville'),
                     ])
                     ->columns(2),
-
                 Infolists\Components\Section::make('QR Code')
                     ->schema([
-                        Infolists\Components\ImageEntry::make('qr_code_path')
-                            ->label('QR Code Employé')
-                            ->size(200)
+                        Infolists\Components\View::make('filament.infolists.qr-code-display')
+                            ->viewData(['record' => $this->record])
                             ->visible(fn($record) => $record->qr_code_path),
                     ])
                     ->collapsible()

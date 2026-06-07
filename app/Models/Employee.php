@@ -16,6 +16,7 @@ class Employee extends Model
         'first_name',
         'last_name',
         'gender',
+        'classification_type',
         'category_recruitment',
         'category_current',
         'category_number',
@@ -67,8 +68,8 @@ class Employee extends Model
         'service_start_date' => 'date',
         'retirement_date' => 'date',
         'is_active' => 'boolean',
-        'category_number' => 'integer',
-        'echelon_number' => 'integer',
+        // 'category_number' => 'integer',
+        // 'echelon_number' => 'integer',
         'indice' => 'integer',
         'retirement_age' => 'integer',
         'children_under_6' => 'integer',
@@ -367,6 +368,10 @@ class Employee extends Model
         return \Storage::url($this->qr_code_path);
     }
 
+    public function getQrCodeUrlAttribute(): ?string
+    {
+        return $this->qr_code_path ? \Storage::url($this->qr_code_path) : null;
+    }
     // ========================================
     // HELPERS - HIÉRARCHIE
     // ========================================
