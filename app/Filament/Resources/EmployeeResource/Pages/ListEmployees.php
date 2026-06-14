@@ -15,8 +15,24 @@ class ListEmployees extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            // ✅ EXPORT CSV (Compatible UTF-8)
+            Actions\Action::make('export_csv')
+                ->label('CSV')
+                ->icon('heroicon-o-document-text')
+                ->color('warning')
+                ->tooltip('Exporter en CSV')
+                ->action(fn() => $this->exportCsv()),
+
+            // ✅ EXPORT EXCEL
+            Actions\Action::make('export_excel')
+                ->label('Excel')
+                ->icon('heroicon-o-table-cells')
+                ->color('success')
+                ->tooltip('Exporter en Excel')
+                ->action(fn() => $this->exportExcel()),
+
             Actions\CreateAction::make()
-                ->label('Nouvel Employé')
+                ->label('Nouvel Employe')
                 ->icon('heroicon-o-plus'),
         ];
     }
@@ -34,7 +50,7 @@ class ListEmployees extends ListRecords
                 ->badge(fn() => \App\Models\Employee::where('is_active', true)->count())
                 ->badgeColor('success'),
 
-            'medical' => Tab::make('Branche Médicale')
+            'medical' => Tab::make('Branche Medicale')
                 ->icon('heroicon-o-heart')
                 ->modifyQueryUsing(
                     fn(Builder $query) =>
@@ -45,8 +61,7 @@ class ListEmployees extends ListRecords
                 )
                 ->badge(fn() => \App\Models\Employee::whereHas(
                     'currentService',
-                    fn($q) =>
-                    $q->where('type', 'medical')
+                    fn($q) => $q->where('type', 'medical')
                 )->orWhereNotNull('department_id')->count())
                 ->badgeColor('success'),
 
@@ -56,14 +71,12 @@ class ListEmployees extends ListRecords
                     fn(Builder $query) =>
                     $query->whereHas(
                         'currentService',
-                        fn($sq) =>
-                        $sq->whereIn('type', ['administrative', 'support', 'technical'])
+                        fn($sq) => $sq->whereIn('type', ['administrative', 'support', 'technical'])
                     )
                 )
                 ->badge(fn() => \App\Models\Employee::whereHas(
                     'currentService',
-                    fn($q) =>
-                    $q->whereIn('type', ['administrative', 'support', 'technical'])
+                    fn($q) => $q->whereIn('type', ['administrative', 'support', 'technical'])
                 )->count())
                 ->badgeColor('primary'),
 
@@ -75,8 +88,7 @@ class ListEmployees extends ListRecords
                 )
                 ->badge(fn() => \App\Models\Employee::whereHas(
                     'position',
-                    fn($q) =>
-                    $q->where('is_managerial', true)
+                    fn($q) => $q->where('is_managerial', true)
                 )->count())
                 ->badgeColor('warning'),
 
@@ -86,5 +98,82 @@ class ListEmployees extends ListRecords
                 ->badge(fn() => \App\Models\Employee::where('is_active', false)->count())
                 ->badgeColor('danger'),
         ];
+    }
+
+    // ✅ EXPORT CSV - Robuste pour UTF-8
+    private function exportCsv()
+    {
+        $employees = \App\Models\Employee::with(['position', 'currentService', 'department'])->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename=employes-' . now()->format('Y-m-d-His') . '.csv',
+        ];
+
+        $callback = function () use ($employees) {
+            $file = fopen('php://output', 'w');
+
+            // BOM pour Excel UTF-8
+            fwrite($file, "\xEF\xBB\xBF");
+
+            // En-têtes
+            $headers = [
+                'ID',
+                'Matricule',
+                'Nom',
+                'Prenom',
+                'Sexe',
+                'Date Naissance',
+                'Poste',
+                'Service',
+                'Departement',
+                'Type Classification',
+                'Categorie Recrutement',
+                'Categorie Actuelle',
+                'Echelon Actuel',
+                'Indice',
+                'Date Recrutement',
+                'Date Retraite',
+                'Statut'
+            ];
+            fputcsv($file, $headers, ',');
+
+            // Données
+            foreach ($employees as $employee) {
+                $row = [
+                    $employee->id,
+                    $employee->matricule ?? '',
+                    $employee->last_name ?? '',
+                    $employee->first_name ?? '',
+                    $employee->gender === 'M' ? 'M' : ($employee->gender === 'F' ? 'F' : ''),
+                    $employee->birth_date?->format('d/m/Y') ?? '',
+                    $employee->position?->name ?? '',
+                    $employee->currentService?->name ?? '',
+                    $employee->department?->name ?? '',
+                    $employee->classification_type === 'cameroon' ? 'Cameroon' : 'Numerique',
+                    $employee->category_recruitment ?? '',
+                    $employee->category_number ?? '',
+                    $employee->echelon_number ?? '',
+                    $employee->indice ?? '',
+                    $employee->recruitment_date?->format('d/m/Y') ?? '',
+                    $employee->retirement_date?->format('d/m/Y') ?? '',
+                    $employee->is_active ? 'Actif' : 'Inactif',
+                ];
+                fputcsv($file, $row, ',');
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    // ✅ EXPORT EXCEL
+    private function exportExcel()
+    {
+        return \Excel::download(
+            new \App\Exports\EmployeesExport(),
+            'employes-' . now()->format('Y-m-d-His') . '.xlsx'
+        );
     }
 }

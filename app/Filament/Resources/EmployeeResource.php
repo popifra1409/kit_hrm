@@ -167,6 +167,49 @@ class EmployeeResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                // ✅ FILTRE 1 : INFORMATIONS OBLIGATOIRES MANQUANTES
+                Tables\Filters\Filter::make('incomplete_required')
+                    ->label('❌ Informations Obligatoires Manquantes')
+                    ->query(function (Builder $query) {
+                        return $query->where(function ($q) {
+                            $q->whereNull('last_name')
+                                ->orWhereNull('first_name')
+                                ->orWhereNull('birth_date')
+                                ->orWhereNull('gender')
+                                ->orWhereNull('recruitment_date')
+                                ->orWhereNull('position_id')
+                                ->orWhereNull('current_service_id');
+                        });
+                    })
+                    ->toggle(),
+
+                // ✅ FILTRE 2 : INFORMATIONS COMPLÈTES
+                Tables\Filters\Filter::make('complete_required')
+                    ->label('✅ Informations Obligatoires Complètes')
+                    ->query(function (Builder $query) {
+                        return $query
+                            ->whereNotNull('last_name')
+                            ->whereNotNull('first_name')
+                            ->whereNotNull('birth_date')
+                            ->whereNotNull('gender')
+                            ->whereNotNull('recruitment_date')
+                            ->whereNotNull('position_id')
+                            ->whereNotNull('current_service_id');
+                    })
+                    ->toggle(),
+
+                // ✅ FILTRE 3 : PHOTO MANQUANTE
+                Tables\Filters\Filter::make('no_photo')
+                    ->label('📷 Sans Photo')
+                    ->query(fn(Builder $query) => $query->whereNull('photo'))
+                    ->toggle(),
+
+                // ✅ FILTRE 4 : QR CODE MANQUANT
+                Tables\Filters\Filter::make('no_qr_code')
+                    ->label('🔲 Sans QR Code')
+                    ->query(fn(Builder $query) => $query->whereNull('qr_code_path'))
+                    ->toggle(),
+
                 Tables\Filters\SelectFilter::make('personnel_type')
                     ->label('Type de Personnel')
                     ->options([
