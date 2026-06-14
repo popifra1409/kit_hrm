@@ -69,11 +69,8 @@ class ViewEmployee extends ViewRecord
                     ->schema([
                         Infolists\Components\Grid::make(3)
                             ->schema([
-                                Infolists\Components\ImageEntry::make('photo')
-                                    ->label('Photo')
-                                    ->circular()
-                                    ->defaultImageUrl(url('/images/default-avatar.png'))
-                                    ->size(120),
+                                Infolists\Components\View::make('filament.infolists.employee-photo')
+                                    ->viewData(['record' => $this->record]),
 
                                 Infolists\Components\Group::make([
                                     Infolists\Components\TextEntry::make('matricule')
