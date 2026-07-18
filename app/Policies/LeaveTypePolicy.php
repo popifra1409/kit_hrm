@@ -28,7 +28,7 @@ class LeaveTypePolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_absences');
+        return $user->can('manage_absences');
     }
 
     /**
@@ -36,7 +36,7 @@ class LeaveTypePolicy
      */
     public function update(User $user, LeaveType $leaveType): bool
     {
-        return $user->can('edit_absences');
+        return $user->can('manage_absences');
     }
 
     /**
@@ -44,7 +44,7 @@ class LeaveTypePolicy
      */
     public function delete(User $user, LeaveType $leaveType): bool
     {
-        return $user->can('delete_absences');
+        return $user->can('manage_absences');
     }
 
     /**
@@ -52,7 +52,7 @@ class LeaveTypePolicy
      */
     public function restore(User $user, LeaveType $leaveType): bool
     {
-        return $user->can('edit_absences');
+        return $user->can('manage_absences');
     }
 
     /**
@@ -60,6 +60,6 @@ class LeaveTypePolicy
      */
     public function forceDelete(User $user, LeaveType $leaveType): bool
     {
-        return $user->hasRole('super_admin') && $user->can('delete_absences');
+        return $user->hasRole('super_admin') && $user->can('manage_absences');
     }
 }

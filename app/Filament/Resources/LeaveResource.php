@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use App\Models\LeaveDecision; 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
@@ -88,6 +89,36 @@ class LeaveResource extends Resource
                             ->suffix('jours'),
                     ])
                     ->columns(3),
+
+                Forms\Components\Section::make('Décision de Mise en Congé')
+                    ->schema([
+                        Forms\Components\Select::make('leave_decision_id')
+                            ->label('Décision Signée (DG)')
+                            ->relationship('leaveDecision', 'decision_number')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->helperText('Sélectionnez la décision signée par le DG'),
+
+                        Forms\Components\Placeholder::make('decision_info')
+                            ->label('Informations')
+                            ->content(function ($get) {
+                                $decision = LeaveDecision::find($get('leave_decision_id'));
+                                if ($decision) {
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="p-3 bg-blue-50 rounded-lg">
+                            <p><strong>Période:</strong> ' . $decision->start_date->format('d/m/Y') . ' au ' . $decision->end_date->format('d/m/Y') . '</p>
+                            <p><strong>Durée:</strong> ' . $decision->duration_days . ' jours</p>
+                            <p><strong>Motif:</strong> ' . ($decision->description ?? '-') . '</p>
+                            <p><a href="' . \Storage::url($decision->decision_document_path) . '" class="text-blue-600 underline">📄 Voir la décision signée</a></p>
+                        </div>'
+                                    );
+                                }
+                                return 'Aucune décision sélectionnée';
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsed(),
 
                 Forms\Components\Section::make('Justification')
                     ->schema([
@@ -499,6 +530,11 @@ class LeaveResource extends Resource
         return 'Demande de Congé';
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return 'Demandes de Congés';
+    }
+
     public static function getPluralModelLabel(): string
     {
         return 'Demandes de Congés';
@@ -511,17 +547,12 @@ class LeaveResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 1;
     }
 
     public static function getNavigationIcon(): ?string
     {
         return 'heroicon-o-calendar-days';
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Demandes de Congés';
     }
 
     public static function getNavigationBadge(): ?string

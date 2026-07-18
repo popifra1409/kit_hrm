@@ -88,6 +88,12 @@ class Leave extends Model
         return $this->belongsTo(User::class, 'return_confirmed_by');
     }
 
+
+    public function leaveDecision()
+    {
+        return $this->belongsTo(LeaveDecision::class);
+    }
+
     // Calculer le score total selon les critères
     public function calculateScore()
     {

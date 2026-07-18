@@ -169,16 +169,11 @@ class LeaveTypeResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 2;
     }
 
     public static function getNavigationIcon(): ?string
     {
         return 'heroicon-o-clipboard-document-list';
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Types de Congés';
     }
 }

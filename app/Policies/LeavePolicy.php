@@ -4,63 +4,78 @@ namespace App\Policies;
 
 use App\Models\Leave;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class LeavePolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Voir la liste
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->can('view_leaves');
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Voir un élément spécifique
      */
     public function view(User $user, Leave $leave): bool
     {
-        return false;
+        return $user->can('view_leaves');
     }
 
     /**
-     * Determine whether the user can create models.
+     * Créer
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->can('create_leaves');
     }
 
     /**
-     * Determine whether the user can update the model.
+     * Modifier
      */
     public function update(User $user, Leave $leave): bool
     {
-        return false;
+        return $user->can('edit_leaves');
     }
 
     /**
-     * Determine whether the user can delete the model.
+     * Supprimer
      */
     public function delete(User $user, Leave $leave): bool
     {
-        return false;
+        return $user->can('delete_leaves');
     }
 
     /**
-     * Determine whether the user can restore the model.
+     * Restaurer
      */
     public function restore(User $user, Leave $leave): bool
     {
-        return false;
+        return $user->can('edit_leaves');
     }
 
     /**
-     * Determine whether the user can permanently delete the model.
+     * Supprimer définitivement
      */
     public function forceDelete(User $user, Leave $leave): bool
     {
-        return false;
+        return $user->hasRole('super_admin') && $user->can('delete_leaves');
+    }
+
+    /**
+     * Approuver les congés
+     */
+    public function approve(User $user): bool
+    {
+        return $user->can('approve_leaves');
+    }
+
+    /**
+     * Rejeter les congés
+     */
+    public function reject(User $user): bool
+    {
+        return $user->can('reject_leaves');
     }
 }

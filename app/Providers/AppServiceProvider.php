@@ -28,6 +28,6 @@ class AppServiceProvider extends ServiceProvider
         /// Enregistrer les observers
         Employee::observe(EmployeeObserver::class);
         EmployeeAffectation::observe(EmployeeAffectationObserver::class);
-         Leave::observe(LeaveObserver::class);  
+        Leave::observe(LeaveObserver::class);
     }
 }
