@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Sector extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
     protected $fillable = [
         'service_id',
@@ -17,18 +16,15 @@ class Sector extends Model
         'description',
         'type',
         'sector_head_id',
-        'head_title',
         'bed_capacity',
-        'order',
         'is_active',
+        'order',
         'phone',
-        'location',
+        'location'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'order' => 'integer',
-        'bed_capacity' => 'integer',
     ];
 
     // Relations
@@ -47,14 +43,20 @@ class Sector extends Model
         return $this->hasMany(Employee::class, 'sector_id');
     }
 
-    // Helpers
-    public function getHeadTitleLabelAttribute()
+    // Scopes
+    public function scopeActive($query)
     {
-        return match ($this->head_title) {
-            'chef_secteur' => 'Chef de Secteur',
-            'major' => 'Major',
-            'responsable' => 'Responsable',
-            default => 'Chef de Secteur',
-        };
+        return $query->where('is_active', true);
+    }
+
+    public function scopeByType($query, $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    // Accesseurs
+    public function getFullNameAttribute()
+    {
+        return "{$this->name} ({$this->code})";
     }
 }

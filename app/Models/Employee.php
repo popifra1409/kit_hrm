@@ -96,6 +96,20 @@ class Employee extends Model
     // RELATIONS - STRUCTURE ORGANISATIONNELLE
     // ========================================
 
+    public function tradeBody()
+    {
+        return $this->belongsTo(TradeBody::class);
+    }
+
+    public function jobTitle()
+    {
+        return $this->belongsTo(JobTitle::class);
+    }
+
+    public function qualification()
+    {
+        return $this->belongsTo(Qualification::class);
+    }
     /**
      * Département (médical uniquement)
      */
@@ -134,6 +148,36 @@ class Employee extends Model
     public function sector()
     {
         return $this->belongsTo(Sector::class);
+    }
+
+    // Services managés par cet employé
+    public function managedServices()
+    {
+        return $this->hasMany(Service::class, 'service_chief_id');
+    }
+
+    // Services où il est major
+    public function majorServices()
+    {
+        return $this->hasMany(Service::class, 'major_id');
+    }
+
+    // Unités managées
+    public function managedSectors()
+    {
+        return $this->hasMany(Sector::class, 'sector_head_id');
+    }
+
+    // Département managé
+    public function managedDepartment()
+    {
+        return $this->hasOne(Department::class, 'department_head_id');
+    }
+
+    // Direction managée
+    public function managedDirection()
+    {
+        return $this->hasOne(Direction::class, 'director_id');
     }
 
     /**
@@ -188,6 +232,27 @@ class Employee extends Model
         }
 
         return implode(' > ', $path);
+    }
+
+    public function getHierarchyLevelAttribute()
+    {
+        return $this->jobTitle?->hierarchy_level ?? 999;
+    }
+
+    public function getIsMedicalAttribute()
+    {
+        return $this->personnel_type === 'soignant' ||
+            $this->tradeBody?->category === 'medical';
+    }
+
+    public function getIsManagerialAttribute()
+    {
+        return $this->jobTitle?->is_managerial ?? false;
+    }
+
+    public function getFullClassificationAttribute()
+    {
+        return "{$this->qualification?->name} - {$this->tradeBody?->name}";
     }
 
     // ========================================

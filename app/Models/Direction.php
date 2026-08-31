@@ -2,31 +2,28 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Direction extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
     protected $fillable = [
         'name',
         'code',
-        'acronym',
+        'type',
         'description',
         'director_id',
-        'type',
-        'order',
         'is_active',
+        'order',
         'phone',
         'email',
-        'location',
+        'location'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'order' => 'integer',
     ];
 
     // Relations
@@ -35,40 +32,14 @@ class Direction extends Model
         return $this->belongsTo(Employee::class, 'director_id');
     }
 
-    public function subDirections()
-    {
-        return $this->hasMany(SubDirection::class)->orderBy('order');
-    }
-
-    /**
-     * Départements médicaux rattachés à cette direction
-     */
     public function departments()
     {
         return $this->hasMany(Department::class);
     }
 
-    public function employees()
+    public function subDirections()
     {
-        return $this->hasManyThrough(Employee::class, SubDirection::class, 'direction_id', 'current_service_id');
-    }
-
-    /**
-     * Compte total des sous-directions (administratives + départements médicaux)
-     */
-    public function getTotalSubstructuresCountAttribute()
-    {
-        return $this->subDirections()->count() + $this->departments()->count();
-    }
-
-    /**
-     * Toutes les sous-structures (sous-directions + départements)
-     */
-    public function allSubstructures()
-    {
-        return collect()
-            ->merge($this->subDirections)
-            ->merge($this->departments);
+        return $this->hasMany(SubDirection::class);
     }
 
     // Scopes
@@ -77,9 +48,34 @@ class Direction extends Model
         return $query->where('is_active', true);
     }
 
-    // Helpers
-    public function getEmployeeCountAttribute()
+    public function scopeMedical($query)
     {
-        return $this->subDirections->sum(fn($sd) => $sd->services->sum('employees_count'));
+        return $query->where('type', 'medical');
+    }
+
+    public function scopeAdministrative($query)
+    {
+        return $query->where('type', 'administrative');
+    }
+
+    // Accesseurs
+    public function getTypeNameAttribute()
+    {
+        return $this->type === 'medical' ? '🏥 Médicale' : '📋 Administrative';
+    }
+
+    public function getFullNameAttribute()
+    {
+        return "{$this->name} ({$this->code})";
+    }
+
+    public function isMedical()
+    {
+        return $this->type === 'medical';
+    }
+
+    public function isAdministrative()
+    {
+        return $this->type === 'administrative';
     }
 }

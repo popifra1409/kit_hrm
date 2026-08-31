@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
             NotificationTemplateSeeder::class,
             ServiceSeeder::class,
             EvaluationCriterionSeeder::class,
+            TradeBodySeeder::class,
+            JobTitleSeeder::class,
+            QualificationSeeder::class,
         ]);
     }
 }

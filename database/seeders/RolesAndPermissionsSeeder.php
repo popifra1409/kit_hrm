@@ -146,6 +146,22 @@ class RolesAndPermissionsSeeder extends Seeder
             // === TYPES DE CONTRATS ===
             ['name' => 'view_contract_types', 'module' => 'contracts', 'description' => 'Voir types de contrats'],
             ['name' => 'manage_contract_types', 'module' => 'contracts', 'description' => 'Gérer types de contrats'],
+
+            // === STRUCTURE ORGANISATIONNELLE ===
+            ['name' => 'view_trade_bodies', 'module' => 'structure', 'description' => 'Voir les corps de métiers'],
+            ['name' => 'create_trade_bodies', 'module' => 'structure', 'description' => 'Créer corps de métiers'],
+            ['name' => 'edit_trade_bodies', 'module' => 'structure', 'description' => 'Modifier corps de métiers'],
+            ['name' => 'delete_trade_bodies', 'module' => 'structure', 'description' => 'Supprimer corps de métiers'],
+
+            ['name' => 'view_job_titles', 'module' => 'structure', 'description' => 'Voir les titres de postes'],
+            ['name' => 'create_job_titles', 'module' => 'structure', 'description' => 'Créer titres de postes'],
+            ['name' => 'edit_job_titles', 'module' => 'structure', 'description' => 'Modifier titres de postes'],
+            ['name' => 'delete_job_titles', 'module' => 'structure', 'description' => 'Supprimer titres de postes'],
+
+            ['name' => 'view_qualifications', 'module' => 'structure', 'description' => 'Voir les qualifications'],
+            ['name' => 'create_qualifications', 'module' => 'structure', 'description' => 'Créer qualifications'],
+            ['name' => 'edit_qualifications', 'module' => 'structure', 'description' => 'Modifier qualifications'],
+            ['name' => 'delete_qualifications', 'module' => 'structure', 'description' => 'Supprimer qualifications'],
         ];
 
         foreach ($permissions as $permissionData) {
@@ -231,6 +247,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage_departments',
             'manage_services',
             'manage_positions',
+            'view_trade_bodies',
+            'view_job_titles',
+            'view_qualifications',
             // Rapports
             'view_reports',
             'generate_reports',
