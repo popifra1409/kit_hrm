@@ -339,7 +339,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['email' => 'adminkit@gmail.com'],
             [
                 'name' => 'Super Administrateur',
-                'password' => Hash::make('Admin@2025'), // Changez ce mot de passe!
+                'password' => Hash::make('Admin@2025'),
                 'email_verified_at' => now(),
             ]
         );
