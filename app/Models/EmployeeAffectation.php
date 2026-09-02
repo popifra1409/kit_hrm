@@ -12,7 +12,7 @@ class EmployeeAffectation extends Model
     protected $fillable = [
         'employee_id',
         'service_id',
-        'position_id',
+        'qualification_id',
         'start_date',
         'end_date',
         'reason',
@@ -37,8 +37,8 @@ class EmployeeAffectation extends Model
         return $this->belongsTo(Service::class);
     }
 
-    public function position()
+    public function qualification()
     {
-        return $this->belongsTo(Position::class);
+        return $this->belongsTo(Qualification::class);
     }
 }

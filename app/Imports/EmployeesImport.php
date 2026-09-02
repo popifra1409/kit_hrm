@@ -3,7 +3,8 @@
 namespace App\Imports;
 
 use App\Models\Employee;
-use App\Models\Position;
+use App\Models\TradeBody;
+use App\Models\Qualification;
 use App\Models\ContractType;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -37,15 +38,32 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             $echelonNumber = (int)$matches[2];
         }
 
-        // Trouver ou créer le poste
-        $qualification = $row['qualification'] ?? 'Non spécifié';
-        $position = Position::firstOrCreate(
-            ['name' => $qualification],
-            [
-                'code' => strtoupper(substr($qualification, 0, 10)),
-                'description' => $qualification,
-            ]
-        );
+        // Trouver ou créer la qualification (métier)
+        $qualificationName = $row['qualification'] ?? 'Non spécifié';
+
+        // Chercher une Qualification existante par nom, tous corps de métier confondus
+        $qualification = Qualification::where('name', $qualificationName)->first();
+
+        if (!$qualification) {
+            // Fallback : corps de métier "Non Classifié" pour les imports non reconnus,
+            // à reclasser manuellement ensuite dans le module Structure Organisationnelle.
+            $fallbackTradeBody = TradeBody::firstOrCreate(
+                ['code' => 'NON-CLASSE'],
+                [
+                    'name' => 'Non Classifié (Import)',
+                    'description' => 'Corps de métier temporaire pour les imports Excel non reconnus.',
+                    'category' => 'administrative',
+                    'is_active' => true,
+                ]
+            );
+
+            $qualification = Qualification::create([
+                'trade_body_id' => $fallbackTradeBody->id,
+                'name' => $qualificationName,
+                'code' => 'IMP-' . strtoupper(\Illuminate\Support\Str::slug(substr($qualificationName, 0, 20), '')),
+                'is_active' => true,
+            ]);
+        }
 
         // Déterminer le type de contrat (CDI par défaut)
         $contractType = ContractType::where('code', 'CDI')->first();
@@ -55,7 +73,7 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
         $personnelType = 'non_soignant';
 
         foreach ($soignantKeywords as $keyword) {
-            if (stripos($qualification, $keyword) !== false) {
+            if (stripos($qualificationName, $keyword) !== false) {
                 $personnelType = 'soignant';
                 break;
             }
@@ -75,8 +93,8 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             'category_current' => $categoryEchelon,
             'category_number' => $categoryNumber,
             'echelon_number' => $echelonNumber,
-            'qualification' => $qualification,
-            'position_id' => $position->id,
+            'qualification_id' => $qualification->id,
+            'trade_body_id' => $qualification->trade_body_id,
             'contract_type_id' => $contractType ? $contractType->id : null,
             'personnel_type' => $personnelType,
             'birth_date' => $birthDate,

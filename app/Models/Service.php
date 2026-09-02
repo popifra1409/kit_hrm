@@ -76,4 +76,18 @@ class Service extends Model
     {
         return "{$this->name} ({$this->code})";
     }
+
+    /**
+     * Responsable "unifié" du service.
+     *
+     * Les colonnes head_of_service_id / deputy_director_id / service_head_id
+     * ont été supprimées (redondantes) : on garde uniquement service_chief_id
+     * (services administratifs) et major_id (services médicaux).
+     * Cet accesseur permet d'écrire $service->serviceHead sans dépendre
+     * d'une relation belongsTo sur une colonne inexistante.
+     */
+    public function getServiceHeadAttribute()
+    {
+        return $this->serviceChief ?? $this->major;
+    }
 }

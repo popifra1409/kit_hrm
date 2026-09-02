@@ -18,7 +18,7 @@ class Replacement extends Model
         'is_active',
         'reason',
         'temporary_service_id',
-        'temporary_position_id',
+        'temporary_qualification_id',
         'responsibilities',
         'has_bonus',
         'bonus_amount',
@@ -60,9 +60,9 @@ class Replacement extends Model
         return $this->belongsTo(Service::class, 'temporary_service_id');
     }
 
-    public function temporaryPosition()
+    public function temporaryQualification()
     {
-        return $this->belongsTo(Position::class, 'temporary_position_id');
+        return $this->belongsTo(Qualification::class, 'temporary_qualification_id');
     }
 
     public function approvedBy()

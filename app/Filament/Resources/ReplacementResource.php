@@ -116,9 +116,9 @@ class ReplacementResource extends Resource
                             ->preload()
                             ->native(false),
 
-                        Forms\Components\Select::make('temporary_position_id')
-                            ->label('Poste Temporaire')
-                            ->relationship('temporaryPosition', 'name')
+                        Forms\Components\Select::make('temporary_qualification_id')
+                            ->label('Qualification Temporaire')
+                            ->relationship('temporaryQualification', 'name')
                             ->searchable()
                             ->preload()
                             ->native(false),

@@ -301,14 +301,45 @@ class EditEmployee extends EditRecord
                                         ->preload()
                                         ->native(false)
                                         ->visible(fn(Forms\Get $get) => $get('current_service_id')),
+                                ]),
 
-                                    Forms\Components\Select::make('position_id')
-                                        ->label('Position / Poste')
+                            Forms\Components\Grid::make(2)
+                                ->schema([
+                                    Forms\Components\Select::make('trade_body_id')
+                                        ->label('Corps de Métier')
+                                        ->relationship('tradeBody', 'name', fn($query) => $query->where('is_active', true))
+                                        ->searchable()
+                                        ->preload()
+                                        ->native(false)
+                                        ->reactive()
+                                        ->afterStateUpdated(fn($set) => $set('qualification_id', null)),
+
+                                    Forms\Components\Select::make('qualification_id')
+                                        ->label('Qualification')
+                                        ->options(function (Forms\Get $get) {
+                                            if (!$get('trade_body_id')) {
+                                                return [];
+                                            }
+                                            return \App\Models\Qualification::where('trade_body_id', $get('trade_body_id'))
+                                                ->where('is_active', true)
+                                                ->orderBy('level_rank')
+                                                ->pluck('name', 'id');
+                                        })
+                                        ->searchable()
+                                        ->preload()
+                                        ->native(false)
+                                        ->disabled(fn(Forms\Get $get) => !$get('trade_body_id')),
+                                ]),
+
+                            Forms\Components\Grid::make(1)
+                                ->schema([
+                                    Forms\Components\Select::make('job_title_id')
+                                        ->label('Poste Hiérarchique')
                                         ->relationship(
-                                            'position',
+                                            'jobTitle',
                                             'name',
                                             fn($query) =>
-                                            $query->where('is_active', true)->orderBy('level_rank')
+                                            $query->where('is_active', true)->orderBy('hierarchy_level')
                                         )
                                         ->searchable()
                                         ->preload()
@@ -316,7 +347,7 @@ class EditEmployee extends EditRecord
                                         ->required()
                                         ->getOptionLabelFromRecordUsing(
                                             fn($record) =>
-                                            '🏆 ' . $record->name . ' (Niveau ' . $record->level_rank . ')'
+                                            '🏆 ' . $record->name . ' (Niveau ' . $record->hierarchy_level . ')'
                                         ),
                                 ]),
                         ]),
@@ -327,13 +358,14 @@ class EditEmployee extends EditRecord
                         ->schema([
                             Forms\Components\Grid::make(3)
                                 ->schema([
-                                    Forms\Components\Select::make('employment_type')
-                                        ->label('Type d\'Emploi')
+                                    Forms\Components\Select::make('administrative_status')
+                                        ->label('Statut Administratif')
                                         ->options([
-                                            'permanent' => 'Permanent',
-                                            'contract' => 'Contractuel',
-                                            'temporary' => 'Temporaire',
-                                            'intern' => 'Stagiaire',
+                                            'fonctionnaire_affecte' => '🏛️ Fonctionnaire Affecté',
+                                            'fonctionnaire_detache' => '🔄 Fonctionnaire en Détachement',
+                                            'contractuel_fp' => '📋 Contractuel de la Fonction Publique',
+                                            'contractuel_structure' => '🏥 Contractuel de la Structure',
+                                            'stagiaire' => '🎓 Stagiaire',
                                         ])
                                         ->required()
                                         ->native(false),
@@ -405,19 +437,12 @@ class EditEmployee extends EditRecord
                     Forms\Components\Tabs\Tab::make('Grille Salariale')
                         ->icon('heroicon-o-chart-bar')
                         ->schema([
-                            Forms\Components\Grid::make(3)
+                            Forms\Components\Grid::make(1)
                                 ->schema([
                                     Forms\Components\TextInput::make('category_recruitment')
                                         ->label('Catégorie Recrutement')
-                                        ->maxLength(50),
-
-                                    Forms\Components\TextInput::make('category_current')
-                                        ->label('Catégorie Actuelle')
-                                        ->maxLength(50),
-
-                                    Forms\Components\TextInput::make('qualification')
-                                        ->label('Qualification')
-                                        ->maxLength(255),
+                                        ->maxLength(50)
+                                        ->helperText('La catégorie actuelle est définie ci-dessous dans la grille salariale.'),
                                 ]),
 
                             Forms\Components\Section::make('Classification Salariale')

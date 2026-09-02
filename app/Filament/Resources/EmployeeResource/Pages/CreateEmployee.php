@@ -192,13 +192,43 @@ class CreateEmployee extends CreateRecord
                                 ->visible(fn(Forms\Get $get) => $get('current_service_id'))
                                 ->helperText('Optionnel : Secteur ou unité spécifique'),
 
-                            Forms\Components\Select::make('position_id')
-                                ->label('Position / Poste')
+                            Forms\Components\Select::make('trade_body_id')
+                                ->label('Corps de Métier')
+                                ->relationship('tradeBody', 'name', fn($query) => $query->where('is_active', true))
+                                ->searchable()
+                                ->preload()
+                                ->native(false)
+                                ->reactive()
+                                ->afterStateUpdated(fn($set) => $set('qualification_id', null))
+                                ->helperText('Médecin, Technicien, Agent administratif...'),
+
+                            Forms\Components\Select::make('qualification_id')
+                                ->label('Qualification')
+                                ->options(function (Forms\Get $get) {
+                                    if (!$get('trade_body_id')) {
+                                        return [];
+                                    }
+                                    return \App\Models\Qualification::where('trade_body_id', $get('trade_body_id'))
+                                        ->where('is_active', true)
+                                        ->orderBy('level_rank')
+                                        ->pluck('name', 'id');
+                                })
+                                ->searchable()
+                                ->preload()
+                                ->native(false)
+                                ->disabled(fn(Forms\Get $get) => !$get('trade_body_id'))
+                                ->helperText('Choisissez d\'abord le corps de métier'),
+                        ]),
+
+                    Forms\Components\Grid::make(2)
+                        ->schema([
+                            Forms\Components\Select::make('job_title_id')
+                                ->label('Poste Hiérarchique')
                                 ->relationship(
-                                    'position',
+                                    'jobTitle',
                                     'name',
                                     fn($query) =>
-                                    $query->where('is_active', true)->orderBy('level_rank')
+                                    $query->where('is_active', true)->orderBy('hierarchy_level')
                                 )
                                 ->searchable()
                                 ->preload()
@@ -206,7 +236,7 @@ class CreateEmployee extends CreateRecord
                                 ->required()
                                 ->getOptionLabelFromRecordUsing(
                                     fn($record) =>
-                                    '🏆 ' . $record->name . ' (Niveau ' . $record->level_rank . ' - ' . $record->hierarchical_level_label . ')'
+                                    '🏆 ' . $record->name . ' (Niveau ' . $record->hierarchy_level . ')'
                                 )
                                 ->helperText('Fonction et niveau hiérarchique'),
                         ]),
@@ -221,17 +251,18 @@ class CreateEmployee extends CreateRecord
                 ->schema([
                     Forms\Components\Grid::make(3)
                         ->schema([
-                            Forms\Components\Select::make('employment_type')
-                                ->label('Type d\'Emploi')
+                            Forms\Components\Select::make('administrative_status')
+                                ->label('Statut Administratif')
                                 ->options([
-                                    'permanent' => '✅ Permanent',
-                                    'contract' => '📝 Contractuel',
-                                    'temporary' => '⏱️ Temporaire',
-                                    'intern' => '🎓 Stagiaire',
+                                    'fonctionnaire_affecte' => '🏛️ Fonctionnaire Affecté',
+                                    'fonctionnaire_detache' => '🔄 Fonctionnaire en Détachement',
+                                    'contractuel_fp' => '📋 Contractuel de la Fonction Publique',
+                                    'contractuel_structure' => '🏥 Contractuel de la Structure',
+                                    'stagiaire' => '🎓 Stagiaire',
                                 ])
                                 ->required()
                                 ->native(false)
-                                ->default('permanent'),
+                                ->default('contractuel_structure'),
 
                             Forms\Components\Select::make('personnel_type')
                                 ->label('Type de Personnel')
@@ -301,24 +332,13 @@ class CreateEmployee extends CreateRecord
                 ->description('Classification salariale selon la grille')
                 ->icon('heroicon-o-chart-bar')
                 ->schema([
-                    Forms\Components\Grid::make(3)
+                    Forms\Components\Grid::make(1)
                         ->schema([
                             Forms\Components\TextInput::make('category_recruitment')
                                 ->label('Catégorie de Recrutement')
                                 ->maxLength(50)
                                 ->placeholder('Ex: A1, B2 ou 1, 2')
-                                ->helperText('Classification initiale'),
-
-                            Forms\Components\TextInput::make('category_current')
-                                ->label('Catégorie Actuelle')
-                                ->maxLength(50)
-                                ->placeholder('Ex: A1, B2 ou 1, 2')
-                                ->helperText('Classification actuelle'),
-
-                            Forms\Components\TextInput::make('qualification')
-                                ->label('Qualification / Titre')
-                                ->maxLength(255)
-                                ->placeholder('Ex: Médecin Spécialiste, IDE, Comptable'),
+                                ->helperText('Classification initiale. La catégorie actuelle est définie ci-dessous dans la grille salariale.'),
                         ]),
 
                     Forms\Components\Section::make('Grille Salariale')

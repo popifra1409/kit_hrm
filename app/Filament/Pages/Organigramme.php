@@ -28,9 +28,14 @@ class Organigramme extends Page
         ];
 
         // Charger les directions avec TOUTES leurs sous-structures
+        // ✅ CORRIGÉ : "serviceHead" n'est plus une relation Eloquent (colonne supprimée),
+        // c'est un accesseur sur Service qui combine serviceChief et major.
+        // On eager-charge donc les deux vraies relations pour éviter le N+1.
         $directions = Direction::with([
-            'subDirections.services.serviceHead',    // Sous-directions administratives
-            'departments.services.serviceHead',       // Départements médicaux (AJOUTÉ)
+            'subDirections.services.serviceChief',
+            'subDirections.services.major',
+            'departments.services.serviceChief',
+            'departments.services.major',
             'director'
         ])
             ->where('is_active', true)
@@ -47,7 +52,7 @@ class Organigramme extends Page
             ];
 
             // 1. AJOUTER LES SOUS-DIRECTIONS ADMINISTRATIVES
-            foreach ($direction->subDirections()->orderBy('order')->get() as $subDir) {
+            foreach ($direction->subDirections as $subDir) {
                 $subDirNode = [
                     'name' => $subDir->name,
                     'title' => $subDir->code,
@@ -58,7 +63,7 @@ class Organigramme extends Page
                 ];
 
                 // Services administratifs
-                foreach ($subDir->services()->orderBy('order')->get() as $service) {
+                foreach ($subDir->services as $service) {
                     $subDirNode['children'][] = [
                         'name' => $service->name,
                         'title' => $service->code,
@@ -71,7 +76,7 @@ class Organigramme extends Page
             }
 
             // 2. AJOUTER LES DÉPARTEMENTS MÉDICAUX (même niveau que sous-directions)
-            foreach ($direction->departments()->orderBy('order')->get() as $dept) {
+            foreach ($direction->departments as $dept) {
                 $deptNode = [
                     'name' => $dept->name,
                     'title' => $dept->code,
@@ -82,7 +87,7 @@ class Organigramme extends Page
                 ];
 
                 // Services médicaux
-                foreach ($dept->services()->orderBy('order')->get() as $service) {
+                foreach ($dept->services as $service) {
                     $deptNode['children'][] = [
                         'name' => $service->name,
                         'title' => $service->code,

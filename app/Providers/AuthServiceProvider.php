@@ -13,14 +13,14 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         // Utilisateurs & Sécurité
         \App\Models\User::class => \App\Policies\UserPolicy::class,
-        
+
         // Employés & Structure
         \App\Models\Employee::class => \App\Policies\EmployeePolicy::class,
         \App\Models\EmployeeAdvancementHistory::class => \App\Policies\EmployeeAdvancementHistoryPolicy::class,
         \App\Models\EmployeeAssignmentHistory::class => \App\Policies\EmployeeAssignmentHistoryPolicy::class,
         \App\Models\EmployeeAffectation::class => \App\Policies\EmployeeAffectationPolicy::class,
         \App\Models\EmployeeCard::class => \App\Policies\EmployeeCardPolicy::class,
-        
+
         // Structure Organisationnelle
         \App\Models\Department::class => \App\Policies\DepartmentPolicy::class,
         \App\Models\Service::class => \App\Policies\ServicePolicy::class,
@@ -29,11 +29,14 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\SubDirection::class => \App\Policies\SubDirectionPolicy::class,
         \App\Models\Sector::class => \App\Policies\SectorPolicy::class,
         \App\Models\MedicalDepartment::class => \App\Policies\MedicalDepartmentPolicy::class,
-        
+        \App\Models\TradeBody::class => \App\Policies\TradeBodyPolicy::class,
+        \App\Models\JobTitle::class => \App\Policies\JobTitlePolicy::class,
+        \App\Models\Qualification::class => \App\Policies\QualificationPolicy::class,
+
         // Contrats
         \App\Models\Contract::class => \App\Policies\ContractPolicy::class,
         \App\Models\ContractType::class => \App\Policies\ContractTypePolicy::class,
-        
+
         // Congés & Absences
         \App\Models\Leave::class => \App\Policies\LeavePolicy::class,
         \App\Models\LeaveType::class => \App\Policies\LeaveTypePolicy::class,
@@ -41,12 +44,12 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Absence::class => \App\Policies\AbsencePolicy::class,
         \App\Models\Replacement::class => \App\Policies\ReplacementPolicy::class,
         \App\Models\Attendance::class => \App\Policies\AttendancePolicy::class,
-        
+
         // Paie & Rémunération
         \App\Models\SalaryGrid::class => \App\Policies\SalaryGridPolicy::class,
         \App\Models\Payroll::class => \App\Policies\PayrollPolicy::class,
         \App\Models\PayrollItem::class => \App\Policies\PayrollItemPolicy::class,
-        
+
         // Quote-Parts
         \App\Models\RevenueDeclaration::class => \App\Policies\RevenueDeclarationPolicy::class,
         \App\Models\QuotpartPeriod::class => \App\Policies\QuotpartPeriodPolicy::class,
@@ -54,24 +57,24 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\QuotpartDeductionType::class => \App\Policies\QuotpartDeductionTypePolicy::class,
         \App\Models\QuotpartParameter::class => \App\Policies\QuotpartParameterPolicy::class,
         \App\Models\MedicalActivity::class => \App\Policies\MedicalActivityPolicy::class,
-        
+
         // Évaluations
         \App\Models\PerformanceEvaluation::class => \App\Policies\PerformanceEvaluationPolicy::class,
         \App\Models\EvaluationCriterion::class => \App\Policies\EvaluationCriterionPolicy::class,
-        
+
         // Formations
         \App\Models\Training::class => \App\Policies\TrainingPolicy::class,
-        
+
         // Documents
         \App\Models\Document::class => \App\Policies\DocumentPolicy::class,
         \App\Models\DocumentCategory::class => \App\Policies\DocumentCategoryPolicy::class,
-        
+
         // Santé
         \App\Models\Dependent::class => \App\Policies\DependentPolicy::class,
-        
+
         // Avancements
         \App\Models\Advancement::class => \App\Policies\AdvancementPolicy::class,
-        
+
         // CNPS & Système
         \App\Models\CnpsPreRegistration::class => \App\Policies\CnpsPreRegistrationPolicy::class,
         \App\Models\Signatory::class => \App\Policies\SignatoryPolicy::class,
@@ -81,6 +84,9 @@ class AuthServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ✅ Enregistre les policies déclarées ci-dessus (obligatoire pour que $policies soit pris en compte)
+        $this->registerPolicies();
+
         // ✅ Super Admin bypass - TOUJOURS EN PREMIER
         Gate::before(function ($user, $ability) {
             if ($user->hasRole('super_admin')) {

@@ -12,7 +12,7 @@ class EmployeesExport implements FromCollection, WithHeadings, WithStyles
 {
     public function collection()
     {
-        return Employee::with(['position', 'currentService', 'department'])
+        return Employee::with(['qualification', 'currentService', 'department'])
             ->get()
             ->map(function ($employee) {
                 return [
@@ -22,7 +22,7 @@ class EmployeesExport implements FromCollection, WithHeadings, WithStyles
                     $employee->first_name ?? '-',
                     $employee->gender === 'M' ? 'M' : ($employee->gender === 'F' ? 'F' : '-'),
                     $employee->birth_date?->format('d/m/Y') ?? '-',
-                    $employee->position?->name ?? '-',
+                    $employee->qualification?->name ?? '-',
                     $employee->currentService?->name ?? '-',
                     $employee->department?->name ?? '-',
                     $employee->classification_type === 'cameroon' ? 'Cameroon' : 'Numerique',
@@ -46,7 +46,7 @@ class EmployeesExport implements FromCollection, WithHeadings, WithStyles
             'Prenom',
             'Sexe',
             'Date Naissance',
-            'Poste',
+            'Qualification',
             'Service',
             'Departement',
             'Type Classification',

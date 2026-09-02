@@ -50,44 +50,26 @@ class ListEmployees extends ListRecords
                 ->badge(fn() => \App\Models\Employee::where('is_active', true)->count())
                 ->badgeColor('success'),
 
-            'medical' => Tab::make('Branche Medicale')
+            'soignant' => Tab::make('Personnel Soignant')
                 ->icon('heroicon-o-heart')
-                ->modifyQueryUsing(
-                    fn(Builder $query) =>
-                    $query->where(function ($q) {
-                        $q->whereHas('currentService', fn($sq) => $sq->where('type', 'medical'))
-                            ->orWhereNotNull('department_id');
-                    })
-                )
-                ->badge(fn() => \App\Models\Employee::whereHas(
-                    'currentService',
-                    fn($q) => $q->where('type', 'medical')
-                )->orWhereNotNull('department_id')->count())
+                ->modifyQueryUsing(fn(Builder $query) => $query->where('personnel_type', 'soignant'))
+                ->badge(fn() => \App\Models\Employee::where('personnel_type', 'soignant')->count())
                 ->badgeColor('success'),
 
-            'administrative' => Tab::make('Branche Administrative')
-                ->icon('heroicon-o-building-office')
-                ->modifyQueryUsing(
-                    fn(Builder $query) =>
-                    $query->whereHas(
-                        'currentService',
-                        fn($sq) => $sq->whereIn('type', ['administrative', 'support', 'technical'])
-                    )
-                )
-                ->badge(fn() => \App\Models\Employee::whereHas(
-                    'currentService',
-                    fn($q) => $q->whereIn('type', ['administrative', 'support', 'technical'])
-                )->count())
+            'non_soignant' => Tab::make('Personnel Non-Soignant')
+                ->icon('heroicon-o-briefcase')
+                ->modifyQueryUsing(fn(Builder $query) => $query->where('personnel_type', 'non_soignant'))
+                ->badge(fn() => \App\Models\Employee::where('personnel_type', 'non_soignant')->count())
                 ->badgeColor('primary'),
 
             'managers' => Tab::make('Cadres de Management')
                 ->icon('heroicon-o-user-group')
                 ->modifyQueryUsing(
                     fn(Builder $query) =>
-                    $query->whereHas('position', fn($q) => $q->where('is_managerial', true))
+                    $query->whereHas('jobTitle', fn($q) => $q->where('is_managerial', true))
                 )
                 ->badge(fn() => \App\Models\Employee::whereHas(
-                    'position',
+                    'jobTitle',
                     fn($q) => $q->where('is_managerial', true)
                 )->count())
                 ->badgeColor('warning'),
@@ -103,7 +85,7 @@ class ListEmployees extends ListRecords
     // ✅ EXPORT CSV - Robuste pour UTF-8
     private function exportCsv()
     {
-        $employees = \App\Models\Employee::with(['position', 'currentService', 'department'])->get();
+        $employees = \App\Models\Employee::with(['jobTitle', 'currentService', 'department'])->get();
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -147,7 +129,7 @@ class ListEmployees extends ListRecords
                     $employee->first_name ?? '',
                     $employee->gender === 'M' ? 'M' : ($employee->gender === 'F' ? 'F' : ''),
                     $employee->birth_date?->format('d/m/Y') ?? '',
-                    $employee->position?->name ?? '',
+                    $employee->jobTitle?->name ?? '',
                     $employee->currentService?->name ?? '',
                     $employee->department?->name ?? '',
                     $employee->classification_type === 'cameroon' ? 'Cameroon' : 'Numerique',

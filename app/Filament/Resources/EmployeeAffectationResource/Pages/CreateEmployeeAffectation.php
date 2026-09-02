@@ -17,11 +17,11 @@ class CreateEmployeeAffectation extends CreateRecord
         // Récupérer l'affectation créée
         $affectation = $this->record;
 
-        // Charger les relations
-        $affectation->load(['employee', 'service', 'position', 'service.department']);
+        // Charger les relations (position -> qualification)
+        $affectation->load(['employee', 'service', 'qualification', 'service.department']);
 
         \Log::info('Service chargé: ' . ($affectation->service?->name ?? 'NULL'));
-        \Log::info('Position chargée: ' . ($affectation->position?->name ?? 'NULL'));
+        \Log::info('Qualification chargée: ' . ($affectation->qualification?->name ?? 'NULL'));
 
         $employee = $affectation->employee;
 
@@ -32,8 +32,8 @@ class CreateEmployeeAffectation extends CreateRecord
 
         \Log::info('✅ Employé trouvé: ' . $employee->full_name);
 
-        // Charger les relations de l'employé
-        $employee->load(['service', 'position', 'department']);
+        // Charger les relations de l'employé (position -> qualification/jobTitle)
+        $employee->load(['currentService', 'qualification', 'jobTitle', 'department']);
 
         // Récupérer le département depuis le service
         $department = $affectation->service?->department;
@@ -41,21 +41,24 @@ class CreateEmployeeAffectation extends CreateRecord
         \Log::info('Département: ' . ($department?->name ?? 'NULL'));
 
         // Créer l'historique manuellement
+        // Note : les colonnes de EmployeeAssignmentHistory s'appellent encore
+        // old_position_id/old_position_title pour l'instant (non renommées),
+        // mais elles stockent désormais des données de Qualification.
         $history = EmployeeAssignmentHistory::create([
             'employee_id' => $affectation->employee_id,
-            'assignment_type' => $affectation->position_id ? 'position' : 'service',
+            'assignment_type' => $affectation->qualification_id ? 'position' : 'service',
 
             // Anciennes valeurs (depuis l'employé)
-            'old_position_id' => $employee->position_id,
-            'old_position_name' => $employee->position?->name,
+            'old_position_id' => $employee->qualification_id,
+            'old_position_title' => $employee->qualification?->name,
             'old_department_id' => $employee->department_id,
             'old_department_name' => $employee->department?->name,
-            'old_service_id' => $employee->service_id,
-            'old_service_name' => $employee->service?->name,
+            'old_service_id' => $employee->current_service_id,
+            'old_service_name' => $employee->currentService?->name,
 
             // Nouvelles valeurs (depuis l'affectation)
-            'new_position_id' => $affectation->position_id,
-            'new_position_name' => $affectation->position?->name,
+            'new_position_id' => $affectation->qualification_id,
+            'new_position_title' => $affectation->qualification?->name,
             'new_department_id' => $department?->id,
             'new_department_name' => $department?->name,
             'new_service_id' => $affectation->service_id,
@@ -73,7 +76,7 @@ class CreateEmployeeAffectation extends CreateRecord
 
         \Log::info('✅ Historique créé ID: ' . $history->id);
         \Log::info('New Service Name: ' . ($history->new_service_name ?? 'NULL'));
-        \Log::info('New Position Name: ' . ($history->new_position_name ?? 'NULL'));
+        \Log::info('New Position Title: ' . ($history->new_position_title ?? 'NULL'));
 
         \Filament\Notifications\Notification::make()
             ->title('Historique créé')

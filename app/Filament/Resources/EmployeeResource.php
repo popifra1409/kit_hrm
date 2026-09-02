@@ -136,6 +136,24 @@ class EmployeeResource extends Resource
                     ->color('warning')
                     ->toggleable(),
 
+                Tables\Columns\TextColumn::make('tradeBody.name')
+                    ->label('Corps de Métier')
+                    ->searchable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('administrative_status_label')
+                    ->label('Statut Administratif')
+                    ->badge()
+                    ->color(fn($record) => match ($record->administrative_status) {
+                        'fonctionnaire_affecte' => 'success',
+                        'fonctionnaire_detache' => 'info',
+                        'contractuel_fp' => 'warning',
+                        'contractuel_structure' => 'primary',
+                        'stagiaire' => 'gray',
+                        default => 'gray',
+                    })
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('status')
                     ->label('Statut')
                     ->badge()
@@ -177,7 +195,7 @@ class EmployeeResource extends Resource
                                 ->orWhereNull('birth_date')
                                 ->orWhereNull('gender')
                                 ->orWhereNull('recruitment_date')
-                                ->orWhereNull('position_id')
+                                ->orWhereNull('job_title_id')
                                 ->orWhereNull('current_service_id');
                         });
                     })
@@ -236,6 +254,24 @@ class EmployeeResource extends Resource
                     ->relationship('currentService', 'name')
                     ->searchable()
                     ->preload(),
+
+                Tables\Filters\SelectFilter::make('trade_body_id')
+                    ->label('Corps de Métier')
+                    ->relationship('tradeBody', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->multiple(),
+
+                Tables\Filters\SelectFilter::make('administrative_status')
+                    ->label('Statut Administratif')
+                    ->options([
+                        'fonctionnaire_affecte' => 'Fonctionnaire Affecté',
+                        'fonctionnaire_detache' => 'Fonctionnaire en Détachement',
+                        'contractuel_fp' => 'Contractuel Fonction Publique',
+                        'contractuel_structure' => 'Contractuel de la Structure',
+                        'stagiaire' => 'Stagiaire',
+                    ])
+                    ->multiple(),
 
                 Tables\Filters\TrashedFilter::make()
                     ->label('Archivés'),

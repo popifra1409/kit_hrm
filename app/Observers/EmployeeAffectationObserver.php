@@ -43,8 +43,8 @@ class EmployeeAffectationObserver
             'old_service_name' => $oldValues['service_name'],
 
             // Nouvelles valeurs (depuis EmployeeAffectation)
-            'new_position_id' => $affectation->position_id,
-            'new_position_title' => $affectation->position?->title,
+            'new_position_id' => $affectation->qualification_id,
+            'new_position_title' => $affectation->qualification?->name,
             'new_department_id' => $department?->id,
             'new_department_name' => $department?->name,
             'new_service_id' => $affectation->service_id,
@@ -75,8 +75,8 @@ class EmployeeAffectationObserver
     protected function getOldValues($employee): array
     {
         return [
-            'position_id' => $employee->position_id,
-            'position_title' => $employee->position?->title,
+            'position_id' => $employee->qualification_id,
+            'position_title' => $employee->qualification?->name,
             'department_id' => $employee->department_id,
             'department_name' => $employee->department?->name,
             'service_id' => $employee->service_id,
@@ -89,7 +89,7 @@ class EmployeeAffectationObserver
      */
     protected function determineType(EmployeeAffectation $affectation): string
     {
-        if ($affectation->position_id) {
+        if ($affectation->qualification_id) {
             return 'position';
         }
         if ($affectation->service_id) {
@@ -121,7 +121,7 @@ class EmployeeAffectationObserver
             };
 
             $newValue = match ($type) {
-                'position' => $affectation->position?->title ?? 'N/A',
+                'position' => $affectation->qualification?->name ?? 'N/A',
                 'service' => $affectation->service?->name ?? 'N/A',
                 default => 'N/A',
             };

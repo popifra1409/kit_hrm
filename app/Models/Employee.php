@@ -22,13 +22,14 @@ class Employee extends Model
         'category_number',
         'echelon_number',
         'indice',
-        'qualification',
+        'trade_body_id',
+        'qualification_id',
+        'job_title_id',
         'department_id',
-        'position_id',
         'current_service_id',
         'service_id',
         'sector_id',
-        'employment_type',
+        'administrative_status',
         'contract_type_id',
         'personnel_type',
         'birth_date',
@@ -110,20 +111,13 @@ class Employee extends Model
     {
         return $this->belongsTo(Qualification::class);
     }
+
     /**
      * Département (médical uniquement)
      */
     public function department()
     {
         return $this->belongsTo(Department::class);
-    }
-
-    /**
-     * Position/Poste hiérarchique
-     */
-    public function position()
-    {
-        return $this->belongsTo(Position::class);
     }
 
     /**
@@ -234,6 +228,9 @@ class Employee extends Model
         return implode(' > ', $path);
     }
 
+    /**
+     * Niveau hiérarchique (unifié sur JobTitle, Position supprimé)
+     */
     public function getHierarchyLevelAttribute()
     {
         return $this->jobTitle?->hierarchy_level ?? 999;
@@ -243,6 +240,18 @@ class Employee extends Model
     {
         return $this->personnel_type === 'soignant' ||
             $this->tradeBody?->category === 'medical';
+    }
+
+    public function getAdministrativeStatusLabelAttribute(): string
+    {
+        return match ($this->administrative_status) {
+            'fonctionnaire_affecte' => 'Fonctionnaire Affecté',
+            'fonctionnaire_detache' => 'Fonctionnaire en Détachement',
+            'contractuel_fp' => 'Contractuel de la Fonction Publique',
+            'contractuel_structure' => 'Contractuel de la Structure',
+            'stagiaire' => 'Stagiaire',
+            default => 'Non défini',
+        };
     }
 
     public function getIsManagerialAttribute()
@@ -437,6 +446,7 @@ class Employee extends Model
     {
         return $this->qr_code_path ? \Storage::url($this->qr_code_path) : null;
     }
+
     // ========================================
     // HELPERS - HIÉRARCHIE
     // ========================================
@@ -459,31 +469,17 @@ class Employee extends Model
     }
 
     /**
-     * Obtenir le niveau hiérarchique
-     */
-    public function getHierarchicalLevelAttribute()
-    {
-        return $this->position?->hierarchical_level;
-    }
-
-    /**
-     * Obtenir le rang hiérarchique (1-10)
-     */
-    public function getLevelRankAttribute()
-    {
-        return $this->position?->level_rank;
-    }
-
-    /**
-     * Vérifier si c'est un poste de management
+     * Vérifier si c'est un poste de management (Position supprimé -> basé sur JobTitle)
      */
     public function isManager(): bool
     {
-        return $this->position?->is_managerial ?? false;
+        return $this->jobTitle?->is_managerial ?? false;
     }
 
     /**
-     * Obtenir tous les subordonnés (si manager)
+     * Obtenir tous les subordonnés (si manager).
+     * Basé sur les relations "managed*" plutôt que sur un libellé de Position,
+     * pour ne plus dépendre du modèle Position supprimé.
      */
     public function getSubordinates()
     {
@@ -491,17 +487,36 @@ class Employee extends Model
             return collect([]);
         }
 
-        // Si chef de service, retourner les employés du service
-        if ($this->hierarchical_level === 'chef_service' && $this->currentService) {
-            return $this->currentService->employees()->where('id', '!=', $this->id)->get();
+        // Chef de service / Major : employés de ses services gérés
+        $serviceIds = $this->managedServices()->pluck('id')
+            ->merge($this->majorServices()->pluck('id'));
+
+        if ($serviceIds->isNotEmpty()) {
+            return Employee::whereIn('current_service_id', $serviceIds)
+                ->where('id', '!=', $this->id)
+                ->get();
         }
 
-        // Si chef de secteur, retourner les employés du secteur
-        if ($this->hierarchical_level === 'chef_secteur' && $this->sector) {
-            return $this->sector->employees()->where('id', '!=', $this->id)->get();
+        // Chef de secteur : employés de ses secteurs gérés
+        $sectorIds = $this->managedSectors()->pluck('id');
+
+        if ($sectorIds->isNotEmpty()) {
+            return Employee::whereIn('sector_id', $sectorIds)
+                ->where('id', '!=', $this->id)
+                ->get();
         }
 
-        // Pour les niveaux supérieurs, logique plus complexe
+        // Chef de département : employés des services du département
+        if ($this->managedDepartment) {
+            return Employee::whereHas(
+                'currentService',
+                fn($q) =>
+                $q->where('department_id', $this->managedDepartment->id)
+            )
+                ->where('id', '!=', $this->id)
+                ->get();
+        }
+
         return collect([]);
     }
 

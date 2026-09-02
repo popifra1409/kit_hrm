@@ -40,9 +40,9 @@ class EmployeeAffectationResource extends Resource
                             ->searchable()
                             ->required(),
 
-                        Forms\Components\Select::make('position_id')
-                            ->label('Poste')
-                            ->relationship('position', 'name')
+                        Forms\Components\Select::make('qualification_id')
+                            ->label('Qualification')
+                            ->relationship('qualification', 'name')
                             ->searchable()
                             ->nullable(),
                     ])
@@ -105,8 +105,8 @@ class EmployeeAffectationResource extends Resource
                     ->badge()
                     ->color('success'),
 
-                Tables\Columns\TextColumn::make('position.name')
-                    ->label('Poste')
+                Tables\Columns\TextColumn::make('qualification.name')
+                    ->label('Qualification')
                     ->searchable(),
 
                 Tables\Columns\TextColumn::make('start_date')
