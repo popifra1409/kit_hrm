@@ -11,6 +11,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class ServiceResource extends Resource
 {
@@ -35,7 +36,7 @@ class ServiceResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
+        return 5;
     }
 
     public static function form(Form $form): Form
@@ -61,10 +62,8 @@ class ServiceResource extends Resource
                                 // Réinitialiser les rattachements lors du changement de type
                                 if ($state === 'medical') {
                                     $set('sub_direction_id', null);
-                                    $set('service_chief_id', null);
                                 } else {
                                     $set('department_id', null);
-                                    $set('major_id', null);
                                 }
                             })
                             ->columnSpanFull(),
@@ -113,33 +112,16 @@ class ServiceResource extends Resource
                     ->columns(3),
 
                 Forms\Components\Section::make('Responsabilité')
-                    ->description('Le champ affiché dépend du type de service (médical = Major, autre = Chef de Service)')
                     ->schema([
-                        // Service médical -> major_id
-                        Forms\Components\Select::make('major_id')
-                            ->label('Major (Chef de Service Médical)')
-                            ->relationship('major', 'matricule')
-                            ->searchable()
-                            ->preload()
-                            ->getOptionLabelFromRecordUsing(
-                                fn($record) =>
-                                $record->full_name . ' (' . $record->matricule . ')'
-                            )
-                            ->visible(fn(Forms\Get $get) => $get('type') === 'medical')
-                            ->helperText('Responsable du service médical')
-                            ->columnSpanFull(),
-
-                        // Service administratif/support/technique -> service_chief_id
-                        Forms\Components\Select::make('service_chief_id')
+                        Forms\Components\Select::make('service_head_id')
                             ->label('Chef de Service')
-                            ->relationship('serviceChief', 'matricule')
+                            ->relationship('serviceHead', 'matricule')
                             ->searchable()
                             ->preload()
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) =>
-                                $record->full_name . ' (' . $record->matricule . ')'
+                                $record->full_name . ' (' . $record->matricule . ') - ' . ($record->position?->name ?? 'N/A')
                             )
-                            ->visible(fn(Forms\Get $get) => in_array($get('type'), ['administrative', 'support', 'technical']))
                             ->helperText('Responsable du service')
                             ->columnSpanFull(),
                     ]),
@@ -224,12 +206,9 @@ class ServiceResource extends Resource
                     ->searchable()
                     ->toggleable(),
 
-                // ✅ CORRIGÉ : plus de "serviceHead" (colonne/relation inexistante).
-                // On passe par l'accesseur getServiceHeadAttribute() (serviceChief ?? major)
-                // via une closure, pas via une notation pointée qui tenterait la relation.
-                Tables\Columns\TextColumn::make('service_head_name')
+                Tables\Columns\TextColumn::make('serviceHead.full_name')
                     ->label('Chef de Service')
-                    ->getStateUsing(fn($record) => $record->serviceHead?->full_name)
+                    ->searchable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('employee_count')
@@ -276,19 +255,20 @@ class ServiceResource extends Resource
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Actif'),
 
-                // ✅ CORRIGÉ : service_head_id n'existe plus, on vérifie les 2 colonnes réelles
                 Tables\Filters\Filter::make('has_head')
                     ->label('Avec Chef de Service')
-                    ->query(fn($query) => $query->where(function ($q) {
-                        $q->whereNotNull('service_chief_id')
-                            ->orWhereNotNull('major_id');
-                    })),
+                    ->query(fn($query) => $query->whereNotNull('service_head_id')),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer'),
+                ])
+                    ->button()
+                    ->label('Actions')
+                    ->icon('heroicon-o-ellipsis-horizontal'),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

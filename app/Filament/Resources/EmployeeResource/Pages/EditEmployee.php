@@ -256,12 +256,16 @@ class EditEmployee extends EditRecord
                                 ->schema([
                                     Forms\Components\Select::make('department_id')
                                         ->label('Département Médical')
-                                        ->relationship('department', 'name')
+                                        ->options(
+                                            \App\Models\Department::where('is_active', true)
+                                                ->pluck('name', 'id')
+                                        )
                                         ->searchable()
                                         ->preload()
                                         ->native(false)
                                         ->visible(fn(Forms\Get $get) => $get('branch_type') === 'medical')
                                         ->reactive()
+                                        ->getOptionLabelUsing(fn($value) => \App\Models\Department::find($value)?->name)
                                         ->afterStateUpdated(fn($set) => $set('current_service_id', null)),
 
                                     Forms\Components\Select::make('current_service_id')
@@ -283,6 +287,7 @@ class EditEmployee extends EditRecord
                                         ->preload()
                                         ->native(false)
                                         ->reactive()
+                                        ->getOptionLabelUsing(fn($value) => \App\Models\Service::find($value)?->name)
                                         ->afterStateUpdated(fn($set) => $set('sector_id', null)),
                                 ]),
 

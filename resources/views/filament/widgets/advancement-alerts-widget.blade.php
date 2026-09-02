@@ -109,7 +109,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-center whitespace-nowrap">
                                     <div class="text-sm text-gray-900 font-semibold">
-                                        {{ $item['months_in_current'] }} mois
+                                        {{ $item['tenure_formatted'] }}
                                     </div>
                                     <div class="text-xs text-gray-500">
                                         requis: {{ $item['required_months'] }} mois

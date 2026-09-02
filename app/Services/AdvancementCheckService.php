@@ -24,9 +24,10 @@ class AdvancementCheckService
             if ($this->isEligibleForAdvancement($employee)) {
                 $eligible[] = [
                     'employee' => $employee,
-                    'current_echelon' => $employee->current_echelon,
+                    'current_echelon' => $employee->current_echelon ?? '?',
                     'next_echelon' => $this->getNextEchelon($employee),
                     'months_in_current' => $this->getMonthsInCurrentEchelon($employee),
+                    'tenure_formatted' => $this->getFormattedTenureInEchelon($employee),
                     'required_months' => $this->getRequiredMonths($employee),
                     'eligible_date' => $this->getEligibleDate($employee),
                 ];
@@ -57,7 +58,7 @@ class AdvancementCheckService
     }
 
     /**
-     * Obtenir le nombre de mois dans l'échelon actuel
+     * Obtenir le nombre de mois dans l'échelon actuel (entier, arrondi à l'inférieur)
      */
     public function getMonthsInCurrentEchelon(Employee $employee)
     {
@@ -65,7 +66,39 @@ class AdvancementCheckService
             return 0;
         }
 
-        return Carbon::parse($employee->echelon_start_date)->diffInMonths(now());
+        return (int) floor(Carbon::parse($employee->echelon_start_date)->diffInMonths(now()));
+    }
+
+    /**
+     * Ancienneté dans l'échelon actuel, formatée lisiblement (ex: "2 ans 5 mois", "18 mois", "12 jours")
+     */
+    public function getFormattedTenureInEchelon(Employee $employee): string
+    {
+        if (!$employee->echelon_start_date) {
+            return 'Non défini';
+        }
+
+        $start = Carbon::parse($employee->echelon_start_date);
+        $now = now();
+
+        $years = (int) $start->diffInYears($now);
+        $months = (int) $start->copy()->addYears($years)->diffInMonths($now);
+        $days = (int) $start->copy()->addYears($years)->addMonths($months)->diffInDays($now);
+
+        $parts = [];
+        if ($years > 0) {
+            $parts[] = $years . ' an' . ($years > 1 ? 's' : '');
+        }
+        if ($months > 0) {
+            $parts[] = $months . ' mois';
+        }
+        // On n'affiche les jours que si la durée totale est inférieure à 1 mois,
+        // pour ne pas surcharger l'affichage sur les anciennetés longues.
+        if ($years === 0 && $months === 0) {
+            $parts[] = $days . ' jour' . ($days > 1 ? 's' : '');
+        }
+
+        return $parts ? implode(' ', $parts) : '0 jour';
     }
 
     /**

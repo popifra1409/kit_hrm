@@ -38,7 +38,7 @@ class RetirementAlerts extends Page implements HasTable
                     ->label('Nom complet')
                     ->searchable(['first_name', 'last_name']),
 
-                TextColumn::make('qualification')
+                TextColumn::make('qualification.name')
                     ->label('Qualification')
                     ->wrap(),
 

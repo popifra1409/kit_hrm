@@ -38,11 +38,11 @@ class CalculateAdvancements extends Page implements HasTable
                     ->label('Nom complet')
                     ->searchable(['first_name', 'last_name']),
 
-                TextColumn::make('qualification')
+                TextColumn::make('qualification.name')
                     ->label('Qualification')
                     ->wrap(),
 
-                TextColumn::make('category_current')
+                TextColumn::make('category_number')
                     ->label('Catégorie actuelle')
                     ->badge()
                     ->color('gray'),
@@ -118,7 +118,7 @@ class CalculateAdvancements extends Page implements HasTable
             // Créer l'avancement
             $advancement = Advancement::create([
                 'employee_id' => $employee->id,
-                'previous_category' => $employee->category_current,
+                'previous_category' => $employee->category_number,
                 'new_category' => $newCategory,
                 'previous_echelon' => $currentEchelon,
                 'new_echelon' => $newEchelon,

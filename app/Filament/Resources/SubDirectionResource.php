@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class SubDirectionResource extends Resource
 {
@@ -87,7 +88,7 @@ class SubDirectionResource extends Resource
                             ->preload()
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) =>
-                                $record->full_name . ' (' . $record->matricule . ') - ' . ($record->position?->name ?? 'N/A')
+                                $record->full_name . ' (' . $record->matricule . ') - ' . ($record->jobTitle?->name ?? 'N/A')
                             )
                             ->helperText('Sélectionnez le Sous-Directeur responsable')
                             ->columnSpanFull(),
@@ -197,10 +198,15 @@ class SubDirectionResource extends Resource
                     ->label('Active'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer'),
+                ])
+                    ->button()
+                    ->label('Actions')
+                    ->icon('heroicon-o-ellipsis-horizontal'),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

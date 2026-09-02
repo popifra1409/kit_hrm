@@ -106,4 +106,50 @@ class Service extends Model
     {
         return in_array($this->type, ['administrative', 'support', 'technical']);
     }
+
+    /**
+     * Libellé lisible du type de service (utilisé par ServiceResource)
+     */
+    public function getTypeLabelAttribute()
+    {
+        return match ($this->type) {
+            'medical' => '🏥 Médical',
+            'administrative' => '🏢 Administratif',
+            'support' => '🛠️ Support',
+            'technical' => '⚙️ Technique',
+            default => $this->type,
+        };
+    }
+
+    /**
+     * Nom du rattachement hiérarchique (Département médical ou Sous-Direction)
+     */
+    public function getParentNameAttribute()
+    {
+        if ($this->type === 'medical' && $this->department) {
+            return $this->department->name;
+        }
+
+        if ($this->subDirection) {
+            return $this->subDirection->name;
+        }
+
+        return '—';
+    }
+
+    /**
+     * Nombre d'employés rattachés à ce service
+     */
+    public function getEmployeeCountAttribute()
+    {
+        return $this->employees()->count();
+    }
+
+    /**
+     * Nombre de secteurs/unités rattachés à ce service
+     */
+    public function getSectorCountAttribute()
+    {
+        return $this->sectors()->count();
+    }
 }
