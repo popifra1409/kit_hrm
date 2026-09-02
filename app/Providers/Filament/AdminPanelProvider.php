@@ -73,7 +73,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugin(
                 \Hasnayeen\Themes\ThemesPlugin::make()
-                    ->canViewThemesPage(fn() => auth()->user()?->hasRole('super_admin'))
+                    ->canViewThemesPage(fn(): bool => auth()->check() && auth()->user()->hasRole('super_admin'))
             )
             ->middleware([
                 EncryptCookies::class,
