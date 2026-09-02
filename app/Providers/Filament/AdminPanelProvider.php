@@ -71,6 +71,10 @@ class AdminPanelProvider extends PanelProvider
                 //Widgets\AccountWidget::class,
                 //Widgets\FilamentInfoWidget::class,
             ])
+            ->plugin(
+                \Hasnayeen\Themes\ThemesPlugin::make()
+                    ->canViewThemesPage(fn() => auth()->user()?->hasRole('super_admin'))
+            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -81,6 +85,7 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                \Hasnayeen\Themes\Http\Middleware\SetTheme::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
@@ -104,6 +109,14 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsed(true),
                 NavigationGroup::make('🔧 Administration')
                     ->collapsed(true),
+            ])
+            ->navigationItems([
+                \Filament\Navigation\NavigationItem::make('Thèmes')
+                    ->icon('heroicon-o-swatch')
+                    ->group('⚙️ Paramétrage')
+                    ->url(fn() => route('filament.admin.pages.themes'))
+                    ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                    ->sort(3),
             ])
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,

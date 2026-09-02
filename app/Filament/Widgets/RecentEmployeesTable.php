@@ -31,7 +31,7 @@ class RecentEmployeesTable extends BaseWidget
                     ->label('Nom complet')
                     ->searchable(['first_name', 'last_name']),
 
-                Tables\Columns\TextColumn::make('qualification')
+                Tables\Columns\TextColumn::make('qualification.name')
                     ->label('Qualification')
                     ->wrap(),
 
