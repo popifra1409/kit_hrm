@@ -109,6 +109,8 @@ class ServiceResource extends Resource
 
                         Forms\Components\TextInput::make('code')
                             ->label('Code')
+                            ->required()
+                            ->unique(ignoreRecord: true)
                             ->maxLength(50)
                             ->placeholder('CARD, BUDG...')
                             ->helperText('Code unique du service'),
