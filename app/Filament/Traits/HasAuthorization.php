@@ -72,11 +72,13 @@ trait HasAuthorization
             // Structure
             'Department' => 'departments',
             'Service' => 'services',
-            'Position' => 'positions',
             'Direction' => 'departments',
             'SubDirection' => 'services',
             'Sector' => 'services',
             'MedicalDepartment' => 'departments',
+            'TradeBody' => 'trade_bodies',
+            'Qualification' => 'qualifications',
+            'JobTitle' => 'job_titles',
 
             // Contrats
             'Contract' => 'contracts',

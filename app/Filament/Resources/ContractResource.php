@@ -53,8 +53,8 @@ class ContractResource extends Resource
                                     ->afterStateUpdated(function ($state, callable $set) {
                                         if ($state) {
                                             $employee = \App\Models\Employee::find($state);
-                                            if ($employee && $employee->position) {
-                                                $set('position', $employee->position->name ?? null);
+                                            if ($employee && $employee->qualification) {
+                                                $set('position', $employee->qualification->name ?? null);
                                             }
                                         }
                                     }),

@@ -90,4 +90,20 @@ class Service extends Model
     {
         return $this->serviceChief ?? $this->major;
     }
+
+    /**
+     * Le service est-il de type médical ?
+     */
+    public function isMedical(): bool
+    {
+        return $this->type === 'medical';
+    }
+
+    /**
+     * Le service est-il de type administratif (administratif, support ou technique) ?
+     */
+    public function isAdministrative(): bool
+    {
+        return in_array($this->type, ['administrative', 'support', 'technical']);
+    }
 }

@@ -440,7 +440,7 @@ class EditEmployee extends EditRecord
                             Forms\Components\Grid::make(1)
                                 ->schema([
                                     Forms\Components\TextInput::make('category_recruitment')
-                                        ->label('Catégorie Recrutement')
+                                        ->label('Catégorie de Recrutement/Echelon')
                                         ->maxLength(50)
                                         ->helperText('La catégorie actuelle est définie ci-dessous dans la grille salariale.'),
                                 ]),

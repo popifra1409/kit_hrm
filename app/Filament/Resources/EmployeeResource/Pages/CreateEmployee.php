@@ -335,7 +335,7 @@ class CreateEmployee extends CreateRecord
                     Forms\Components\Grid::make(1)
                         ->schema([
                             Forms\Components\TextInput::make('category_recruitment')
-                                ->label('Catégorie de Recrutement')
+                                ->label('Catégorie de Recrutement/Echelon')
                                 ->maxLength(50)
                                 ->placeholder('Ex: A1, B2 ou 1, 2')
                                 ->helperText('Classification initiale. La catégorie actuelle est définie ci-dessous dans la grille salariale.'),

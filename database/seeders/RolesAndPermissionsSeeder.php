@@ -117,7 +117,6 @@ class RolesAndPermissionsSeeder extends Seeder
             // === STRUCTURE ORGANISATIONNELLE ===
             ['name' => 'manage_departments', 'module' => 'structure', 'description' => 'Gérer les départements'],
             ['name' => 'manage_services', 'module' => 'structure', 'description' => 'Gérer les services'],
-            ['name' => 'manage_positions', 'module' => 'structure', 'description' => 'Gérer les postes'],
 
             // === GRILLE SALARIALE ===
             ['name' => 'view_salary_grids', 'module' => 'payroll', 'description' => 'Voir la grille salariale'],
@@ -181,7 +180,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // 0. SUPER ADMIN - Accès absolu (un seul dans le système)
         $superAdmin = Role::firstOrCreate(['name' => 'super_admin'], ['guard_name' => 'web']);
-        $superAdmin->syncPermissions(Permission::all()); // TOUTES les permissions
+        $superAdmin->syncPermissions(Permission::all());
 
         // 1. ADMIN - Accès complet SAUF gestion super_admin
         $admin = Role::firstOrCreate(['name' => 'admin'], ['guard_name' => 'web']);
@@ -246,7 +245,6 @@ class RolesAndPermissionsSeeder extends Seeder
             // Structure
             'manage_departments',
             'manage_services',
-            'manage_positions',
             'view_trade_bodies',
             'view_job_titles',
             'view_qualifications',

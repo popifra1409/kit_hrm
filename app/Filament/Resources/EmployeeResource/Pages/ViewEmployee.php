@@ -89,7 +89,7 @@ class ViewEmployee extends ViewRecord
                                         ->label('Sexe')
                                         ->formatStateUsing(fn($state) => $state === 'M' ? '👨 Masculin' : '👩 Féminin'),
 
-                                    Infolists\Components\TextEntry::make('qualification')
+                                    Infolists\Components\TextEntry::make('qualification.name')
                                         ->label('Qualification')
                                         ->badge()
                                         ->color('info'),
@@ -127,12 +127,17 @@ class ViewEmployee extends ViewRecord
                             ->label('Secteur / Unité')
                             ->visible(fn($record) => $record->sector_id),
 
-                        Infolists\Components\TextEntry::make('position.name')
-                            ->label('Poste')
+                        Infolists\Components\TextEntry::make('tradeBody.name')
+                            ->label('Corps de Métier')
                             ->badge()
-                            ->color(fn($record) => $record->position?->level_color ?? 'gray'),
+                            ->color('info'),
 
-                        Infolists\Components\TextEntry::make('position.hierarchical_level_label')
+                        Infolists\Components\TextEntry::make('jobTitle.name')
+                            ->label('Poste Hiérarchique')
+                            ->badge()
+                            ->color('warning'),
+
+                        Infolists\Components\TextEntry::make('jobTitle.hierarchy_level')
                             ->label('Niveau Hiérarchique')
                             ->badge()
                             ->color('warning'),
@@ -141,14 +146,15 @@ class ViewEmployee extends ViewRecord
 
                 Infolists\Components\Section::make('Informations Professionnelles')
                     ->schema([
-                        Infolists\Components\TextEntry::make('employment_type')
-                            ->label('Type d\'Emploi')
+                        Infolists\Components\TextEntry::make('administrative_status')
+                            ->label('Statut Administratif')
                             ->formatStateUsing(fn($state) => match ($state) {
-                                'permanent' => '✅ Permanent',
-                                'contract' => '📝 Contractuel',
-                                'temporary' => '⏱️ Temporaire',
-                                'intern' => '🎓 Stagiaire',
-                                default => $state,
+                                'fonctionnaire_affecte' => '🏛️ Fonctionnaire Affecté',
+                                'fonctionnaire_detache' => '🔄 Fonctionnaire en Détachement',
+                                'contractuel_fp' => '📋 Contractuel de la Fonction Publique',
+                                'contractuel_structure' => '🏥 Contractuel de la Structure',
+                                'stagiaire' => '🎓 Stagiaire',
+                                default => 'Non défini',
                             })
                             ->badge(),
 

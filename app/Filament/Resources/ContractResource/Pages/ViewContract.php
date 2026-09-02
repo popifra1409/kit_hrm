@@ -184,8 +184,8 @@ class ViewContract extends ViewRecord
                                     ->badge()
                                     ->color('info'),
 
-                                Infolists\Components\TextEntry::make('employee.position.name')
-                                    ->label('Poste Actuel')
+                                Infolists\Components\TextEntry::make('employee.qualification.name')
+                                    ->label('Qualification Actuelle')
                                     ->placeholder('Non défini'),
                             ]),
                     ])

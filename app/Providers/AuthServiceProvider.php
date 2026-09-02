@@ -24,7 +24,6 @@ class AuthServiceProvider extends ServiceProvider
         // Structure Organisationnelle
         \App\Models\Department::class => \App\Policies\DepartmentPolicy::class,
         \App\Models\Service::class => \App\Policies\ServicePolicy::class,
-        \App\Models\Position::class => \App\Policies\PositionPolicy::class,
         \App\Models\Direction::class => \App\Policies\DirectionPolicy::class,
         \App\Models\SubDirection::class => \App\Policies\SubDirectionPolicy::class,
         \App\Models\Sector::class => \App\Policies\SectorPolicy::class,

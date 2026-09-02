@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 use App\Filament\Traits\HasAuthorization;
 
 class EmployeeResource extends Resource
@@ -94,7 +95,7 @@ class EmployeeResource extends Resource
                     ->height(40)
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('qualification')
+                Tables\Columns\TextColumn::make('qualification.name')
                     ->label('Qualification')
                     ->searchable()
                     ->wrap(),
@@ -389,8 +390,11 @@ class EmployeeResource extends Resource
                     Tables\Actions\DeleteAction::make()
                         ->label('Supprimer')
                         ->visible(fn($record) => static::checkCan('delete', $record)), // ✅ Correction
-                ]),
-            ])
+                ])
+                    ->button()
+                    ->label('Actions')
+                    ->icon('heroicon-o-ellipsis-horizontal'),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
