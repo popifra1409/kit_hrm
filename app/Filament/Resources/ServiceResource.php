@@ -237,8 +237,7 @@ class ServiceResource extends Resource
                     ->label('Rattachement')
                     ->getStateUsing(fn($record) => $record->parent_name)
                     ->badge()
-                    ->color('gray')
-                    ->searchable(),
+                    ->color('gray'),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Service')
