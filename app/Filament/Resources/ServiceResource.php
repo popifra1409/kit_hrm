@@ -6,6 +6,7 @@ use App\Filament\Resources\ServiceResource\Pages;
 use App\Models\Service;
 use App\Models\Department;
 use App\Models\SubDirection;
+use App\Models\Employee;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -36,7 +37,7 @@ class ServiceResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 4;
     }
 
     public static function form(Form $form): Form
@@ -59,11 +60,12 @@ class ServiceResource extends Resource
                             ->native(false)
                             ->reactive()
                             ->afterStateUpdated(function ($state, Forms\Set $set) {
-                                // Réinitialiser les rattachements lors du changement de type
                                 if ($state === 'medical') {
                                     $set('sub_direction_id', null);
+                                    $set('service_chief_id', null);
                                 } else {
                                     $set('department_id', null);
+                                    $set('major_id', null);
                                 }
                             })
                             ->columnSpanFull(),
@@ -74,10 +76,11 @@ class ServiceResource extends Resource
                         // Pour services médicaux
                         Forms\Components\Select::make('department_id')
                             ->label('Département Médical')
-                            ->relationship('department', 'name')
+                            ->options(fn() => Department::where('is_active', true)->pluck('name', 'id'))
                             ->searchable()
                             ->preload()
                             ->native(false)
+                            ->getOptionLabelUsing(fn($value) => Department::find($value)?->name)
                             ->visible(fn(Forms\Get $get) => $get('type') === 'medical')
                             ->helperText('Rattachement au département médical')
                             ->columnSpanFull(),
@@ -85,10 +88,11 @@ class ServiceResource extends Resource
                         // Pour services administratifs
                         Forms\Components\Select::make('sub_direction_id')
                             ->label('Sous-Direction')
-                            ->relationship('subDirection', 'name')
+                            ->options(fn() => SubDirection::where('is_active', true)->pluck('name', 'id'))
                             ->searchable()
                             ->preload()
                             ->native(false)
+                            ->getOptionLabelUsing(fn($value) => SubDirection::find($value)?->name)
                             ->visible(fn(Forms\Get $get) => in_array($get('type'), ['administrative', 'support', 'technical']))
                             ->helperText('Rattachement à la sous-direction administrative')
                             ->columnSpanFull(),
@@ -112,16 +116,55 @@ class ServiceResource extends Resource
                     ->columns(3),
 
                 Forms\Components\Section::make('Responsabilité')
+                    ->description('Le champ affiché dépend du type de service (médical = Major, autre = Chef de Service)')
                     ->schema([
-                        Forms\Components\Select::make('service_head_id')
-                            ->label('Chef de Service')
-                            ->relationship('serviceHead', 'matricule')
+                        // Service médical -> major_id
+                        Forms\Components\Select::make('major_id')
+                            ->label('Major (Chef de Service Médical)')
+                            ->options(fn() => Employee::where('is_active', true)->pluck('matricule', 'id'))
                             ->searchable()
                             ->preload()
-                            ->getOptionLabelFromRecordUsing(
-                                fn($record) =>
-                                $record->full_name . ' (' . $record->matricule . ') - ' . ($record->position?->name ?? 'N/A')
-                            )
+                            ->getOptionLabelUsing(function ($value) {
+                                $record = Employee::find($value);
+                                return $record ? $record->full_name . ' (' . $record->matricule . ')' : null;
+                            })
+                            ->getSearchResultsUsing(function (string $search) {
+                                return Employee::where('is_active', true)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('matricule', 'like', "%{$search}%")
+                                            ->orWhere('first_name', 'like', "%{$search}%")
+                                            ->orWhere('last_name', 'like', "%{$search}%");
+                                    })
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(fn($e) => [$e->id => $e->full_name . ' (' . $e->matricule . ')']);
+                            })
+                            ->visible(fn(Forms\Get $get) => $get('type') === 'medical')
+                            ->helperText('Responsable du service médical')
+                            ->columnSpanFull(),
+
+                        // Service administratif/support/technique -> service_chief_id
+                        Forms\Components\Select::make('service_chief_id')
+                            ->label('Chef de Service')
+                            ->options(fn() => Employee::where('is_active', true)->pluck('matricule', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->getOptionLabelUsing(function ($value) {
+                                $record = Employee::find($value);
+                                return $record ? $record->full_name . ' (' . $record->matricule . ')' : null;
+                            })
+                            ->getSearchResultsUsing(function (string $search) {
+                                return Employee::where('is_active', true)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('matricule', 'like', "%{$search}%")
+                                            ->orWhere('first_name', 'like', "%{$search}%")
+                                            ->orWhere('last_name', 'like', "%{$search}%");
+                                    })
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(fn($e) => [$e->id => $e->full_name . ' (' . $e->matricule . ')']);
+                            })
+                            ->visible(fn(Forms\Get $get) => in_array($get('type'), ['administrative', 'support', 'technical']))
                             ->helperText('Responsable du service')
                             ->columnSpanFull(),
                     ]),
@@ -206,9 +249,9 @@ class ServiceResource extends Resource
                     ->searchable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('serviceHead.full_name')
+                Tables\Columns\TextColumn::make('service_head_name')
                     ->label('Chef de Service')
-                    ->searchable()
+                    ->getStateUsing(fn($record) => $record->serviceHead?->full_name)
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('employee_count')
@@ -242,22 +285,23 @@ class ServiceResource extends Resource
 
                 Tables\Filters\SelectFilter::make('department_id')
                     ->label('Département Médical')
-                    ->relationship('department', 'name')
-                    ->searchable()
-                    ->preload(),
+                    ->options(fn() => Department::where('is_active', true)->pluck('name', 'id'))
+                    ->searchable(),
 
                 Tables\Filters\SelectFilter::make('sub_direction_id')
                     ->label('Sous-Direction')
-                    ->relationship('subDirection', 'name')
-                    ->searchable()
-                    ->preload(),
+                    ->options(fn() => SubDirection::where('is_active', true)->pluck('name', 'id'))
+                    ->searchable(),
 
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Actif'),
 
                 Tables\Filters\Filter::make('has_head')
                     ->label('Avec Chef de Service')
-                    ->query(fn($query) => $query->whereNotNull('service_head_id')),
+                    ->query(fn($query) => $query->where(function ($q) {
+                        $q->whereNotNull('service_chief_id')
+                            ->orWhereNotNull('major_id');
+                    })),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
