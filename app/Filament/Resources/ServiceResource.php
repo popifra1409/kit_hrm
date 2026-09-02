@@ -35,7 +35,7 @@ class ServiceResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 3;
     }
 
     public static function form(Form $form): Form
