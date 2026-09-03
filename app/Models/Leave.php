@@ -145,8 +145,33 @@ class Leave extends Model
 
         static::saving(function ($leave) {
             if ($leave->start_date && $leave->end_date) {
-                $leave->total_days = $leave->start_date->diffInDays($leave->end_date) + 1;
+                $leave->total_days = static::countLeaveDays($leave->start_date, $leave->end_date);
             }
         });
+    }
+
+    /**
+     * Compte le nombre de jours de congé entre deux dates selon la règle :
+     * - Le samedi est compté comme un jour de congé
+     * - Le dimanche n'est PAS compté
+     * - Les jours fériés ne sont PAS comptés
+     */
+    public static function countLeaveDays(Carbon $start, Carbon $end): int
+    {
+        $count = 0;
+        $current = $start->copy();
+
+        while ($current->lte($end)) {
+            $isSunday = $current->isSunday();
+            $isHoliday = \App\Models\PublicHoliday::isHoliday($current);
+
+            if (!$isSunday && !$isHoliday) {
+                $count++;
+            }
+
+            $current->addDay();
+        }
+
+        return $count;
     }
 }

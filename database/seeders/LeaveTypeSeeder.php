@@ -9,83 +9,46 @@ class LeaveTypeSeeder extends Seeder
 {
     public function run(): void
     {
-        $leaveTypes = [
+        $types = [
             [
                 'name' => 'Congé Annuel',
                 'code' => 'CA',
-                'description' => 'Congé annuel payé - Droit : 30 jours ouvrables par an',
+                'description' => "Congé annuel : 30 jours pour les fonctionnaires, 18 jours pour les contractuels (+2 jours après 5 ans de service). Le nombre de jours exact est calculé automatiquement par employé.",
+                'default_days' => 30, // valeur de base (fonctionnaires) ; le service d'attribution ajuste selon le statut
+                'max_days_per_year' => null,
+                'requires_document' => false,
+                'is_paid' => true,
+                'deductible_from_annual' => false,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Congé Rayon X',
+                'code' => 'CRX',
+                'description' => "Congé spécifique aux employés du service de Radiologie : 30 jours par an.",
                 'default_days' => 30,
                 'max_days_per_year' => 30,
                 'requires_document' => false,
                 'is_paid' => true,
                 'deductible_from_annual' => false,
-            ],
-            [
-                'name' => 'Congé de Maladie',
-                'code' => 'CM',
-                'description' => 'Congé pour raison médicale avec certificat médical',
-                'default_days' => 15,
-                'max_days_per_year' => 90,
-                'requires_document' => true,
-                'is_paid' => true,
-                'deductible_from_annual' => false,
+                'is_active' => true,
             ],
             [
                 'name' => 'Congé de Maternité',
                 'code' => 'CMAT',
-                'description' => 'Congé de maternité - 14 semaines',
-                'default_days' => 98, // 14 semaines = 98 jours
+                'description' => "Congé de maternité : 14 semaines (98 jours).",
+                'default_days' => 98,
                 'max_days_per_year' => 98,
                 'requires_document' => true,
                 'is_paid' => true,
                 'deductible_from_annual' => false,
-            ],
-            [
-                'name' => 'Congé de Paternité',
-                'code' => 'CPAT',
-                'description' => 'Congé de paternité - 10 jours',
-                'default_days' => 10,
-                'max_days_per_year' => 10,
-                'requires_document' => true,
-                'is_paid' => true,
-                'deductible_from_annual' => false,
-            ],
-            [
-                'name' => 'Congé pour Événement Familial',
-                'code' => 'CEF',
-                'description' => 'Mariage, décès, etc.',
-                'default_days' => 3,
-                'max_days_per_year' => 10,
-                'requires_document' => true,
-                'is_paid' => true,
-                'deductible_from_annual' => false,
-            ],
-            [
-                'name' => 'Permission Exceptionnelle',
-                'code' => 'PE',
-                'description' => 'Permission pour raison personnelle (déductible du congé annuel)',
-                'default_days' => 1,
-                'max_days_per_year' => 5,
-                'requires_document' => false,
-                'is_paid' => true,
-                'deductible_from_annual' => true,
-            ],
-            [
-                'name' => 'Congé sans Solde',
-                'code' => 'CSS',
-                'description' => 'Congé non payé à la demande de l\'employé',
-                'default_days' => 0,
-                'max_days_per_year' => 90,
-                'requires_document' => false,
-                'is_paid' => false,
-                'deductible_from_annual' => false,
+                'is_active' => true,
             ],
         ];
 
-        foreach ($leaveTypes as $type) {
-            LeaveType::create($type);
+        foreach ($types as $type) {
+            LeaveType::firstOrCreate(['code' => $type['code']], $type);
         }
 
-        $this->command->info('✅ Types de congés créés avec succès!');
+        echo "✅ " . count($types) . " types de congés créés/mis à jour.\n";
     }
 }
