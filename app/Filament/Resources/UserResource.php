@@ -23,6 +23,17 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
+                Forms\Components\Select::make('employee_id')
+                    ->label('Employé lié (compte mobile)')
+                    ->relationship('employee', 'matricule')
+                    ->searchable()
+                    ->preload()
+                    ->getOptionLabelFromRecordUsing(
+                        fn($record) => $record->full_name . ' (' . $record->matricule . ')'
+                    )
+                    ->nullable()
+                    ->helperText('Laissez vide pour un compte purement administratif (sans accès mobile employé).'),
+
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->maxLength(255),
@@ -35,12 +46,16 @@ class UserResource extends Resource
                     ->password()
                     ->required(fn($context) => $context === 'create')
                     ->dehydrated(fn($state) => filled($state))
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->helperText(fn($context) => $context === 'create'
+                        ? "Mot de passe temporaire à communiquer à l'employé pour l'activation de son compte mobile."
+                        : null),
                 Forms\Components\Select::make('roles')
                     ->relationship('roles', 'name')
                     ->multiple()
                     ->preload()
-                    ->searchable(),
+                    ->searchable()
+                    ->helperText("Si l'employé active son compte mobile sans rôle assigné ici, le rôle 'employee' lui sera attribué automatiquement."),
             ]);
     }
 
@@ -48,6 +63,13 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('employee.matricule')
+                    ->label('Employé lié')
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('—')
+                    ->searchable(),
+
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
@@ -55,6 +77,10 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('roles.name')
                     ->badge()
                     ->searchable(),
+                Tables\Columns\IconColumn::make('activated_at')
+                    ->label('Activé')
+                    ->boolean()
+                    ->getStateUsing(fn($record) => $record->activated_at !== null),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

@@ -273,6 +273,17 @@ class Employee extends Model
         return $this->belongsTo(ContractType::class);
     }
 
+    /**
+     * Compte utilisateur lié (accès Filament admin ou API mobile).
+     * ⚠️ Cette relation était utilisée par EmployeeObserver sans jamais être
+     * définie — les notifications vers $employee->user ne fonctionnaient donc
+     * pas avant cet ajout.
+     */
+    public function user()
+    {
+        return $this->hasOne(User::class);
+    }
+
     public function contracts()
     {
         return $this->hasMany(Contract::class);

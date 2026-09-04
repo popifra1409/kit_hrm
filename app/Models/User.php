@@ -7,23 +7,25 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable, HasRoles, HasApiTokens;
 
     protected $fillable = [
+        'employee_id',
         'name',
         'email',
         'password',
         'is_super_admin',
+        'activated_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
-        'is_super_admin' => 'boolean',
     ];
 
     protected function casts(): array
@@ -31,6 +33,8 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_super_admin' => 'boolean',
+            'activated_at' => 'datetime',
         ];
     }
 
@@ -48,5 +52,19 @@ class User extends Authenticatable implements FilamentUser
     public function canManageAdmins(): bool
     {
         return $this->hasPermissionTo('manage_admins') || $this->isSuperAdmin();
+    }
+
+    public function isActivated(): bool
+    {
+        return $this->activated_at !== null;
+    }
+
+    // ========================================
+    // RELATIONS
+    // ========================================
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 }
