@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Grouping\Group;
+use Filament\Tables\Enums\ActionsPosition;
 
 class DependentResource extends Resource
 {
@@ -242,6 +243,47 @@ class DependentResource extends Resource
                     ->columns(3)
                     ->collapsible(),
 
+                Forms\Components\Section::make('Validation RH')
+                    ->description('Statut de validation après vérification des documents physiques par les RH')
+                    ->schema([
+                        Forms\Components\Select::make('validation_status')
+                            ->label('Statut')
+                            ->options([
+                                'pending' => '⏳ En attente',
+                                'validated' => '✅ Validé',
+                                'rejected' => '❌ Rejeté',
+                            ])
+                            ->native(false)
+                            ->disabled()
+                            ->dehydrated(false),
+
+                        Forms\Components\TextInput::make('validatedBy.name')
+                            ->label('Validé par')
+                            ->disabled()
+                            ->dehydrated(false),
+
+                        Forms\Components\DateTimePicker::make('validated_at')
+                            ->label('Date de validation')
+                            ->disabled()
+                            ->dehydrated(false),
+
+                        Forms\Components\Textarea::make('rejection_reason')
+                            ->label('Motif de rejet')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn($get) => $get('validation_status') === 'rejected')
+                            ->columnSpanFull(),
+
+                        Forms\Components\TextInput::make('submitted_via')
+                            ->label('Origine de la saisie')
+                            ->formatStateUsing(fn($state) => $state === 'mobile' ? '📱 App mobile (employé)' : '🖥️ Administration')
+                            ->disabled()
+                            ->dehydrated(false),
+                    ])
+                    ->columns(2)
+                    ->collapsible()
+                    ->visible(fn($context) => $context === 'edit'),
+
                 Forms\Components\Section::make('Notes')
                     ->schema([
                         Forms\Components\Textarea::make('medical_notes')
@@ -307,6 +349,15 @@ class DependentResource extends Resource
                     ->badge()
                     ->color('success'),
 
+                Tables\Columns\BadgeColumn::make('validation_status')
+                    ->label('Statut RH')
+                    ->formatStateUsing(fn($record) => $record->validation_status_label)
+                    ->colors([
+                        'warning' => 'pending',
+                        'success' => 'validated',
+                        'danger' => 'rejected',
+                    ]),
+
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Actif')
                     ->boolean()
@@ -340,6 +391,14 @@ class DependentResource extends Resource
             // ->defaultGroup('employee.full_name')
             // ->groupsOnly()
             ->filters([
+                Tables\Filters\SelectFilter::make('validation_status')
+                    ->label('Statut RH')
+                    ->options([
+                        'pending' => '⏳ En attente',
+                        'validated' => '✅ Validé',
+                        'rejected' => '❌ Rejeté',
+                    ]),
+
                 Tables\Filters\SelectFilter::make('employee_id')
                     ->label('Employé')
                     ->relationship('employee', 'matricule')
@@ -368,11 +427,51 @@ class DependentResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    // ... vos actions restent identiques
-                ]),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn(Dependent $record) => $record->isPending())
+                        ->requiresConfirmation()
+                        ->modalHeading('Valider cet ayant droit')
+                        ->modalDescription('Confirmez-vous avoir vérifié les documents physiques justificatifs ?')
+                        ->action(fn(Dependent $record) => $record->validate()),
+
+                    Tables\Actions\Action::make('reject')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn(Dependent $record) => $record->isPending())
+                        ->requiresConfirmation()
+                        ->form([
+                            Forms\Components\Textarea::make('reason')
+                                ->label('Motif du rejet')
+                                ->required(),
+                        ])
+                        ->action(fn(Dependent $record, array $data) => $record->reject($data['reason'])),
+
+                    Tables\Actions\DeleteAction::make()->label('Supprimer'),
+                ])
+                    ->button()
+                    ->label('Actions')
+                    ->icon('heroicon-o-ellipsis-horizontal'),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
-                // ... vos bulk actions restent identiques
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+
+                    Tables\Actions\BulkAction::make('validate_bulk')
+                        ->label('Valider la sélection')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->action(function ($records) {
+                            $records->each(fn(Dependent $record) => $record->isPending() && $record->validate());
+                        }),
+                ]),
             ])
             ->defaultSort('created_at', 'desc');
     }

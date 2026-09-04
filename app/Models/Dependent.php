@@ -13,6 +13,11 @@ class Dependent extends Model
 
     protected $fillable = [
         'employee_id',
+        'validation_status',
+        'validated_by',
+        'validated_at',
+        'rejection_reason',
+        'submitted_via',
         'relationship',
         'first_name',
         'last_name',
@@ -45,6 +50,7 @@ class Dependent extends Model
     protected $casts = [
         'birth_date' => 'date',
         'death_date' => 'date',
+        'validated_at' => 'datetime',
         'coverage_start_date' => 'date',
         'coverage_end_date' => 'date',
         'card_issue_date' => 'date',
@@ -60,6 +66,74 @@ class Dependent extends Model
     public function employee()
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function validatedBy()
+    {
+        return $this->belongsTo(User::class, 'validated_by');
+    }
+
+    // Scopes
+    public function scopePending($query)
+    {
+        return $query->where('validation_status', 'pending');
+    }
+
+    public function scopeValidated($query)
+    {
+        return $query->where('validation_status', 'validated');
+    }
+
+    public function scopeRejected($query)
+    {
+        return $query->where('validation_status', 'rejected');
+    }
+
+    // Workflow de validation
+    public function validate(int $userId = null, ?string $notes = null): void
+    {
+        $this->validation_status = 'validated';
+        $this->validated_by = $userId ?? auth()->id();
+        $this->validated_at = now();
+        $this->rejection_reason = null;
+        if ($notes) {
+            $this->notes = trim(($this->notes ? $this->notes . "\n" : '') . $notes);
+        }
+        $this->save();
+    }
+
+    public function reject(string $reason, int $userId = null): void
+    {
+        $this->validation_status = 'rejected';
+        $this->validated_by = $userId ?? auth()->id();
+        $this->validated_at = now();
+        $this->rejection_reason = $reason;
+        $this->save();
+    }
+
+    public function isPending(): bool
+    {
+        return $this->validation_status === 'pending';
+    }
+
+    public function isValidated(): bool
+    {
+        return $this->validation_status === 'validated';
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->validation_status === 'rejected';
+    }
+
+    public function getValidationStatusLabelAttribute(): string
+    {
+        return match ($this->validation_status) {
+            'pending' => 'En attente de validation',
+            'validated' => 'Validé',
+            'rejected' => 'Rejeté',
+            default => $this->validation_status,
+        };
     }
 
     // Méthodes
