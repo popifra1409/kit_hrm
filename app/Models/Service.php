@@ -13,6 +13,7 @@ class Service extends Model
         'name',
         'code',
         'type',
+        'is_rayon_x_eligible',
         'description',
         'department_id',
         'medical_department_id',
@@ -28,6 +29,7 @@ class Service extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_rayon_x_eligible' => 'boolean',
     ];
 
     // Relations

@@ -3,16 +3,18 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\LeaveResource\Pages;
-use App\Filament\Resources\LeaveResource\RelationManagers;
 use App\Models\Leave;
+use App\Models\LeaveDecision;
+use App\Models\Employee;
+use App\Models\Replacement;
+use App\Services\LeaveEntitlementService;
+use App\Services\LeaveWorkflowService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use App\Models\LeaveDecision; 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class LeaveResource extends Resource
 {
@@ -24,32 +26,27 @@ class LeaveResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Informations sur la Demande')
+                Forms\Components\Section::make('Employé & Type de Congé')
                     ->schema([
                         Forms\Components\Select::make('employee_id')
                             ->label('Employé')
-                            ->options(function () {
-                                return \App\Models\Employee::where('is_active', true)
-                                    ->get()
-                                    ->pluck('full_name', 'id');
-                            })
+                            ->options(fn() => Employee::where('is_active', true)->get()->pluck('full_name', 'id'))
                             ->searchable()
                             ->required()
                             ->reactive()
                             ->preload()
-                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                // Calculer automatiquement le score
-                                if ($state) {
-                                    $leave = new \App\Models\Leave([
-                                        'employee_id' => $state,
-                                    ]);
-                                    $leave->calculateScore();
+                            ->columnSpan(2),
 
-                                    $set('anciennete_score', $leave->anciennete_score);
-                                    $set('discipline_score', $leave->discipline_score);
-                                    $set('children_score', $leave->children_score);
-                                    $set('total_score', $leave->total_score);
+                        Forms\Components\Placeholder::make('employee_info')
+                            ->label('Matricule / Qualité')
+                            ->content(function ($get) {
+                                $employee = Employee::find($get('employee_id'));
+                                if (!$employee) {
+                                    return '—';
                                 }
+                                return $employee->matricule
+                                    . ($employee->matricule_fonction_publique ? ' / FP: ' . $employee->matricule_fonction_publique : '')
+                                    . ' — ' . $employee->administrative_status_label;
                             }),
 
                         Forms\Components\Select::make('leave_type_id')
@@ -61,64 +58,176 @@ class LeaveResource extends Resource
                             ->preload()
                             ->native(false),
 
-                        Forms\Components\DatePicker::make('start_date')
-                            ->label('Date de début')
-                            ->required()
-                            ->native(false)
-                            ->displayFormat('d/m/Y')
-                            ->reactive(),
-
-                        Forms\Components\DatePicker::make('end_date')
-                            ->label('Date de fin')
-                            ->required()
-                            ->native(false)
-                            ->displayFormat('d/m/Y')
-                            ->reactive()
-                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                $start = $get('start_date');
-                                if ($start && $state) {
-                                    $days = \Carbon\Carbon::parse($start)->diffInDays($state) + 1;
-                                    $set('total_days', $days);
-                                }
-                            }),
-
-                        Forms\Components\TextInput::make('total_days')
-                            ->label('Nombre de jours')
-                            ->numeric()
-                            ->disabled()
-                            ->suffix('jours'),
-                    ])
-                    ->columns(3),
-
-                Forms\Components\Section::make('Décision de Mise en Congé')
-                    ->schema([
-                        Forms\Components\Select::make('leave_decision_id')
-                            ->label('Décision Signée (DG)')
-                            ->relationship('leaveDecision', 'decision_number')
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            ->helperText('Sélectionnez la décision signée par le DG'),
-
-                        Forms\Components\Placeholder::make('decision_info')
-                            ->label('Informations')
+                        Forms\Components\Placeholder::make('balance_info')
+                            ->label('Solde disponible (informatif)')
                             ->content(function ($get) {
-                                $decision = LeaveDecision::find($get('leave_decision_id'));
-                                if ($decision) {
-                                    return new \Illuminate\Support\HtmlString(
-                                        '<div class="p-3 bg-blue-50 rounded-lg">
-                            <p><strong>Période:</strong> ' . $decision->start_date->format('d/m/Y') . ' au ' . $decision->end_date->format('d/m/Y') . '</p>
-                            <p><strong>Durée:</strong> ' . $decision->duration_days . ' jours</p>
-                            <p><strong>Motif:</strong> ' . ($decision->description ?? '-') . '</p>
-                            <p><a href="' . \Storage::url($decision->decision_document_path) . '" class="text-blue-600 underline">📄 Voir la décision signée</a></p>
-                        </div>'
-                                    );
+                                $employee = Employee::find($get('employee_id'));
+                                $leaveType = \App\Models\LeaveType::find($get('leave_type_id'));
+
+                                if (!$employee || !$leaveType) {
+                                    return '—';
                                 }
-                                return 'Aucune décision sélectionnée';
+
+                                $service = app(LeaveEntitlementService::class);
+
+                                if (!$service->isEligibleForLeave($employee)) {
+                                    $date = $service->getNextEligibilityDate($employee);
+                                    return "⚠️ Pas encore éligible (1er congé possible à partir du " . $date?->format('d/m/Y') . ")";
+                                }
+
+                                $balance = $service->getAvailableDays($employee, $leaveType);
+
+                                if ($balance === null) {
+                                    return 'Pas de solde applicable pour ce type (événementiel).';
+                                }
+
+                                return "{$balance['available']} jour(s) disponible(s) sur {$balance['entitlement']} (cycle en cours).";
                             })
                             ->columnSpanFull(),
                     ])
-                    ->collapsed(),
+                    ->columns(2),
+
+                Forms\Components\Section::make('Période')
+                    ->description('Cochez "Fractionner" pour scinder ce congé en 2 prises (ex: 10 jours puis 8 jours plus tard) au sein de la même demande.')
+                    ->schema([
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\DatePicker::make('start_date')
+                                    ->label('Date de début (1ère prise)')
+                                    ->required()
+                                    ->native(false)
+                                    ->displayFormat('d/m/Y')
+                                    ->reactive(),
+
+                                Forms\Components\DatePicker::make('end_date')
+                                    ->label('Date de fin (1ère prise)')
+                                    ->required()
+                                    ->native(false)
+                                    ->displayFormat('d/m/Y')
+                                    ->reactive()
+                                    ->afterOrEqual('start_date'),
+
+                                Forms\Components\Placeholder::make('computed_days_1')
+                                    ->label('Jours (1ère prise)')
+                                    ->content(function ($get) {
+                                        $start = $get('start_date');
+                                        $end = $get('end_date');
+                                        if (!$start || !$end) {
+                                            return '—';
+                                        }
+                                        return Leave::countLeaveDays(\Carbon\Carbon::parse($start), \Carbon\Carbon::parse($end)) . ' jour(s)';
+                                    }),
+                            ]),
+
+                        Forms\Components\Toggle::make('is_split')
+                            ->label('Fractionner ce congé en 2 prises')
+                            ->reactive()
+                            ->default(false)
+                            ->columnSpanFull(),
+
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\DatePicker::make('start_date_2')
+                                    ->label('Date de début (2ème prise)')
+                                    ->native(false)
+                                    ->displayFormat('d/m/Y')
+                                    ->reactive()
+                                    ->required(fn($get) => $get('is_split'))
+                                    ->afterOrEqual('end_date')
+                                    ->helperText('Doit être après la 1ère prise'),
+
+                                Forms\Components\DatePicker::make('end_date_2')
+                                    ->label('Date de fin (2ème prise)')
+                                    ->native(false)
+                                    ->displayFormat('d/m/Y')
+                                    ->reactive()
+                                    ->required(fn($get) => $get('is_split'))
+                                    ->afterOrEqual('start_date_2'),
+
+                                Forms\Components\Placeholder::make('computed_days_2')
+                                    ->label('Jours (2ème prise)')
+                                    ->content(function ($get) {
+                                        $start = $get('start_date_2');
+                                        $end = $get('end_date_2');
+                                        if (!$start || !$end) {
+                                            return '—';
+                                        }
+                                        return Leave::countLeaveDays(\Carbon\Carbon::parse($start), \Carbon\Carbon::parse($end)) . ' jour(s)';
+                                    }),
+                            ])
+                            ->visible(fn($get) => $get('is_split')),
+
+                        Forms\Components\Placeholder::make('computed_days_total')
+                            ->label('Total cumulé')
+                            ->content(function ($get) {
+                                $days = 0;
+                                if ($get('start_date') && $get('end_date')) {
+                                    $days += Leave::countLeaveDays(\Carbon\Carbon::parse($get('start_date')), \Carbon\Carbon::parse($get('end_date')));
+                                }
+                                if ($get('is_split') && $get('start_date_2') && $get('end_date_2')) {
+                                    $days += Leave::countLeaveDays(\Carbon\Carbon::parse($get('start_date_2')), \Carbon\Carbon::parse($get('end_date_2')));
+                                }
+                                return $days . ' jour(s) au total';
+                            })
+                            ->extraAttributes(['class' => 'font-bold'])
+                            ->columnSpanFull(),
+                    ]),
+
+                Forms\Components\Section::make('Détails Spécifiques')
+                    ->schema([
+                        Forms\Components\TextInput::make('destination')
+                            ->label('Destination')
+                            ->maxLength(255)
+                            ->visible(fn($get) => optional(\App\Models\LeaveType::find($get('leave_type_id')))->code === 'PERM'),
+
+                        Forms\Components\TextInput::make('address_during_leave')
+                            ->label('Adresse pendant le congé')
+                            ->maxLength(255)
+                            ->visible(fn($get) => optional(\App\Models\LeaveType::find($get('leave_type_id')))->code !== 'PERM'),
+
+                        Forms\Components\TextInput::make('children_under_6_at_request')
+                            ->label('Enfants légitimes < 6 ans (femme salariée)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->visible(fn($get) => in_array(
+                                optional(\App\Models\LeaveType::find($get('leave_type_id')))->code,
+                                ['CA', 'CMAT']
+                            )),
+
+                        Forms\Components\Select::make('replacement_id')
+                            ->label('Intérimaire durant le congé')
+                            ->relationship('replacement', 'id')
+                            ->getOptionLabelFromRecordUsing(fn($record) => $record->replacementEmployee?->full_name ?? '—')
+                            ->searchable()
+                            ->preload()
+                            ->createOptionForm([
+                                Forms\Components\Select::make('replacement_employee_id')
+                                    ->label('Employé intérimaire')
+                                    ->options(fn() => Employee::where('is_active', true)->get()->pluck('full_name', 'id'))
+                                    ->searchable()
+                                    ->required(),
+                                Forms\Components\DatePicker::make('start_date')
+                                    ->label('Début')
+                                    ->required()
+                                    ->native(false),
+                                Forms\Components\DatePicker::make('end_date')
+                                    ->label('Fin')
+                                    ->required()
+                                    ->native(false),
+                            ])
+                            ->createOptionUsing(function (array $data, $get) {
+                                return Replacement::create([
+                                    'original_employee_id' => $get('employee_id'),
+                                    'replacement_employee_id' => $data['replacement_employee_id'],
+                                    'start_date' => $data['start_date'],
+                                    'end_date' => $data['end_date'],
+                                    'reason' => 'leave',
+                                    'status' => 'approved',
+                                    'is_active' => true,
+                                ])->id;
+                            }),
+                    ])
+                    ->columns(2),
 
                 Forms\Components\Section::make('Justification')
                     ->schema([
@@ -130,70 +239,67 @@ class LeaveResource extends Resource
                             ->columnSpanFull(),
 
                         Forms\Components\FileUpload::make('document_path')
-                            ->label('Justificatif (si requis)')
+                            ->label('Justificatif')
                             ->directory('leave-documents')
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
                             ->maxSize(5120)
-                            ->helperText('PDF ou image, max 5 MB'),
-                    ])
-                    ->columns(1),
+                            ->required(fn($get) => optional(\App\Models\LeaveType::find($get('leave_type_id')))->requires_document)
+                            ->helperText('PDF ou image, max 5 Mo'),
+                    ]),
 
-                Forms\Components\Section::make('Scores d\'Évaluation')
+                Forms\Components\Section::make('Circuit de Validation')
                     ->schema([
-                        Forms\Components\TextInput::make('anciennete_score')
-                            ->label('Score Ancienneté (0-10)')
-                            ->numeric()
-                            ->disabled()
-                            ->suffix('pts')
-                            ->helperText('1 point par année, max 10'),
-
-                        Forms\Components\TextInput::make('discipline_score')
-                            ->label('Score Discipline (0-10)')
-                            ->numeric()
-                            ->disabled()
-                            ->suffix('pts')
-                            ->helperText('10 - points disciplinaires'),
-
-                        Forms\Components\TextInput::make('children_score')
-                            ->label('Score Enfants < 6 ans (0-5)')
-                            ->numeric()
-                            ->disabled()
-                            ->suffix('pts')
-                            ->helperText('1 point par enfant, max 5'),
-
-                        Forms\Components\TextInput::make('total_score')
-                            ->label('Score Total')
-                            ->numeric()
-                            ->disabled()
-                            ->suffix('pts')
-                            ->extraAttributes(['class' => 'font-bold']),
-                    ])
-                    ->columns(4)
-                    ->collapsed(),
-
-                Forms\Components\Section::make('Statut et Notes')
-                    ->schema([
-                        Forms\Components\Select::make('status')
+                        Forms\Components\Placeholder::make('workflow_status')
                             ->label('Statut')
-                            ->options([
-                                'pending' => 'En attente',
-                                'approved_n1' => 'Approuvé Niveau 1 (Chef Service)',
-                                'approved_n2' => 'Approuvé Niveau 2 (DRH)',
-                                'approved' => 'Approuvé Final',
-                                'rejected' => 'Rejeté',
-                                'cancelled' => 'Annulé',
-                            ])
-                            ->default('pending')
-                            ->required()
-                            ->native(false),
+                            ->content(function ($record) {
+                                if (!$record) {
+                                    return "Le circuit de validation démarre automatiquement à la création de la demande.";
+                                }
 
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Notes')
-                            ->rows(2)
-                            ->maxLength(65535)
+                                $status = match ($record->status) {
+                                    'pending' => '⏳ En attente — étape : ' . ($record->currentApprovalStep?->name ?? '—'),
+                                    'approved' => '✅ Approuvée définitivement',
+                                    'rejected' => '❌ Rejetée : ' . $record->rejection_reason,
+                                    default => $record->status,
+                                };
+
+                                return $status;
+                            })
                             ->columnSpanFull(),
                     ])
-                    ->columns(1),
+                    ->visible(fn($record) => $record !== null)
+                    ->collapsible(),
+
+                Forms\Components\Section::make('Décision de Congé (établie après validation)')
+                    ->description('Une fois la demande approuvée par toutes les étapes du circuit, la décision de départ en congé est établie manuellement et soumise à la signature du DG. Renseignez-la ici une fois disponible.')
+                    ->schema([
+                        Forms\Components\Select::make('leave_decision_id')
+                            ->label('Décision Signée (DG)')
+                            ->relationship('leaveDecision', 'decision_number')
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Optionnel tant que la décision n\'a pas encore été établie/signée'),
+
+                        Forms\Components\Placeholder::make('decision_info')
+                            ->label('Informations')
+                            ->content(function ($get) {
+                                $decision = LeaveDecision::find($get('leave_decision_id'));
+                                if (!$decision) {
+                                    return 'Aucune décision liée pour le moment.';
+                                }
+                                return new \Illuminate\Support\HtmlString(
+                                    '<div class="p-3 bg-blue-50 rounded-lg">
+                                        <p><strong>Période :</strong> ' . $decision->start_date->format('d/m/Y') . ' au ' . $decision->end_date->format('d/m/Y') . '</p>
+                                        <p><strong>Durée :</strong> ' . $decision->duration_days . ' jours</p>
+                                        <p><a href="' . \Storage::url($decision->decision_document_path) . '" class="text-blue-600 underline" target="_blank">📄 Voir la décision signée</a></p>
+                                    </div>'
+                                );
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn($record) => $record && $record->status === 'approved')
+                    ->collapsed(),
+
                 Forms\Components\Section::make('Suivi du Retour')
                     ->schema([
                         Forms\Components\Toggle::make('has_returned')
@@ -212,28 +318,7 @@ class LeaveResource extends Resource
                         Forms\Components\Textarea::make('return_notes')
                             ->label('Notes sur le retour')
                             ->rows(2)
-                            ->visible(fn($get) => $get('has_returned'))
-                            ->placeholder('Ex: Retour anticipé, prolongation maladie, etc.'),
-
-                        Forms\Components\Placeholder::make('return_info')
-                            ->label('Informations')
-                            ->content(function ($record) {
-                                if (!$record || !$record->has_returned) {
-                                    return '';
-                                }
-
-                                $info = "Retour confirmé le " . $record->return_confirmed_at?->format('d/m/Y à H:i');
-                                if ($record->returnConfirmedBy) {
-                                    $info .= " par " . $record->returnConfirmedBy->name;
-                                }
-
-                                if ($record->is_late_return) {
-                                    $info .= "\n⚠️ Retour en retard de {$record->late_days} jour(s)";
-                                }
-
-                                return $info;
-                            })
-                            ->visible(fn($record) => $record && $record->has_returned),
+                            ->visible(fn($get) => $get('has_returned')),
                     ])
                     ->columns(2)
                     ->visible(fn($record) => $record && $record->status === 'approved')
@@ -269,71 +354,37 @@ class LeaveResource extends Resource
                     ->label('Jours')
                     ->suffix(' j')
                     ->alignCenter()
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('total_score')
-                    ->label('Score')
-                    ->badge()
-                    ->color('success')
-                    ->suffix(' pts')
-                    ->alignCenter()
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn(Leave $record) => $record->is_split ? '✂️ Fractionné en 2' : null),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Statut')
                     ->colors([
                         'warning' => 'pending',
-                        'info' => 'approved_n1',
-                        'primary' => 'approved_n2',
                         'success' => 'approved',
                         'danger' => 'rejected',
-                        'secondary' => 'cancelled',
                     ])
                     ->formatStateUsing(fn(string $state): string => match ($state) {
                         'pending' => 'En attente',
-                        'approved_n1' => 'Approuvé N1',
-                        'approved_n2' => 'Approuvé N2',
                         'approved' => 'Approuvé',
                         'rejected' => 'Rejeté',
-                        'cancelled' => 'Annulé',
                         default => $state,
                     }),
+
+                Tables\Columns\TextColumn::make('currentApprovalStep.name')
+                    ->label('Étape en cours')
+                    ->badge()
+                    ->color('gray')
+                    ->placeholder('—')
+                    ->visible(fn($record) => !$record || $record->status === 'pending'),
+
                 Tables\Columns\IconColumn::make('has_returned')
                     ->label('Retour')
                     ->boolean()
                     ->trueIcon('heroicon-o-check-circle')
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
-                    ->falseColor('warning')
-                    ->tooltip(fn($record) => $record->has_returned
-                        ? 'Retour confirmé le ' . $record->return_confirmed_at?->format('d/m/Y')
-                        : 'En attente de retour')
-                    ->visible(fn($record) => $record && $record->status === 'approved'),
-
-                Tables\Columns\BadgeColumn::make('return_status')
-                    ->label('Statut Retour')
-                    ->formatStateUsing(function ($record) {
-                        if ($record->status !== 'approved') {
-                            return '—';
-                        }
-
-                        if ($record->has_returned) {
-                            return $record->is_late_return ? '⚠️ Retard' : '✅ À temps';
-                        }
-
-                        if (now()->isAfter($record->end_date)) {
-                            return '❌ En retard';
-                        }
-
-                        return '⏳ En cours';
-                    })
-                    ->colors([
-                        'success' => fn($record) => $record->has_returned && !$record->is_late_return,
-                        'warning' => fn($record) => $record->is_late_return,
-                        'danger' => fn($record) => !$record->has_returned && now()->isAfter($record->end_date),
-                        'gray' => fn($record) => $record->status !== 'approved',
-                    ])
-                    ->toggleable(),
+                    ->falseColor('warning'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Demandé le')
@@ -351,135 +402,90 @@ class LeaveResource extends Resource
                     ->label('Statut')
                     ->options([
                         'pending' => 'En attente',
-                        'approved_n1' => 'Approuvé N1',
-                        'approved_n2' => 'Approuvé N2',
                         'approved' => 'Approuvé',
                         'rejected' => 'Rejeté',
-                        'cancelled' => 'Annulé',
                     ]),
 
-                Tables\Filters\Filter::make('my_team')
-                    ->label('Mon équipe')
-                    ->query(function ($query) {
-                        // Filtrer les demandes de l'équipe de l'utilisateur connecté
-                        // À adapter selon votre logique métier
-                        return $query;
-                    }),
+                Tables\Filters\SelectFilter::make('current_approval_step_id')
+                    ->label('Étape en cours')
+                    ->relationship('currentApprovalStep', 'name'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
 
-                Tables\Actions\Action::make('approve_n1')
-                    ->label('Approuver N1')
-                    ->icon('heroicon-o-check')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'pending')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'approved_n1',
-                            'approved_by_n1' => auth()->id(),
-                            'approved_at_n1' => now(),
-                        ]);
+                    Tables\Actions\Action::make('approve_step')
+                        ->label('Approuver l\'étape')
+                        ->icon('heroicon-o-check')
+                        ->color('success')
+                        ->visible(fn(Leave $record) => $record->status === 'pending')
+                        ->requiresConfirmation()
+                        ->modalDescription(fn(Leave $record) => 'Approuver l\'étape "' . $record->currentApprovalStep?->name . '" ?')
+                        ->form([
+                            Forms\Components\Textarea::make('comments')
+                                ->label('Commentaire (optionnel)'),
+                        ])
+                        ->action(function (Leave $record, array $data) {
+                            app(LeaveWorkflowService::class)->approveCurrentStep($record, auth()->user(), $data['comments'] ?? null);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande approuvée niveau 1')
-                            ->success()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Étape approuvée')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('approve_n2')
-                    ->label('Approuver N2')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'approved_n1')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'approved_n2',
-                            'approved_by_n2' => auth()->id(),
-                            'approved_at_n2' => now(),
-                        ]);
+                    Tables\Actions\Action::make('reject_step')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-mark')
+                        ->color('danger')
+                        ->visible(fn(Leave $record) => $record->status === 'pending')
+                        ->form([
+                            Forms\Components\Textarea::make('reason')
+                                ->label('Motif du rejet')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function (Leave $record, array $data) {
+                            app(LeaveWorkflowService::class)->rejectCurrentStep($record, auth()->user(), $data['reason']);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande approuvée niveau 2')
-                            ->success()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Demande rejetée')
+                                ->warning()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('approve_final')
-                    ->label('Approuver Final')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'approved_n2')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'approved',
-                        ]);
+                    Tables\Actions\Action::make('confirm_return')
+                        ->label('Confirmer Retour')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn(Leave $record) => $record->status === 'approved' && !$record->has_returned)
+                        ->form([
+                            Forms\Components\DatePicker::make('actual_return_date')
+                                ->label('Date de retour effective')
+                                ->required()
+                                ->default(now())
+                                ->native(false)
+                                ->displayFormat('d/m/Y'),
 
-                        // Mettre à jour le solde de congés
-                        $this->updateLeaveBalance($record);
+                            Forms\Components\Textarea::make('return_notes')
+                                ->label('Notes')
+                                ->rows(3),
+                        ])
+                        ->action(function (Leave $record, array $data) {
+                            $record->confirmReturn($data['actual_return_date'], $data['return_notes'] ?? null);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande approuvée et solde mis à jour')
-                            ->success()
-                            ->send();
-                    }),
-
-                Tables\Actions\Action::make('reject')
-                    ->label('Rejeter')
-                    ->icon('heroicon-o-x-mark')
-                    ->color('danger')
-                    ->visible(fn($record) => in_array($record->status, ['pending', 'approved_n1', 'approved_n2']))
-                    ->form([
-                        Forms\Components\Textarea::make('rejection_reason')
-                            ->label('Motif du rejet')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->update([
-                            'status' => 'rejected',
-                            'rejection_reason' => $data['rejection_reason'],
-                            'rejected_by' => auth()->id(),
-                            'rejected_at' => now(),
-                        ]);
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande rejetée')
-                            ->warning()
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('confirm_return')
-                    ->label('Confirmer Retour')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record && $record->status === 'approved' && !$record->has_returned)
-                    ->form([
-                        Forms\Components\DatePicker::make('actual_return_date')
-                            ->label('Date de retour effective')
-                            ->required()
-                            ->default(now())
-                            ->native(false)
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\Textarea::make('return_notes')
-                            ->label('Notes')
-                            ->rows(3)
-                            ->placeholder('Observations éventuelles sur le retour...'),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->confirmReturn($data['actual_return_date'], $data['return_notes'] ?? null);
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Retour confirmé')
-                            ->success()
-                            ->body("Le retour de {$record->employee->full_name} a été enregistré.")
-                            ->send();
-                    }),
-            ])
+                            \Filament\Notifications\Notification::make()
+                                ->title('Retour confirmé')
+                                ->success()
+                                ->body("Le retour de {$record->employee->full_name} a été enregistré.")
+                                ->send();
+                        }),
+                ])
+                    ->button()
+                    ->label('Actions')
+                    ->icon('heroicon-o-ellipsis-horizontal'),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),
@@ -492,28 +498,6 @@ class LeaveResource extends Resource
         return [
             //
         ];
-    }
-
-    protected static function updateLeaveBalance($leave)
-    {
-        $year = $leave->start_date->year;
-
-        $balance = \App\Models\LeaveBalance::firstOrCreate(
-            [
-                'employee_id' => $leave->employee_id,
-                'leave_type_id' => $leave->leave_type_id,
-                'year' => $year,
-            ],
-            [
-                'total_entitled' => $leave->leaveType->default_days,
-                'used' => 0,
-                'pending' => 0,
-                'available' => $leave->leaveType->default_days,
-            ]
-        );
-
-        $balance->used += $leave->total_days;
-        $balance->recalculate();
     }
 
     public static function getPages(): array
@@ -547,7 +531,7 @@ class LeaveResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 2;
     }
 
     public static function getNavigationIcon(): ?string
@@ -557,7 +541,7 @@ class LeaveResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return static::getModel()::where('status', 'pending')->count();
+        return (string) static::getModel()::where('status', 'pending')->count();
     }
 
     public static function getNavigationBadgeColor(): ?string

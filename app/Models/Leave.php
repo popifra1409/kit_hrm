@@ -16,6 +16,10 @@ class Leave extends Model
         'start_date',
         'end_date',
         'total_days',
+        'is_split',
+        'start_date_2',
+        'end_date_2',
+        'total_days_2',
         'reason',
         'document_path',
         'status',
@@ -25,6 +29,7 @@ class Leave extends Model
         'replacement_id',
         'deductible_from_annual',
         'current_approval_step_id',
+        'service_year',
         'approved_by_n1',
         'approved_by_n2',
         'approved_at_n1',
@@ -49,6 +54,10 @@ class Leave extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'is_split' => 'boolean',
+        'start_date_2' => 'date',
+        'end_date_2' => 'date',
+        'total_days_2' => 'integer',
         'approved_at_n1' => 'datetime',
         'approved_at_n2' => 'datetime',
         'rejected_at' => 'datetime',
@@ -168,7 +177,23 @@ class Leave extends Model
 
         static::saving(function ($leave) {
             if ($leave->start_date && $leave->end_date) {
-                $leave->total_days = static::countLeaveDays($leave->start_date, $leave->end_date);
+                $days1 = static::countLeaveDays($leave->start_date, $leave->end_date);
+
+                if ($leave->is_split && $leave->start_date_2 && $leave->end_date_2) {
+                    $leave->total_days_2 = static::countLeaveDays($leave->start_date_2, $leave->end_date_2);
+                    $leave->total_days = $days1 + $leave->total_days_2;
+                } else {
+                    $leave->total_days_2 = null;
+                    $leave->total_days = $days1;
+                }
+            }
+
+            if ($leave->start_date && $leave->employee_id && !$leave->service_year) {
+                $employee = $leave->employee ?? \App\Models\Employee::find($leave->employee_id);
+                if ($employee?->recruitment_date) {
+                    $leave->service_year = app(\App\Services\LeaveEntitlementService::class)
+                        ->resolveServiceYearForDate($employee, $leave->start_date);
+                }
             }
         });
     }

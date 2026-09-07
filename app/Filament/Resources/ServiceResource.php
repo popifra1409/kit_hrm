@@ -37,7 +37,7 @@ class ServiceResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 4;
+        return 5;
     }
 
     public static function form(Form $form): Form
@@ -212,6 +212,12 @@ class ServiceResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Actif')
                             ->default(true)
+                            ->inline(false),
+
+                        Forms\Components\Toggle::make('is_rayon_x_eligible')
+                            ->label('Éligible au Congé Rayon X')
+                            ->helperText('Les employés de ce service bénéficient de 30 jours de Congé Rayon X (au lieu du Congé Annuel classique)')
+                            ->default(false)
                             ->inline(false),
                     ])
                     ->columns(2)

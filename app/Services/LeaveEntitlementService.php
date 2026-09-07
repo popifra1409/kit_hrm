@@ -5,70 +5,186 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
+use App\Models\SystemSetting;
+use Carbon\Carbon;
 
 class LeaveEntitlementService
 {
-    public const PERMISSION_THRESHOLD_DAYS = 10;
+    // ========================================
+    // PARAMÈTRES (lus depuis SystemSetting, avec valeurs par défaut de repli)
+    // ========================================
 
-    public function getAnnualEntitlement(Employee $employee, int $year): int
+    protected function cycleMonths(): int
     {
-        return match ($employee->administrative_status) {
-            'fonctionnaire_affecte', 'fonctionnaire_detache' => 30,
-            'contractuel_fp', 'contractuel_structure' => $this->contractuelEntitlement($employee, $year),
-            'stagiaire' => 0,
+        return (int) SystemSetting::get('leave.cycle_months', 12);
+    }
+
+    protected function minCyclesBeforeFirstLeave(): int
+    {
+        return (int) SystemSetting::get('leave.min_cycles_before_first_leave', 1);
+    }
+
+    protected function baseDays(string $administrativeStatus): int
+    {
+        return match ($administrativeStatus) {
+            'fonctionnaire_affecte', 'fonctionnaire_detache' => (int) SystemSetting::get('leave.base_days_fonctionnaire', 30),
+            'contractuel_fp', 'contractuel_structure' => (int) SystemSetting::get('leave.base_days_contractuel', 18),
+            'stagiaire' => (int) SystemSetting::get('leave.base_days_stagiaire', 0),
             default => 0,
         };
     }
 
-    protected function contractuelEntitlement(Employee $employee, int $year): int
+    protected function bonusEveryNCycles(): int
     {
-        $base = 18;
+        return (int) SystemSetting::get('leave.bonus_every_n_cycles', 5);
+    }
 
+    protected function bonusDays(): int
+    {
+        return (int) SystemSetting::get('leave.bonus_days', 2);
+    }
+
+    protected function bonusIsCumulative(): bool
+    {
+        return (bool) SystemSetting::get('leave.bonus_cumulative', true);
+    }
+
+    protected function rayonXDays(): int
+    {
+        return (int) SystemSetting::get('leave.rayon_x_days', 30);
+    }
+
+    public function permissionThresholdDays(): int
+    {
+        return (int) SystemSetting::get('leave.permission_threshold_days', 10);
+    }
+
+    protected function permissionPeriodBasis(): string
+    {
+        return SystemSetting::get('leave.permission_period_basis', 'calendar_year');
+    }
+
+    // ========================================
+    // CYCLES DE SERVICE (N mois glissants depuis le recrutement)
+    // ========================================
+
+    public function getServiceYear(Employee $employee, ?Carbon $asOf = null): int
+    {
         if (!$employee->recruitment_date) {
+            return 0;
+        }
+
+        $asOf = $asOf ?? now();
+        $monthsCompleted = $employee->recruitment_date->diffInMonths($asOf);
+
+        return (int) intdiv($monthsCompleted, $this->cycleMonths());
+    }
+
+    public function getServiceYearBounds(Employee $employee, int $serviceYear): array
+    {
+        $start = $employee->recruitment_date->copy()->addMonths(($serviceYear - 1) * $this->cycleMonths());
+        $end = $start->copy()->addMonths($this->cycleMonths())->subDay();
+
+        return [$start, $end];
+    }
+
+    public function resolveServiceYearForDate(Employee $employee, Carbon $date): int
+    {
+        if (!$employee->recruitment_date) {
+            return 0;
+        }
+
+        $monthsCompleted = $employee->recruitment_date->diffInMonths($date);
+
+        return (int) intdiv($monthsCompleted, $this->cycleMonths()) + 1;
+    }
+
+    public function isEligibleForLeave(Employee $employee, ?Carbon $asOf = null): bool
+    {
+        return $this->getServiceYear($employee, $asOf) >= $this->minCyclesBeforeFirstLeave();
+    }
+
+    public function getNextEligibilityDate(Employee $employee, ?Carbon $asOf = null): ?Carbon
+    {
+        if (!$employee->recruitment_date) {
+            return null;
+        }
+
+        $asOf = $asOf ?? now();
+        $currentServiceYear = $this->getServiceYear($employee, $asOf);
+        $targetCycle = max($currentServiceYear + 1, $this->minCyclesBeforeFirstLeave());
+
+        return $employee->recruitment_date->copy()->addMonths($targetCycle * $this->cycleMonths());
+    }
+
+    // ========================================
+    // DROITS (ENTITLEMENT)
+    // ========================================
+
+    public function getAnnualEntitlement(Employee $employee, int $serviceYear): int
+    {
+        $base = $this->baseDays($employee->administrative_status);
+
+        if ($base === 0) {
+            return 0;
+        }
+
+        $bonusEveryN = $this->bonusEveryNCycles();
+        $bonusDays = $this->bonusDays();
+
+        if ($bonusEveryN <= 0 || $bonusDays <= 0) {
             return $base;
         }
 
-        $referenceDate = \Carbon\Carbon::createFromDate($year, 12, 31);
-        $seniorityYears = $employee->recruitment_date->diffInYears($referenceDate);
+        $milestones = intdiv(max($serviceYear, 0), $bonusEveryN);
 
-        return $seniorityYears >= 5 ? $base + 2 : $base;
+        $bonus = $this->bonusIsCumulative()
+            ? $milestones * $bonusDays
+            : ($milestones > 0 ? $bonusDays : 0);
+
+        return $base + $bonus;
     }
 
-    /**
-     * L'employé est-il éligible au Congé Rayon X (basé sur son service actuel) ?
-     */
     public function isEligibleForRayonX(Employee $employee): bool
     {
-        $serviceName = $employee->currentService?->name;
+        return (bool) $employee->currentService?->is_rayon_x_eligible;
+    }
 
-        if (!$serviceName) {
-            return false;
+    // ========================================
+    // SOLDE (informatif, calculé à la volée)
+    // ========================================
+
+    public function getUsedDays(Employee $employee, LeaveType $leaveType, int $serviceYear, ?int $excludeLeaveId = null): int
+    {
+        $query = Leave::where('employee_id', $employee->id)
+            ->where('leave_type_id', $leaveType->id)
+            ->where('service_year', $serviceYear)
+            ->whereIn('status', ['approved', 'pending']);
+
+        if ($excludeLeaveId) {
+            $query->where('id', '!=', $excludeLeaveId);
         }
 
-        return str_contains(mb_strtolower($serviceName), 'radiolog');
+        return (int) $query->sum('total_days');
     }
 
-    /**
-     * Jours déjà utilisés (approuvés ou en attente) pour un type de congé donné, sur une année.
-     */
-    public function getUsedDays(Employee $employee, LeaveType $leaveType, int $year): int
+    public function getAvailableDays(Employee $employee, LeaveType $leaveType, ?int $serviceYear = null): ?array
     {
-        return (int) Leave::where('employee_id', $employee->id)
-            ->where('leave_type_id', $leaveType->id)
-            ->whereIn('status', ['approved', 'pending'])
-            ->whereYear('start_date', $year)
-            ->sum('total_days');
-    }
+        $serviceYear = $serviceYear ?? $this->getServiceYear($employee);
 
-    /**
-     * Solde disponible = droit - déjà pris/en attente. Purement informatif (calculé à la volée).
-     */
-    public function getAvailableDays(Employee $employee, LeaveType $leaveType, int $year): ?int
-    {
+        if (!$this->isEligibleForLeave($employee)) {
+            return [
+                'eligible' => false,
+                'entitlement' => 0,
+                'used' => 0,
+                'available' => 0,
+                'next_eligibility_date' => $this->getNextEligibilityDate($employee)?->format('Y-m-d'),
+            ];
+        }
+
         $entitlement = match ($leaveType->code) {
-            'CA' => $this->getAnnualEntitlement($employee, $year),
-            'CRX' => $this->isEligibleForRayonX($employee) ? 30 : 0,
-            'CMAT' => null, // pas un solde annuel, événementiel
+            'CA' => $this->getAnnualEntitlement($employee, $serviceYear),
+            'CRX' => $this->isEligibleForRayonX($employee) ? $this->rayonXDays() : 0,
             default => null,
         };
 
@@ -76,18 +192,32 @@ class LeaveEntitlementService
             return null;
         }
 
-        return max(0, $entitlement - $this->getUsedDays($employee, $leaveType, $year));
+        $used = $this->getUsedDays($employee, $leaveType, $serviceYear);
+
+        return [
+            'eligible' => true,
+            'service_year' => $serviceYear,
+            'entitlement' => $entitlement,
+            'used' => $used,
+            'available' => max(0, $entitlement - $used),
+        ];
     }
 
-    /**
-     * Total des jours de Permission d'Absence déjà pris/en attente sur l'année.
-     */
-    public function getPermissionDaysUsedThisYear(Employee $employee, int $year, ?int $excludeLeaveId = null): int
+    // ========================================
+    // PERMISSION D'ABSENCE (seuil cumulé configurable)
+    // ========================================
+
+    public function getPermissionDaysUsed(Employee $employee, int $referencePeriod, ?int $excludeLeaveId = null): int
     {
         $query = Leave::where('employee_id', $employee->id)
             ->whereHas('leaveType', fn($q) => $q->where('code', 'PERM'))
-            ->whereIn('status', ['approved', 'pending'])
-            ->whereYear('start_date', $year);
+            ->whereIn('status', ['approved', 'pending']);
+
+        if ($this->permissionPeriodBasis() === 'service_cycle') {
+            $query->where('service_year', $referencePeriod);
+        } else {
+            $query->whereYear('start_date', $referencePeriod);
+        }
 
         if ($excludeLeaveId) {
             $query->where('id', '!=', $excludeLeaveId);
@@ -97,20 +227,41 @@ class LeaveEntitlementService
     }
 
     /**
-     * Sur les `newDays` jours de la nouvelle permission demandée, combien dépassent
-     * le seuil cumulé de 10 jours/an et doivent donc être déduits du congé annuel ?
+     * Détermine la période de référence (année civile ou cycle de service) à utiliser
+     * pour une date de permission donnée, selon le mode configuré.
      */
-    public function getDaysExceedingPermissionThreshold(Employee $employee, int $year, int $newDays, ?int $excludeLeaveId = null): int
+    public function resolvePermissionPeriod(Employee $employee, Carbon $date): int
     {
-        $alreadyUsed = $this->getPermissionDaysUsedThisYear($employee, $year, $excludeLeaveId);
+        return $this->permissionPeriodBasis() === 'service_cycle'
+            ? $this->resolveServiceYearForDate($employee, $date)
+            : (int) $date->format('Y');
+    }
+
+    public function getDaysExceedingPermissionThreshold(Employee $employee, int $referencePeriod, int $newDays, ?int $excludeLeaveId = null): int
+    {
+        $alreadyUsed = $this->getPermissionDaysUsed($employee, $referencePeriod, $excludeLeaveId);
+        $threshold = $this->permissionThresholdDays();
         $totalAfter = $alreadyUsed + $newDays;
 
-        if ($totalAfter <= self::PERMISSION_THRESHOLD_DAYS) {
+        if ($totalAfter <= $threshold) {
             return 0;
         }
 
-        $excess = $totalAfter - self::PERMISSION_THRESHOLD_DAYS;
+        return min($totalAfter - $threshold, $newDays);
+    }
 
-        return min($excess, $newDays);
+    // ========================================
+    // RAPPORTS
+    // ========================================
+
+    public function getLastAnnualLeaveDate(Employee $employee): ?Carbon
+    {
+        $last = Leave::where('employee_id', $employee->id)
+            ->whereHas('leaveType', fn($q) => $q->where('code', 'CA'))
+            ->where('status', 'approved')
+            ->orderByDesc('end_date')
+            ->first();
+
+        return $last?->end_date;
     }
 }
