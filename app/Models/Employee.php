@@ -351,6 +351,30 @@ class Employee extends Model
         return $this->hasMany(Dependent::class);
     }
 
+    // ========================================
+    // RELATIONS - DIPLÔMES & FORMATIONS
+    // ========================================
+
+    public function diplomas()
+    {
+        return $this->hasMany(EmployeeDiploma::class);
+    }
+
+    public function recruitmentDiploma()
+    {
+        return $this->hasOne(EmployeeDiploma::class)->where('type', EmployeeDiploma::TYPE_RECRUITMENT);
+    }
+
+    public function highestDiploma()
+    {
+        return $this->hasOne(EmployeeDiploma::class)->where('type', EmployeeDiploma::TYPE_HIGHEST);
+    }
+
+    public function trainings()
+    {
+        return $this->hasMany(EmployeeDiploma::class)->where('type', EmployeeDiploma::TYPE_TRAINING);
+    }
+
     public function employeeCards()
     {
         return $this->hasMany(EmployeeCard::class);

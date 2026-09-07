@@ -411,6 +411,7 @@ class EmployeeResource extends Resource
             RelationManagers\AssignmentHistoryRelationManager::class,
             RelationManagers\AdvancementHistoryRelationManager::class,
             RelationManagers\DependentsRelationManager::class,
+            RelationManagers\DiplomasRelationManager::class,
         ];
     }
 

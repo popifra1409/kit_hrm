@@ -18,6 +18,15 @@ class ViewEmployee extends ViewRecord
             Actions\EditAction::make()
                 ->label('Modifier'),
 
+            Actions\Action::make('generate_cv')
+                ->label('Générer CV')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('gray')
+                ->action(function () {
+                    $service = new \App\Services\CvPdfService();
+                    return $service->download($this->record);
+                }),
+
             Actions\Action::make('generate_professional_card')
                 ->label('Générer Carte Pro')
                 ->icon('heroicon-o-identification')
