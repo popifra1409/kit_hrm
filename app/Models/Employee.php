@@ -13,6 +13,7 @@ class Employee extends Model
 
     protected $fillable = [
         'matricule',
+        'matricule_fonction_publique',
         'first_name',
         'last_name',
         'gender',

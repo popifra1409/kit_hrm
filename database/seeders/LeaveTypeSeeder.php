@@ -43,6 +43,17 @@ class LeaveTypeSeeder extends Seeder
                 'deductible_from_annual' => false,
                 'is_active' => true,
             ],
+            [
+                'name' => "Permission d'Absence",
+                'code' => 'PERM',
+                'description' => "Autorisation ponctuelle de courte durée. Au-delà de 10 jours cumulés sur l'année, les jours supplémentaires sont déduits du Congé Annuel.",
+                'default_days' => 0, // pas de solde propre, cf. seuil des 10j cumulés
+                'max_days_per_year' => null,
+                'requires_document' => false,
+                'is_paid' => true,
+                'deductible_from_annual' => false, // devient vrai au cas par cas au-delà du seuil
+                'is_active' => true,
+            ],
         ];
 
         foreach ($types as $type) {

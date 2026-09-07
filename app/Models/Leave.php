@@ -19,6 +19,12 @@ class Leave extends Model
         'reason',
         'document_path',
         'status',
+        'destination',
+        'address_during_leave',
+        'children_under_6_at_request',
+        'replacement_id',
+        'deductible_from_annual',
+        'current_approval_step_id',
         'approved_by_n1',
         'approved_by_n2',
         'approved_at_n1',
@@ -55,6 +61,8 @@ class Leave extends Model
         'return_confirmed_at' => 'date',
         'has_returned' => 'boolean',
         'is_late_return' => 'boolean',
+        'deductible_from_annual' => 'boolean',
+        'children_under_6_at_request' => 'integer',
     ];
 
     // Relations
@@ -92,6 +100,21 @@ class Leave extends Model
     public function leaveDecision()
     {
         return $this->belongsTo(LeaveDecision::class);
+    }
+
+    public function replacement()
+    {
+        return $this->belongsTo(Replacement::class);
+    }
+
+    public function approvals()
+    {
+        return $this->hasMany(LeaveApproval::class);
+    }
+
+    public function currentApprovalStep()
+    {
+        return $this->belongsTo(LeaveApprovalStep::class, 'current_approval_step_id');
     }
 
     // Calculer le score total selon les critères
