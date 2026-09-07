@@ -19,7 +19,7 @@ class InitializeLeaveBalances extends Page implements HasForms
     protected static ?string $navigationLabel = 'Initialiser Soldes';
     protected static ?string $title = 'Initialiser les Soldes de Congés';
     protected static ?string $navigationGroup = '🏖️ Congés & Absences';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 6;
 
     protected static string $view = 'filament.pages.initialize-leave-balances';
 

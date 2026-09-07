@@ -436,6 +436,24 @@ class EditEmployee extends EditRecord
                                         ->default(true)
                                         ->inline(false),
                                 ]),
+
+                            Forms\Components\Section::make('Assurance Santé')
+                                ->schema([
+                                    Forms\Components\TextInput::make('coverage_rate')
+                                        ->label('Taux de Prise en Charge (employé)')
+                                        ->numeric()
+                                        ->suffix('%')
+                                        ->minValue(0)
+                                        ->maxValue(100)
+                                        ->step(0.01)
+                                        ->helperText('Passe automatiquement à 50% (configurable) une fois l\'employé à la retraite.'),
+
+                                    Forms\Components\Placeholder::make('effective_rate_info')
+                                        ->label('Taux effectif actuel')
+                                        ->content(fn($record) => $record ? $record->effective_coverage_rate . '%' . ($record->isRetired() ? ' (retraité)' : '') : '—'),
+                                ])
+                                ->columns(2)
+                                ->collapsible(),
                         ]),
 
                     // TAB 4 : CATÉGORIE, ÉCHELON & INDICE

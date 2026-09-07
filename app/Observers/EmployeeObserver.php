@@ -67,6 +67,22 @@ class EmployeeObserver
         if ($employee->wasChanged(['matricule', 'birth_date'])) {
             $this->generateQrCode($employee);
         }
+
+        // Passage à la retraite : désactiver tous les ayants droit
+        // (plus aucun ayant droit une fois retraité, cf. règle métier).
+        if ($employee->wasChanged(['is_active', 'retirement_date']) && $employee->isRetired()) {
+            $employee->dependents()->where('is_active', true)->get()->each(function ($dependent) {
+                $dependent->update([
+                    'is_active' => false,
+                    'card_active' => false,
+                ]);
+            });
+
+            Log::info('Ayants droit désactivés suite à la mise à la retraite', [
+                'employee_id' => $employee->id,
+                'matricule' => $employee->matricule,
+            ]);
+        }
     }
 
     /**
@@ -99,7 +115,7 @@ class EmployeeObserver
                 'hire_date' => $employee->hire_date?->format('d/m/Y'),
                 'department' => $employee->department?->name,
                 'service' => $employee->service?->name,
-                'position' => $employee->position?->name,
+                'position' => $employee->qualification?->name,
                 'generated_at' => now()->format('d/m/Y H:i:s'),
             ];
 

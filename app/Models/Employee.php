@@ -50,6 +50,7 @@ class Employee extends Model
         'total_children',
         'status',
         'is_active',
+        'coverage_rate',
         'current_echelon',
         'echelon_start_date',
         'last_advancement_date',
@@ -70,6 +71,7 @@ class Employee extends Model
         'service_start_date' => 'date',
         'retirement_date' => 'date',
         'is_active' => 'boolean',
+        'coverage_rate' => 'decimal:2',
         // 'category_number' => 'integer',
         // 'echelon_number' => 'integer',
         'indice' => 'integer',
@@ -385,6 +387,31 @@ class Employee extends Model
     // HELPERS - CARTES
     // ========================================
 
+    /**
+     * L'employé est-il retraité ? (inactif ET date de retraite dépassée)
+     */
+    public function isRetired(): bool
+    {
+        return !$this->is_active
+            && $this->retirement_date
+            && $this->retirement_date->isPast();
+    }
+
+    /**
+     * Taux de prise en charge EFFECTIF de l'employé lui-même (pas ses ayants droit).
+     * Calculé à la volée : le taux de base (coverage_rate, 75% par défaut) tant qu'il
+     * est actif, automatiquement ramené au taux "retraité" (configurable, 50% par
+     * défaut) une fois à la retraite — aucune valeur figée à mettre à jour manuellement.
+     */
+    public function getEffectiveCoverageRateAttribute(): float
+    {
+        if ($this->isRetired()) {
+            return (float) \App\Models\SystemSetting::get('health.retired_coverage_rate', 50);
+        }
+
+        return (float) ($this->coverage_rate ?? \App\Models\SystemSetting::get('health.active_coverage_rate_default', 75));
+    }
+
     public function hasActiveHealthCard(): bool
     {
         return $this->employeeCards()
@@ -441,6 +468,33 @@ class Employee extends Model
     public function getAncienneteAttribute()
     {
         return $this->recruitment_date ? $this->recruitment_date->diffInYears(now()) : 0;
+    }
+
+    public function getAncienneteFormattedAttribute(): string
+    {
+        if (!$this->recruitment_date) {
+            return 'Non défini';
+        }
+
+        $start = $this->recruitment_date;
+        $now = now();
+
+        $years = (int) $start->diffInYears($now);
+        $months = (int) $start->copy()->addYears($years)->diffInMonths($now);
+        $days = (int) $start->copy()->addYears($years)->addMonths($months)->diffInDays($now);
+
+        $parts = [];
+        if ($years > 0) {
+            $parts[] = $years . ' an' . ($years > 1 ? 's' : '');
+        }
+        if ($months > 0) {
+            $parts[] = $months . ' mois';
+        }
+        if ($years === 0 && $months === 0) {
+            $parts[] = $days . ' jour' . ($days > 1 ? 's' : '');
+        }
+
+        return $parts ? implode(' ', $parts) : '0 jour';
     }
 
     public function getAgeAttribute()

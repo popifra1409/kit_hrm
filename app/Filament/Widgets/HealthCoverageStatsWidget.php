@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use App\Models\Dependent;
+use App\Models\Employee;
 use App\Models\EmployeeCard;
 
 class HealthCoverageStatsWidget extends BaseWidget
@@ -23,6 +24,23 @@ class HealthCoverageStatsWidget extends BaseWidget
             ->groupBy('relationship')
             ->pluck('count', 'relationship');
 
+        // ✅ CORRIGÉ : arrondi à 1 décimale au lieu du nombre brut (ex: 74.8333333333)
+        $avgDependentCoverage = round((float) Dependent::where('is_active', true)->avg('coverage_rate'), 1);
+
+        // Taux effectif des employés eux-mêmes (75% actifs, 50% retraités par défaut,
+        // calculé via Employee::effective_coverage_rate — rien de stocké à additionner).
+        $activeEmployees = Employee::where('is_active', true)->get();
+        $retiredEmployees = Employee::where('is_active', false)
+            ->whereNotNull('retirement_date')
+            ->where('retirement_date', '<=', now())
+            ->get();
+
+        $allRelevantEmployees = $activeEmployees->merge($retiredEmployees);
+
+        $avgEmployeeCoverage = $allRelevantEmployees->isNotEmpty()
+            ? round($allRelevantEmployees->avg(fn($e) => $e->effective_coverage_rate), 1)
+            : 0;
+
         return [
             Stat::make('Ayants Droit Actifs', $totalDependents)
                 ->description('Total bénéficiaires')
@@ -40,10 +58,15 @@ class HealthCoverageStatsWidget extends BaseWidget
                 ->descriptionIcon('heroicon-o-credit-card')
                 ->color('info'),
 
-            Stat::make('Taux Couverture Moyen', Dependent::where('is_active', true)->avg('coverage_rate') . '%')
+            Stat::make('Taux Couverture Moyen (Ayants Droit)', $avgDependentCoverage . '%')
                 ->description('Moyenne de prise en charge')
                 ->descriptionIcon('heroicon-o-chart-bar')
                 ->color('warning'),
+
+            Stat::make('Taux Couverture Moyen (Employés)', $avgEmployeeCoverage . '%')
+                ->description($retiredEmployees->count() . ' retraité(s) à 50% inclus')
+                ->descriptionIcon('heroicon-o-identification')
+                ->color('primary'),
         ];
     }
 }

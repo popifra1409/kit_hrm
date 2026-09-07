@@ -187,9 +187,9 @@ class ViewEmployee extends ViewRecord
                             ->label('Date de Recrutement')
                             ->date('d/m/Y'),
 
-                        Infolists\Components\TextEntry::make('anciennete')
+                        Infolists\Components\TextEntry::make('anciennete_formatted')
                             ->label('Ancienneté')
-                            ->getStateUsing(fn($record) => $record->anciennete . ' ans')
+                            ->getStateUsing(fn($record) => $record->anciennete_formatted)
                             ->badge()
                             ->color('success'),
 

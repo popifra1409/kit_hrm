@@ -323,6 +323,20 @@ class CreateEmployee extends CreateRecord
                                 ->inline(false)
                                 ->helperText('Désactiver si l\'employé n\'est plus en service'),
                         ]),
+
+                    Forms\Components\Section::make('Assurance Santé')
+                        ->schema([
+                            Forms\Components\TextInput::make('coverage_rate')
+                                ->label('Taux de Prise en Charge (employé)')
+                                ->numeric()
+                                ->suffix('%')
+                                ->default(75.00)
+                                ->minValue(0)
+                                ->maxValue(100)
+                                ->step(0.01)
+                                ->helperText('Passe automatiquement à 50% (configurable) une fois l\'employé à la retraite — pas besoin de le modifier manuellement à ce moment-là.'),
+                        ])
+                        ->collapsible(),
                 ]),
 
             // ========================================

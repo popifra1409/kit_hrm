@@ -14,6 +14,8 @@ class LeaveDecisionResource extends Resource
 {
     protected static ?string $model = LeaveDecision::class;
 
+    protected static ?int $navigationSort = 2;
+
     public static function form(Form $form): Form
     {
         return $form
@@ -202,7 +204,7 @@ class LeaveDecisionResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 0;
+        return 3;
     }
 
     public static function getNavigationIcon(): ?string

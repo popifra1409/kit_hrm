@@ -172,7 +172,7 @@ class LeaveBalanceResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
+        return 6;
     }
 
     public static function getNavigationIcon(): ?string
