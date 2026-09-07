@@ -115,13 +115,25 @@ class DiplomasRelationManager extends RelationManager
                     ->trueColor('success')
                     ->falseColor('gray'),
 
-                Tables\Columns\IconColumn::make('is_verified')
-                    ->label('Vérifié RH')
-                    ->boolean()
-                    ->trueColor('success')
-                    ->falseColor('warning'),
+                Tables\Columns\BadgeColumn::make('validation_status')
+                    ->label('Statut RH')
+                    ->formatStateUsing(fn($record) => $record->validation_status_label)
+                    ->colors([
+                        'warning' => 'pending',
+                        'success' => 'validated',
+                        'danger' => 'rejected',
+                    ]),
             ])
             ->defaultSort('year_obtained', 'desc')
+            ->filters([
+                Tables\Filters\SelectFilter::make('validation_status')
+                    ->label('Statut RH')
+                    ->options([
+                        'pending' => '⏳ En attente',
+                        'validated' => '✅ Validé',
+                        'rejected' => '❌ Rejeté',
+                    ]),
+            ])
             ->headerActions([
                 Tables\Actions\CreateAction::make(),
             ])
@@ -134,13 +146,27 @@ class DiplomasRelationManager extends RelationManager
                         ->url(fn($record) => \Illuminate\Support\Facades\Storage::disk('public')->url($record->document_path))
                         ->openUrlInNewTab(),
 
-                    Tables\Actions\Action::make('verify')
-                        ->label('Marquer vérifié')
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
                         ->icon('heroicon-o-check-badge')
                         ->color('success')
-                        ->visible(fn($record) => !$record->is_verified)
+                        ->visible(fn($record) => $record->isPending())
                         ->requiresConfirmation()
-                        ->action(fn($record) => $record->markVerified()),
+                        ->modalDescription('Confirmez-vous avoir vérifié le document physique justificatif ?')
+                        ->action(fn($record) => $record->validate()),
+
+                    Tables\Actions\Action::make('reject')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn($record) => $record->isPending())
+                        ->requiresConfirmation()
+                        ->form([
+                            Forms\Components\Textarea::make('reason')
+                                ->label('Motif du rejet')
+                                ->required(),
+                        ])
+                        ->action(fn($record, array $data) => $record->reject($data['reason'])),
 
                     Tables\Actions\EditAction::make()->label('Modifier'),
                     Tables\Actions\DeleteAction::make()->label('Supprimer'),
