@@ -33,7 +33,9 @@ class LeaveSettings extends Page implements HasForms
     public function mount(): void
     {
         $this->form->fill([
-            'cycle_months' => (int) SystemSetting::get('leave.cycle_months', 12),
+            'cycle_months_fonctionnaire' => (int) SystemSetting::get('leave.cycle_months_fonctionnaire', 12),
+            'cycle_months_contractuel' => (int) SystemSetting::get('leave.cycle_months_contractuel', 12),
+            'cycle_months_stagiaire' => (int) SystemSetting::get('leave.cycle_months_stagiaire', 12),
             'min_cycles_before_first_leave' => (int) SystemSetting::get('leave.min_cycles_before_first_leave', 1),
             'base_days_fonctionnaire' => (int) SystemSetting::get('leave.base_days_fonctionnaire', 30),
             'base_days_contractuel' => (int) SystemSetting::get('leave.base_days_contractuel', 18),
@@ -52,23 +54,29 @@ class LeaveSettings extends Page implements HasForms
         return $form
             ->schema([
                 Forms\Components\Section::make('Cycle de Service')
-                    ->description("Base de calcul de l'ancienneté et de l'éligibilité au congé")
+                    ->description("Base de calcul de l'ancienneté et de l'éligibilité au congé — réglable par statut")
                     ->schema([
-                        Forms\Components\TextInput::make('cycle_months')
-                            ->label('Durée d\'un cycle de service (mois)')
-                            ->numeric()
-                            ->minValue(1)
-                            ->required()
-                            ->helperText('12 = cycle annuel classique depuis la date de recrutement'),
+                        Forms\Components\TextInput::make('cycle_months_fonctionnaire')
+                            ->label('Fonctionnaires (mois)')
+                            ->numeric()->minValue(1)->required(),
+
+                        Forms\Components\TextInput::make('cycle_months_contractuel')
+                            ->label('Contractuels (mois)')
+                            ->numeric()->minValue(1)->required(),
+
+                        Forms\Components\TextInput::make('cycle_months_stagiaire')
+                            ->label('Stagiaires (mois)')
+                            ->numeric()->minValue(1)->required(),
 
                         Forms\Components\TextInput::make('min_cycles_before_first_leave')
                             ->label('Cycles requis avant le 1er congé')
                             ->numeric()
                             ->minValue(0)
                             ->required()
-                            ->helperText('1 = le premier congé n\'est possible qu\'après 12 mois de service'),
+                            ->helperText('1 = le premier congé n\'est possible qu\'après un cycle complet de service')
+                            ->columnSpanFull(),
                     ])
-                    ->columns(2),
+                    ->columns(3),
 
                 Forms\Components\Section::make('Congé Annuel — Jours de Base')
                     ->schema([

@@ -239,12 +239,12 @@ class LeaveResource extends Resource
                             ->columnSpanFull(),
 
                         Forms\Components\FileUpload::make('document_path')
-                            ->label('Justificatif')
+                            ->label('Document Justificatif')
                             ->directory('leave-documents')
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
                             ->maxSize(5120)
                             ->required(fn($get) => optional(\App\Models\LeaveType::find($get('leave_type_id')))->requires_document)
-                            ->helperText('PDF ou image, max 5 Mo'),
+                            ->helperText('Au choix, selon ce qui est disponible : décision de départ en congé déjà signée par la hiérarchie/DG, planning de congé du service, ou tout autre document attestant du droit au congé. PDF ou image, max 5 Mo.'),
                     ]),
 
                 Forms\Components\Section::make('Circuit de Validation')

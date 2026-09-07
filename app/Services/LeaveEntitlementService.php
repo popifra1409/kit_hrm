@@ -14,9 +14,30 @@ class LeaveEntitlementService
     // PARAMÈTRES (lus depuis SystemSetting, avec valeurs par défaut de repli)
     // ========================================
 
-    protected function cycleMonths(): int
+    /**
+     * Catégorie générique du statut administratif, pour regrouper les réglages
+     * (fonctionnaire_affecte/detache -> 'fonctionnaire', contractuel_fp/structure -> 'contractuel').
+     */
+    protected function statusCategory(string $administrativeStatus): string
     {
-        return (int) SystemSetting::get('leave.cycle_months', 12);
+        return match ($administrativeStatus) {
+            'fonctionnaire_affecte', 'fonctionnaire_detache' => 'fonctionnaire',
+            'contractuel_fp', 'contractuel_structure' => 'contractuel',
+            'stagiaire' => 'stagiaire',
+            default => 'contractuel',
+        };
+    }
+
+    /**
+     * Durée du cycle de service EN MOIS, paramétrable par statut
+     * (un fonctionnaire et un contractuel de la structure peuvent avoir des
+     * cycles différents selon les textes en vigueur).
+     */
+    protected function cycleMonths(string $administrativeStatus): int
+    {
+        $category = $this->statusCategory($administrativeStatus);
+
+        return (int) SystemSetting::get("leave.cycle_months_{$category}", 12);
     }
 
     protected function minCyclesBeforeFirstLeave(): int
@@ -77,13 +98,14 @@ class LeaveEntitlementService
         $asOf = $asOf ?? now();
         $monthsCompleted = $employee->recruitment_date->diffInMonths($asOf);
 
-        return (int) intdiv($monthsCompleted, $this->cycleMonths());
+        return (int) intdiv($monthsCompleted, $this->cycleMonths($employee->administrative_status));
     }
 
     public function getServiceYearBounds(Employee $employee, int $serviceYear): array
     {
-        $start = $employee->recruitment_date->copy()->addMonths(($serviceYear - 1) * $this->cycleMonths());
-        $end = $start->copy()->addMonths($this->cycleMonths())->subDay();
+        $cycleMonths = $this->cycleMonths($employee->administrative_status);
+        $start = $employee->recruitment_date->copy()->addMonths(($serviceYear - 1) * $cycleMonths);
+        $end = $start->copy()->addMonths($cycleMonths)->subDay();
 
         return [$start, $end];
     }
@@ -96,7 +118,7 @@ class LeaveEntitlementService
 
         $monthsCompleted = $employee->recruitment_date->diffInMonths($date);
 
-        return (int) intdiv($monthsCompleted, $this->cycleMonths()) + 1;
+        return (int) intdiv($monthsCompleted, $this->cycleMonths($employee->administrative_status)) + 1;
     }
 
     public function isEligibleForLeave(Employee $employee, ?Carbon $asOf = null): bool
@@ -114,7 +136,7 @@ class LeaveEntitlementService
         $currentServiceYear = $this->getServiceYear($employee, $asOf);
         $targetCycle = max($currentServiceYear + 1, $this->minCyclesBeforeFirstLeave());
 
-        return $employee->recruitment_date->copy()->addMonths($targetCycle * $this->cycleMonths());
+        return $employee->recruitment_date->copy()->addMonths($targetCycle * $this->cycleMonths($employee->administrative_status));
     }
 
     // ========================================
