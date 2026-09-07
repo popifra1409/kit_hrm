@@ -18,14 +18,19 @@ class ViewEmployee extends ViewRecord
             Actions\EditAction::make()
                 ->label('Modifier'),
 
+            Actions\Action::make('preview_cv')
+                ->label('Aperçu CV')
+                ->icon('heroicon-o-eye')
+                ->color('gray')
+                ->url(fn() => route('employees.cv.preview', $this->record))
+                ->openUrlInNewTab(),
+
             Actions\Action::make('generate_cv')
                 ->label('Générer CV')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('gray')
-                ->action(function () {
-                    $service = new \App\Services\CvPdfService();
-                    return $service->download($this->record);
-                }),
+                ->url(fn() => route('employees.cv.download', $this->record))
+                ->openUrlInNewTab(),
 
             Actions\Action::make('generate_professional_card')
                 ->label('Générer Carte Pro')
