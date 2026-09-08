@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployeeProfileController;
 use App\Http\Controllers\Api\DependentController;
 use App\Http\Controllers\Api\DiplomaController;
+use App\Http\Controllers\Api\LeaveController;
 use Illuminate\Support\Facades\Route;
 
 // ========================================
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 // ========================================
 Route::prefix('auth')->group(function () {
     Route::post('/activate', [AuthController::class, 'activate']);
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login']); // matricule + password
 });
 
 // ========================================
@@ -31,15 +32,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dependents', [DependentController::class, 'index']);
         Route::post('/dependents', [DependentController::class, 'store']);
         Route::get('/dependents/{id}', [DependentController::class, 'show']);
-        Route::post('/dependents/{id}', [DependentController::class, 'update']); // upload fichier -> POST
+        Route::post('/dependents/{id}', [DependentController::class, 'update']);
         Route::delete('/dependents/{id}', [DependentController::class, 'destroy']);
 
         // Diplômes & Formations
         Route::get('/diplomas', [DiplomaController::class, 'index']);
         Route::post('/diplomas', [DiplomaController::class, 'store']);
-        Route::post('/diplomas/{id}', [DiplomaController::class, 'update']); // upload fichier -> POST
+        Route::post('/diplomas/{id}', [DiplomaController::class, 'update']);
         Route::delete('/diplomas/{id}', [DiplomaController::class, 'destroy']);
+
+        // Congés & Permissions
+        Route::get('/leave-types', [LeaveController::class, 'types']);
+        Route::get('/leaves/balance', [LeaveController::class, 'balance']);
+        Route::get('/leaves', [LeaveController::class, 'index']);
+        Route::post('/leaves', [LeaveController::class, 'store']);
+        Route::get('/leaves/{id}', [LeaveController::class, 'show']);
     });
 
-    // Les prochains lots (congés, présences, etc.) viendront ici.
+    // Les prochains lots viendront ici.
 });

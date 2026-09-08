@@ -107,13 +107,13 @@ class AuthController extends Controller
     /**
      * Se connecter
      *
-     * Connexion standard pour un compte déjà activé. Retourne un token
-     * Sanctum à utiliser dans l'en-tête Authorization: Bearer {token}
-     * pour toutes les routes protégées.
+     * Connexion standard pour un compte déjà activé, via matricule + mot de passe.
+     * Retourne un token Sanctum à utiliser dans l'en-tête
+     * Authorization: Bearer {token} pour toutes les routes protégées.
      *
      * @unauthenticated
      *
-     * @bodyParam email string required L'adresse email du compte. Example: jean.dupont@example.com
+     * @bodyParam matricule string required Le matricule de l'employé. Example: 98240812A
      * @bodyParam password string required Le mot de passe. Example: MonMotDePasse123
      *
      * @response 200 scenario="Connexion réussie" {
@@ -133,7 +133,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => ['required', 'email'],
+            'matricule' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
@@ -144,7 +144,9 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::whereHas('employee', function ($query) use ($request) {
+            $query->where('matricule', $request->matricule);
+        })->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([

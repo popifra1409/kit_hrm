@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
-use App\Services\CvPdfService;
+use App\Services\ProfessionalProfileService;
 use Illuminate\Http\Request;
 
-class EmployeeCvController extends Controller
+class EmployeeProfessionalProfileController extends Controller
 {
     public function download(Request $request, Employee $employee)
     {
@@ -15,14 +15,11 @@ class EmployeeCvController extends Controller
             403
         );
 
-        $service = new CvPdfService();
+        $service = new ProfessionalProfileService();
 
         return $service->download($employee);
     }
 
-    /**
-     * Aperçu HTML du CV avant génération du PDF.
-     */
     public function preview(Request $request, Employee $employee)
     {
         abort_unless(
@@ -38,17 +35,25 @@ class EmployeeCvController extends Controller
             'qualification',
             'jobTitle',
             'diplomas',
+            'assignmentHistory',
+            'advancementHistory',
         ]);
 
         $recruitmentDiploma = $employee->diplomas->firstWhere('type', 'recruitment_diploma');
         $highestDiploma = $employee->diplomas->firstWhere('type', 'highest_diploma');
         $trainings = $employee->diplomas->where('type', 'training')->sortByDesc('year_obtained');
+        $careerPath = $employee->assignmentHistory->sortBy('effective_date')->values();
+        $advancements = $employee->advancementHistory->sortBy('effective_date')->values();
+        $servicesWorked = $careerPath->pluck('new_service_name')->filter()->unique()->values();
 
-        return view('pdf.employee-cv', [
+        return view('pdf.employee-professional-profile', [
             'employee' => $employee,
             'recruitmentDiploma' => $recruitmentDiploma,
             'highestDiploma' => $highestDiploma,
             'trainings' => $trainings,
+            'careerPath' => $careerPath,
+            'advancements' => $advancements,
+            'servicesWorked' => $servicesWorked,
         ]);
     }
 }

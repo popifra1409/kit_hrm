@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PayrollPDFController;
 use App\Http\Controllers\ClearCacheController;
-use App\Http\Controllers\EmployeeCvController;
+use App\Http\Controllers\EmployeeProfessionalProfileController;
 
 Route::get('/', function () {
     return view('welcome-hrm');
@@ -16,14 +16,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payroll/{payroll}/view', [PayrollPDFController::class, 'view'])
         ->name('payroll.view');
 
-    Route::middleware(['auth'])->group(function () {
-        Route::get('/admin/employees/{employee}/cv', [EmployeeCvController::class, 'download'])
-            ->name('employees.cv.download');
-    });
+    Route::get('/admin/employees/{employee}/profile', [EmployeeProfessionalProfileController::class, 'download'])
+        ->name('employees.profile.download');
 
-    Route::get('/admin/employees/{employee}/cv-preview', [EmployeeCvController::class, 'preview'])
-        ->middleware(['auth'])
-        ->name('employees.cv.preview');
+    Route::get('/admin/employees/{employee}/profile-preview', [EmployeeProfessionalProfileController::class, 'preview'])
+        ->name('employees.profile.preview');
 });
 
 Route::middleware(['web', 'auth'])->group(function () {

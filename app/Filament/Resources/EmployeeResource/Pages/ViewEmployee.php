@@ -18,18 +18,18 @@ class ViewEmployee extends ViewRecord
             Actions\EditAction::make()
                 ->label('Modifier'),
 
-            Actions\Action::make('preview_cv')
-                ->label('Aperçu CV')
+            Actions\Action::make('preview_profile')
+                ->label('Aperçu Profil Professionnel')
                 ->icon('heroicon-o-eye')
                 ->color('gray')
-                ->url(fn() => route('employees.cv.preview', $this->record))
+                ->url(fn() => route('employees.profile.preview', $this->record))
                 ->openUrlInNewTab(),
 
-            Actions\Action::make('generate_cv')
-                ->label('Générer CV')
+            Actions\Action::make('generate_profile')
+                ->label('Générer Profil Professionnel')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('gray')
-                ->url(fn() => route('employees.cv.download', $this->record))
+                ->url(fn() => route('employees.profile.download', $this->record))
                 ->openUrlInNewTab(),
 
             Actions\Action::make('generate_professional_card')

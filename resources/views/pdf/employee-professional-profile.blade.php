@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>CV - {{ $employee->full_name }}</title>
+    <title>Profil Professionnel - {{ $employee->full_name }}</title>
     <style>
         body { font-family: 'DejaVu Sans', sans-serif; font-size: 11px; color: #1f2937; margin: 0; padding: 0; }
         .header { background: #1e3a5f; color: #fff; padding: 24px 32px; }
@@ -15,19 +15,20 @@
         table.info { width: 100%; border-collapse: collapse; }
         table.info td { padding: 4px 8px 4px 0; vertical-align: top; }
         table.info td.label { color: #6b7280; width: 160px; }
-        table.diplomas { width: 100%; border-collapse: collapse; margin-top: 6px; }
-        table.diplomas th { text-align: left; background: #f3f4f6; padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #6b7280; }
-        table.diplomas td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+        table.list { width: 100%; border-collapse: collapse; margin-top: 6px; }
+        table.list th { text-align: left; background: #f3f4f6; padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #6b7280; }
+        table.list td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: bold; }
         .badge-verified { background: #d1fae5; color: #065f46; }
         .badge-pending { background: #fef3c7; color: #92400e; }
+        .chip { display: inline-block; padding: 3px 10px; margin: 2px; border-radius: 12px; font-size: 9px; background: #e0e7ff; color: #3730a3; }
         .footer { text-align: center; font-size: 9px; color: #9ca3af; padding: 16px; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>{{ $employee->full_name }}</h1>
-        <p>{{ $employee->matricule }} — {{ $employee->qualification?->name ?? 'Qualification non renseignée' }}</p>
+        <p>{{ $employee->matricule }} — {{ $employee->qualification?->name ?? 'Qualification non renseignée' }} — {{ $employee->tradeBody?->name ?? '' }}</p>
     </div>
 
     <div class="content">
@@ -54,7 +55,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">Affectation Professionnelle</div>
+            <div class="section-title">Affectation Actuelle</div>
             <table class="info">
                 <tr>
                     <td class="label">Corps de métier</td>
@@ -65,16 +66,91 @@
                 <tr>
                     <td class="label">Poste hiérarchique</td>
                     <td>{{ $employee->jobTitle?->name ?? '—' }}</td>
-                    <td class="label">Service</td>
+                    <td class="label">Service actuel</td>
                     <td>{{ $employee->currentService?->name ?? '—' }}</td>
                 </tr>
                 <tr>
                     <td class="label">Date de recrutement</td>
                     <td>{{ $employee->recruitment_date?->format('d/m/Y') ?? '—' }}</td>
                     <td class="label">Ancienneté</td>
-                    <td>{{ $employee->anciennete }} an(s)</td>
+                    <td>{{ $employee->anciennete_formatted }}</td>
                 </tr>
             </table>
+        </div>
+
+        @if($servicesWorked->isNotEmpty())
+            <div class="section">
+                <div class="section-title">Services Fréquentés</div>
+                <div>
+                    @foreach($servicesWorked as $service)
+                        <span class="chip">{{ $service }}</span>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        <div class="section">
+            <div class="section-title">Parcours au Sein de la Structure</div>
+            @if($careerPath->isNotEmpty())
+                <table class="list">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>De</th>
+                            <th>Vers</th>
+                            <th>Motif</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($careerPath as $item)
+                            <tr>
+                                <td>{{ optional($item->effective_date)->format('d/m/Y') ?? '—' }}</td>
+                                <td>{{ $item->getTypeLabel() ?? $item->assignment_type }}</td>
+                                <td>{{ $item->old_service_name ?? $item->old_department_name ?? $item->old_position_title ?? '—' }}</td>
+                                <td>{{ $item->new_service_name ?? $item->new_department_name ?? $item->new_position_title ?? '—' }}</td>
+                                <td>{{ $item->reason ?? '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @else
+                <p><em>Aucun changement d'affectation enregistré.</em></p>
+            @endif
+        </div>
+
+        <div class="section">
+            <div class="section-title">Avancements</div>
+            @if($advancements->isNotEmpty())
+                <table class="list">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Avant</th>
+                            <th>Après</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($advancements as $item)
+                            <tr>
+                                <td>{{ optional($item->effective_date)->format('d/m/Y') ?? '—' }}</td>
+                                <td>{{ $item->type ?? '—' }}</td>
+                                <td>
+                                    {{ $item->old_category ?? $item->previous_category ?? '' }}
+                                    {{ ($item->old_echelon ?? $item->previous_echelon) ? '/ Éch. ' . ($item->old_echelon ?? $item->previous_echelon) : '' }}
+                                </td>
+                                <td>
+                                    {{ $item->new_category ?? '' }}
+                                    {{ ($item->new_echelon) ? '/ Éch. ' . $item->new_echelon : '' }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @else
+                <p><em>Aucun avancement enregistré.</em></p>
+            @endif
         </div>
 
         <div class="section">
@@ -112,7 +188,7 @@
         <div class="section">
             <div class="section-title">Formations Complémentaires</div>
             @if($trainings->isNotEmpty())
-                <table class="diplomas">
+                <table class="list">
                     <thead>
                         <tr>
                             <th>Intitulé</th>
