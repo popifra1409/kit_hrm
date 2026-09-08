@@ -4,6 +4,7 @@ namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
 use Filament\Actions;
+use Filament\Forms;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -32,19 +33,65 @@ class ViewEmployee extends ViewRecord
                 ->url(fn() => route('employees.profile.download', $this->record))
                 ->openUrlInNewTab(),
 
+            Actions\Action::make('download_professional_card')
+                ->label('Télécharger Carte Pro')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->visible(fn() => $this->record->hasActiveProfessionalCard())
+                ->action(function () {
+                    $record = $this->record;
+
+                    $card = \App\Models\EmployeeCard::where('employee_id', $record->id)
+                        ->where('card_type', 'professional')
+                        ->where('is_active', true)
+                        ->latest()
+                        ->first();
+
+                    if (!$card || !$card->card_pdf_path) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('Aucun PDF disponible')
+                            ->warning()
+                            ->body('Régénérez la carte pour obtenir un PDF.')
+                            ->send();
+                        return;
+                    }
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Carte N° ' . $card->card_number)
+                        ->success()
+                        ->actions([
+                            \Filament\Notifications\Actions\Action::make('download')
+                                ->label('Télécharger PDF')
+                                ->url(\Storage::disk('public')->url($card->card_pdf_path))
+                                ->openUrlInNewTab(),
+                        ])
+                        ->send();
+                }),
+
             Actions\Action::make('generate_professional_card')
                 ->label('Générer Carte Pro')
                 ->icon('heroicon-o-identification')
                 ->color('info')
                 ->visible(fn($record) => !$record->hasActiveProfessionalCard())
-                ->requiresConfirmation()
-                ->action(function () {
+                ->form([
+                    Forms\Components\Select::make('orientation')
+                        ->label('Format de la carte')
+                        ->options([
+                            'horizontal' => 'Horizontal (format hôpital)',
+                            'vertical' => 'Vertical (format type CNI)',
+                        ])
+                        ->default('horizontal')
+                        ->required()
+                        ->native(false),
+                ])
+                ->action(function (array $data) {
                     $record = $this->record;
 
                     try {
                         $card = \App\Models\EmployeeCard::create([
                             'employee_id' => $record->id,
                             'card_type' => 'professional',
+                            'orientation' => $data['orientation'],
                             'issue_date' => now(),
                             'expiry_date' => now()->addYears(5),
                             'status' => 'issued',
@@ -53,9 +100,10 @@ class ViewEmployee extends ViewRecord
                         $card->generateCardNumber();
                         $card->generateQrCode();
 
+                        $pdfPath = null;
                         if (class_exists(\App\Services\CardPdfService::class)) {
                             $pdfService = new \App\Services\CardPdfService();
-                            $pdfPath = $pdfService->generateProfessionalCard($card);
+                            $pdfPath = $pdfService->generateProfessionalCard($card, $data['orientation']);
                         }
 
                         $card->activate();
@@ -63,6 +111,13 @@ class ViewEmployee extends ViewRecord
                         \Filament\Notifications\Notification::make()
                             ->title('Carte créée')
                             ->success()
+                            ->body('N° ' . $card->card_number)
+                            ->actions($pdfPath ? [
+                                \Filament\Notifications\Actions\Action::make('download')
+                                    ->label('Télécharger le PDF')
+                                    ->url(\Storage::disk('public')->url($pdfPath))
+                                    ->openUrlInNewTab(),
+                            ] : [])
                             ->send();
                     } catch (\Exception $e) {
                         \Filament\Notifications\Notification::make()

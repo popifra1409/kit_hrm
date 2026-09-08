@@ -80,7 +80,9 @@ class EmployeeResource extends Resource
                 Tables\Columns\TextColumn::make('full_name')
                     ->label('Nom complet')
                     ->searchable(['first_name', 'last_name'])
-                    ->sortable()
+                    ->sortable(query: function ($query, string $direction) {
+                        return $query->orderBy('last_name', $direction)->orderBy('first_name', $direction);
+                    })
                     ->weight('medium'),
 
                 Tables\Columns\TextColumn::make('gender')
@@ -288,8 +290,18 @@ class EmployeeResource extends Resource
                             !$record->hasActiveProfessionalCard() &&
                                 static::checkCan('update', $record) // ✅ Correction
                         )
-                        ->requiresConfirmation()
-                        ->action(function ($record) {
+                        ->form([
+                            Forms\Components\Select::make('orientation')
+                                ->label('Format de la carte')
+                                ->options([
+                                    'horizontal' => 'Horizontal (format hôpital)',
+                                    'vertical' => 'Vertical (format type CNI)',
+                                ])
+                                ->default('horizontal')
+                                ->required()
+                                ->native(false),
+                        ])
+                        ->action(function ($record, array $data) {
                             try {
                                 // Vérifier carte existante
                                 $existingCard = \App\Models\EmployeeCard::where('employee_id', $record->id)
@@ -310,6 +322,7 @@ class EmployeeResource extends Resource
                                 $card = \App\Models\EmployeeCard::create([
                                     'employee_id' => $record->id,
                                     'card_type' => 'professional',
+                                    'orientation' => $data['orientation'],
                                     'issue_date' => now(),
                                     'expiry_date' => now()->addYears(5),
                                     'status' => 'issued',
@@ -320,7 +333,7 @@ class EmployeeResource extends Resource
 
                                 // Générer le PDF
                                 $pdfService = new \App\Services\CardPdfService();
-                                $pdfPath = $pdfService->generateProfessionalCard($card);
+                                $pdfPath = $pdfService->generateProfessionalCard($card, $data['orientation']);
 
                                 $card->activate();
 
@@ -331,7 +344,7 @@ class EmployeeResource extends Resource
                                     ->actions([
                                         \Filament\Notifications\Actions\Action::make('download')
                                             ->label('Télécharger PDF')
-                                            ->url(\Storage::url($pdfPath))
+                                            ->url(\Storage::disk('public')->url($pdfPath))
                                             ->openUrlInNewTab(),
                                     ])
                                     ->send();
@@ -347,6 +360,39 @@ class EmployeeResource extends Resource
                                     'error' => $e->getMessage()
                                 ]);
                             }
+                        }),
+
+                    Tables\Actions\Action::make('download_professional_card')
+                        ->label('Télécharger Carte Pro')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->color('gray')
+                        ->visible(fn($record) => $record->hasActiveProfessionalCard())
+                        ->action(function ($record) {
+                            $card = \App\Models\EmployeeCard::where('employee_id', $record->id)
+                                ->where('card_type', 'professional')
+                                ->where('is_active', true)
+                                ->latest()
+                                ->first();
+
+                            if (!$card || !$card->card_pdf_path) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Aucun PDF disponible')
+                                    ->warning()
+                                    ->body('Régénérez la carte pour obtenir un PDF.')
+                                    ->send();
+                                return;
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Carte N° ' . $card->card_number)
+                                ->success()
+                                ->actions([
+                                    \Filament\Notifications\Actions\Action::make('download')
+                                        ->label('Télécharger PDF')
+                                        ->url(\Storage::disk('public')->url($card->card_pdf_path))
+                                        ->openUrlInNewTab(),
+                                ])
+                                ->send();
                         }),
 
                     Tables\Actions\Action::make('generate_health_card')
