@@ -21,6 +21,14 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             return null;
         }
 
+        // ✅ Éviter les doublons : ignorer la ligne si ce matricule existe déjà
+        if (\App\Models\Employee::where('matricule', $row['matricule'])->exists()) {
+            \Log::warning('Import employés : matricule déjà existant, ligne ignorée', [
+                'matricule' => $row['matricule'],
+            ]);
+            return null;
+        }
+
         // Extraire nom et prénom
         $fullName = $row['nom'] ?? '';
         $firstName = $row['prenom'] ?? '';
@@ -137,6 +145,6 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
 
     public function headingRow(): int
     {
-        return 4; // Les en-têtes sont à la ligne 4 dans votre fichier
+        return 4; 
     }
 }

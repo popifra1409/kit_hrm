@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\EmployeeProfileController;
 use App\Http\Controllers\Api\DependentController;
 use App\Http\Controllers\Api\DiplomaController;
 use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\MessageController;
 use Illuminate\Support\Facades\Route;
 
 // ========================================
@@ -21,6 +23,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::put('/auth/password', [AuthController::class, 'changePassword']);
 
     Route::prefix('employee')->group(function () {
         // Profil
@@ -47,6 +50,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/leaves', [LeaveController::class, 'index']);
         Route::post('/leaves', [LeaveController::class, 'store']);
         Route::get('/leaves/{id}', [LeaveController::class, 'show']);
+    });
+
+    // Messagerie interne
+    Route::prefix('chat')->group(function () {
+        Route::get('/conversations', [ConversationController::class, 'index']);
+        Route::post('/conversations/direct', [ConversationController::class, 'startDirect']);
+        Route::post('/conversations/group', [ConversationController::class, 'createGroup']);
+        Route::post('/conversations/{id}/members', [ConversationController::class, 'addMembers']);
+        Route::post('/conversations/{id}/leave', [ConversationController::class, 'leaveGroup']);
+
+        Route::get('/conversations/{conversationId}/messages', [MessageController::class, 'index']);
+        Route::post('/conversations/{conversationId}/messages', [MessageController::class, 'store']);
+        Route::delete('/conversations/{conversationId}/messages/{messageId}', [MessageController::class, 'destroy']);
     });
 
     // Les prochains lots viendront ici.

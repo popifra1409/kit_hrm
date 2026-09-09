@@ -208,6 +208,50 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Changer mon mot de passe
+     *
+     * Nécessite le mot de passe actuel pour confirmation. Les autres sessions/
+     * appareils connectés (autres tokens) ne sont pas affectés.
+     *
+     * @bodyParam current_password string required Mot de passe actuel. Example: MonAncienMotDePasse
+     * @bodyParam password string required Nouveau mot de passe (8 caractères minimum). Example: MonNouveauMotDePasse123
+     * @bodyParam password_confirmation string required Confirmation du nouveau mot de passe.
+     *
+     * @response 200 {"message": "Mot de passe mis à jour avec succès."}
+     * @response 401 scenario="Mot de passe actuel incorrect" {"message": "Le mot de passe actuel est incorrect."}
+     * @response 422 scenario="Validation échouée" {"message": "Données invalides.", "errors": {"password": ["Le mot de passe doit contenir au moins 8 caractères."]}}
+     */
+    public function changePassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Données invalides.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'message' => 'Le mot de passe actuel est incorrect.',
+            ], 401);
+        }
+
+        $user->password = $request->password;
+        $user->save();
+
+        return response()->json([
+            'message' => 'Mot de passe mis à jour avec succès.',
+        ]);
+    }
+
     private function formatUser(User $user): array
     {
         $user->loadMissing('employee', 'roles');
