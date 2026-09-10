@@ -7,14 +7,20 @@ use App\Http\Controllers\Api\DiplomaController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\AppInfoController;
 use Illuminate\Support\Facades\Route;
+
+// ========================================
+// PUBLIC (aucune authentification requise)
+// ========================================
+Route::get('/app-info', [AppInfoController::class, 'show']);
 
 // ========================================
 // AUTHENTIFICATION MOBILE (publique)
 // ========================================
 Route::prefix('auth')->group(function () {
     Route::post('/activate', [AuthController::class, 'activate']);
-    Route::post('/login', [AuthController::class, 'login']); // matricule + password
+    Route::post('/login', [AuthController::class, 'login']); 
 });
 
 // ========================================
