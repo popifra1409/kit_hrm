@@ -186,6 +186,16 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'edit_public_holidays', 'module' => 'leaves', 'description' => 'Modifier un jour férié'],
             ['name' => 'delete_public_holidays', 'module' => 'leaves', 'description' => 'Supprimer un jour férié'],
 
+            // === RECENSEMENT ===
+            ['name' => 'view_census_campaigns', 'module' => 'employees', 'description' => 'Voir les campagnes de recensement'],
+            ['name' => 'create_census_campaigns', 'module' => 'employees', 'description' => 'Créer une campagne de recensement'],
+            ['name' => 'edit_census_campaigns', 'module' => 'employees', 'description' => 'Modifier une campagne de recensement'],
+            ['name' => 'delete_census_campaigns', 'module' => 'employees', 'description' => 'Supprimer une campagne de recensement'],
+
+            ['name' => 'view_census_submissions', 'module' => 'employees', 'description' => 'Voir les soumissions de recensement'],
+            ['name' => 'validate_census_submissions', 'module' => 'employees', 'description' => 'Valider une soumission de recensement'],
+            ['name' => 'reject_census_submissions', 'module' => 'employees', 'description' => 'Rejeter une soumission de recensement'],
+
             // === VALIDATION AYANTS DROIT & DIPLÔMES (distinct de la simple édition) ===
             ['name' => 'validate_dependents', 'module' => 'health', 'description' => 'Valider un ayant droit après vérification des documents'],
             ['name' => 'reject_dependents', 'module' => 'health', 'description' => 'Rejeter un ayant droit'],
@@ -240,6 +250,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'validate_diplomas',
             'reject_diplomas',
             'search_employee_profiles',
+            'view_census_campaigns',
+            'create_census_campaigns',
+            'edit_census_campaigns',
+            'view_census_submissions',
+            'validate_census_submissions',
+            'reject_census_submissions',
             // Congés & Absences
             'view_leaves',
             'create_leaves',

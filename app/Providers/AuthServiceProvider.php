@@ -45,6 +45,8 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\LeaveDecision::class => \App\Policies\LeaveDecisionPolicy::class,
         \App\Models\LeaveApprovalStep::class => \App\Policies\LeaveApprovalStepPolicy::class,
         \App\Models\PublicHoliday::class => \App\Policies\PublicHolidayPolicy::class,
+        \App\Models\CensusCampaign::class => \App\Policies\CensusCampaignPolicy::class,
+        \App\Models\CensusSubmission::class => \App\Policies\CensusSubmissionPolicy::class,
         \App\Models\Absence::class => \App\Policies\AbsencePolicy::class,
         \App\Models\Replacement::class => \App\Policies\ReplacementPolicy::class,
         \App\Models\Attendance::class => \App\Policies\AttendancePolicy::class,

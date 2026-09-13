@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\AppInfoController;
+use App\Http\Controllers\Api\CensusController;
 use Illuminate\Support\Facades\Route;
 
 // ========================================
@@ -20,7 +21,7 @@ Route::get('/app-info', [AppInfoController::class, 'show']);
 // ========================================
 Route::prefix('auth')->group(function () {
     Route::post('/activate', [AuthController::class, 'activate']);
-    Route::post('/login', [AuthController::class, 'login']); 
+    Route::post('/login', [AuthController::class, 'login']); // matricule + password
 });
 
 // ========================================
@@ -56,6 +57,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/leaves', [LeaveController::class, 'index']);
         Route::post('/leaves', [LeaveController::class, 'store']);
         Route::get('/leaves/{id}', [LeaveController::class, 'show']);
+
+        // Recensement
+        Route::get('/census/current', [CensusController::class, 'current']);
+        Route::post('/census/{campaignId}/submit', [CensusController::class, 'submit']);
     });
 
     // Messagerie interne
