@@ -23,6 +23,11 @@ class LeaveSettings extends Page implements HasForms
         return 'Congés & Permissions';
     }
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('manage_leave_settings') ?? false;
+    }
+
     public function getTitle(): string
     {
         return 'Paramétrage des Congés & Permissions';

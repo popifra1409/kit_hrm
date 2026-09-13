@@ -434,24 +434,30 @@ class DependentResource extends Resource
                         ->label('Valider')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
-                        ->visible(fn(Dependent $record) => $record->isPending())
+                        ->visible(fn(Dependent $record) => $record->isPending() && auth()->user()->can('validate_dependents'))
                         ->requiresConfirmation()
                         ->modalHeading('Valider cet ayant droit')
                         ->modalDescription('Confirmez-vous avoir vérifié les documents physiques justificatifs ?')
-                        ->action(fn(Dependent $record) => $record->validate()),
+                        ->action(function (Dependent $record) {
+                            abort_unless(auth()->user()->can('validate_dependents'), 403);
+                            $record->validate();
+                        }),
 
                     Tables\Actions\Action::make('reject')
                         ->label('Rejeter')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
-                        ->visible(fn(Dependent $record) => $record->isPending())
+                        ->visible(fn(Dependent $record) => $record->isPending() && auth()->user()->can('reject_dependents'))
                         ->requiresConfirmation()
                         ->form([
                             Forms\Components\Textarea::make('reason')
                                 ->label('Motif du rejet')
                                 ->required(),
                         ])
-                        ->action(fn(Dependent $record, array $data) => $record->reject($data['reason'])),
+                        ->action(function (Dependent $record, array $data) {
+                            abort_unless(auth()->user()->can('reject_dependents'), 403);
+                            $record->reject($data['reason']);
+                        }),
 
                     Tables\Actions\DeleteAction::make()->label('Supprimer'),
                 ])
@@ -467,8 +473,10 @@ class DependentResource extends Resource
                         ->label('Valider la sélection')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
+                        ->visible(fn() => auth()->user()->can('validate_dependents'))
                         ->requiresConfirmation()
                         ->action(function ($records) {
+                            abort_unless(auth()->user()->can('validate_dependents'), 403);
                             $records->each(fn(Dependent $record) => $record->isPending() && $record->validate());
                         }),
                 ]),

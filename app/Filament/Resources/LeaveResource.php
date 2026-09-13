@@ -419,7 +419,7 @@ class LeaveResource extends Resource
                         ->label('Approuver l\'étape')
                         ->icon('heroicon-o-check')
                         ->color('success')
-                        ->visible(fn(Leave $record) => $record->status === 'pending')
+                        ->visible(fn(Leave $record) => $record->status === 'pending' && static::canActOnCurrentStep($record))
                         ->requiresConfirmation()
                         ->modalDescription(fn(Leave $record) => 'Approuver l\'étape "' . $record->currentApprovalStep?->name . '" ?')
                         ->form([
@@ -427,6 +427,15 @@ class LeaveResource extends Resource
                                 ->label('Commentaire (optionnel)'),
                         ])
                         ->action(function (Leave $record, array $data) {
+                            if (!static::canActOnCurrentStep($record)) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Action non autorisée')
+                                    ->body("Vous n'êtes pas habilité à valider cette étape.")
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
                             app(LeaveWorkflowService::class)->approveCurrentStep($record, auth()->user(), $data['comments'] ?? null);
 
                             \Filament\Notifications\Notification::make()
@@ -439,7 +448,7 @@ class LeaveResource extends Resource
                         ->label('Rejeter')
                         ->icon('heroicon-o-x-mark')
                         ->color('danger')
-                        ->visible(fn(Leave $record) => $record->status === 'pending')
+                        ->visible(fn(Leave $record) => $record->status === 'pending' && static::canActOnCurrentStep($record))
                         ->form([
                             Forms\Components\Textarea::make('reason')
                                 ->label('Motif du rejet')
@@ -447,6 +456,15 @@ class LeaveResource extends Resource
                                 ->rows(3),
                         ])
                         ->action(function (Leave $record, array $data) {
+                            if (!static::canActOnCurrentStep($record)) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Action non autorisée')
+                                    ->body("Vous n'êtes pas habilité à rejeter cette étape.")
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
                             app(LeaveWorkflowService::class)->rejectCurrentStep($record, auth()->user(), $data['reason']);
 
                             \Filament\Notifications\Notification::make()
@@ -500,6 +518,26 @@ class LeaveResource extends Resource
         ];
     }
 
+    /**
+     * L'utilisateur connecté est-il habilité à agir sur l'étape courante de cette
+     * demande de congé ? (super_admin toujours autorisé, sinon vérifie via le
+     * service de workflow que l'utilisateur correspond bien au résolveur de l'étape).
+     */
+    protected static function canActOnCurrentStep(Leave $record): bool
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+
+        return app(LeaveWorkflowService::class)->canUserActOnCurrentStep($record, $user);
+    }
+
     public static function getPages(): array
     {
         return [
@@ -531,7 +569,7 @@ class LeaveResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 4;
+        return 2;
     }
 
     public static function getNavigationIcon(): ?string

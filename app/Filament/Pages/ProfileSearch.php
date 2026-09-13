@@ -25,6 +25,11 @@ class ProfileSearch extends Page implements HasForms
         return 'Recherche de Profils';
     }
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('search_employee_profiles') ?? false;
+    }
+
     public function getTitle(): string
     {
         return 'Recherche de Profils Professionnels';

@@ -38,9 +38,26 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
+    /**
+     * Rôles autorisés à se connecter au panel d'administration web.
+     * Liste blanche volontaire : un nouveau rôle mobile/employé ne doit pas
+     * obtenir l'accès par défaut si on oublie de l'exclure explicitement.
+     */
+    protected const PANEL_ROLES = [
+        'super_admin',
+        'admin',
+        'drh',
+        'daaf',
+        'dg',
+        'chef_service',
+        'chef_service_nursing',
+        'dat',
+        'dmr_dmra',
+    ];
+
     public function canAccessPanel(Panel $panel): bool
     {
-        return true; // Pour le moment, on autorise tous les utilisateurs
+        return $this->hasAnyRole(self::PANEL_ROLES);
     }
 
     // Méthodes helper

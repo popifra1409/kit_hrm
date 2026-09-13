@@ -161,6 +161,40 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'create_qualifications', 'module' => 'structure', 'description' => 'Créer qualifications'],
             ['name' => 'edit_qualifications', 'module' => 'structure', 'description' => 'Modifier qualifications'],
             ['name' => 'delete_qualifications', 'module' => 'structure', 'description' => 'Supprimer qualifications'],
+
+            // === RÔLES & PERMISSIONS (gestion, distinct de manage_all_roles réservé au super_admin) ===
+            ['name' => 'view_roles', 'module' => 'security', 'description' => 'Voir les rôles'],
+            ['name' => 'create_roles', 'module' => 'security', 'description' => 'Créer des rôles'],
+            ['name' => 'edit_roles', 'module' => 'security', 'description' => 'Modifier des rôles'],
+            ['name' => 'delete_roles', 'module' => 'security', 'description' => 'Supprimer des rôles'],
+
+            // === DÉCISIONS DE CONGÉ ===
+            ['name' => 'view_leave_decisions', 'module' => 'leaves', 'description' => 'Voir les décisions de congé'],
+            ['name' => 'create_leave_decisions', 'module' => 'leaves', 'description' => 'Créer des décisions de congé'],
+            ['name' => 'edit_leave_decisions', 'module' => 'leaves', 'description' => 'Modifier des décisions de congé'],
+            ['name' => 'delete_leave_decisions', 'module' => 'leaves', 'description' => 'Supprimer des décisions de congé'],
+
+            // === CIRCUIT DE VALIDATION DES CONGÉS (paramétrage) ===
+            ['name' => 'view_leave_approval_steps', 'module' => 'leaves', 'description' => 'Voir le circuit de validation des congés'],
+            ['name' => 'create_leave_approval_steps', 'module' => 'leaves', 'description' => 'Créer une étape du circuit'],
+            ['name' => 'edit_leave_approval_steps', 'module' => 'leaves', 'description' => 'Modifier une étape du circuit'],
+            ['name' => 'delete_leave_approval_steps', 'module' => 'leaves', 'description' => 'Supprimer une étape du circuit'],
+
+            // === JOURS FÉRIÉS ===
+            ['name' => 'view_public_holidays', 'module' => 'leaves', 'description' => 'Voir les jours fériés'],
+            ['name' => 'create_public_holidays', 'module' => 'leaves', 'description' => 'Créer un jour férié'],
+            ['name' => 'edit_public_holidays', 'module' => 'leaves', 'description' => 'Modifier un jour férié'],
+            ['name' => 'delete_public_holidays', 'module' => 'leaves', 'description' => 'Supprimer un jour férié'],
+
+            // === VALIDATION AYANTS DROIT & DIPLÔMES (distinct de la simple édition) ===
+            ['name' => 'validate_dependents', 'module' => 'health', 'description' => 'Valider un ayant droit après vérification des documents'],
+            ['name' => 'reject_dependents', 'module' => 'health', 'description' => 'Rejeter un ayant droit'],
+            ['name' => 'validate_diplomas', 'module' => 'employees', 'description' => 'Valider un diplôme/formation après vérification'],
+            ['name' => 'reject_diplomas', 'module' => 'employees', 'description' => 'Rejeter un diplôme/formation'],
+
+            // === PARAMÉTRAGE CONGÉS & RECHERCHE DE PROFILS ===
+            ['name' => 'manage_leave_settings', 'module' => 'leaves', 'description' => 'Modifier les règles de calcul des congés (jours de base, bonus, seuils)'],
+            ['name' => 'search_employee_profiles', 'module' => 'employees', 'description' => 'Rechercher des profils professionnels (redéploiement)'],
         ];
 
         foreach ($permissions as $permissionData) {
@@ -203,12 +237,25 @@ class RolesAndPermissionsSeeder extends Seeder
             'create_employees',
             'edit_employees',
             'export_employees',
+            'validate_diplomas',
+            'reject_diplomas',
+            'search_employee_profiles',
             // Congés & Absences
             'view_leaves',
             'create_leaves',
             'edit_leaves',
             'approve_leaves',
             'reject_leaves',
+            'view_leave_decisions',
+            'create_leave_decisions',
+            'edit_leave_decisions',
+            'view_leave_approval_steps',
+            'edit_leave_approval_steps',
+            'manage_leave_settings',
+            'view_public_holidays',
+            'create_public_holidays',
+            'edit_public_holidays',
+            'delete_public_holidays',
             'view_absences',
             'manage_absences',
             'view_attendances',
@@ -238,6 +285,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_dependents',
             'create_dependents',
             'edit_dependents',
+            'validate_dependents',
+            'reject_dependents',
             'issue_health_cards',
             'activate_health_cards',
             'view_employee_cards',
@@ -257,9 +306,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage_cache',
         ]);
 
-        // 3. DAF - Directeur Administratif et Financier
-        $daf = Role::firstOrCreate(['name' => 'daf'], ['guard_name' => 'web']);
-        $daf->syncPermissions([
+        // 3. DAAF - Directeur des Affaires Administratives et Financières
+        $daaf = Role::firstOrCreate(['name' => 'daaf'], ['guard_name' => 'web']);
+        $daaf->syncPermissions([
             // Employés (lecture)
             'view_employees',
             // Paie (complet)
@@ -323,8 +372,8 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
 
         // 6. EMPLOYEE - Employé standard
-        $standardUser = Role::firstOrCreate(['name' => 'standard_user'], ['guard_name' => 'web']);
-        $standardUser->syncPermissions([
+        $employee = Role::firstOrCreate(['name' => 'employee'], ['guard_name' => 'web']);
+        $employee->syncPermissions([
             // Congés (ses propres demandes)
             'create_leaves',
             'view_leaves',
@@ -342,7 +391,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $this->createSuperAdminUser();
 
         echo "✅ Rôles et permissions créés avec succès!\n";
-        echo "   - Rôles créés: super_admin, admin, drh, daf, dg, chef_service, employee\n";
+        echo "   - Rôles créés: super_admin, admin, drh, daaf, dg, chef_service, employee\n";
         echo "   - " . Permission::count() . " permissions créées\n";
         echo "   - Super Admin créé: adminkit@gmail.com\n";
     }

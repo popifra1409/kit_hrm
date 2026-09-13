@@ -13,6 +13,8 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         // Utilisateurs & Sécurité
         \App\Models\User::class => \App\Policies\UserPolicy::class,
+        \Spatie\Permission\Models\Role::class => \App\Policies\RolePolicy::class,
+        \Spatie\Permission\Models\Permission::class => \App\Policies\PermissionPolicy::class,
 
         // Employés & Structure
         \App\Models\Employee::class => \App\Policies\EmployeePolicy::class,
@@ -40,6 +42,9 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Leave::class => \App\Policies\LeavePolicy::class,
         \App\Models\LeaveType::class => \App\Policies\LeaveTypePolicy::class,
         \App\Models\LeaveBalance::class => \App\Policies\LeaveBalancePolicy::class,
+        \App\Models\LeaveDecision::class => \App\Policies\LeaveDecisionPolicy::class,
+        \App\Models\LeaveApprovalStep::class => \App\Policies\LeaveApprovalStepPolicy::class,
+        \App\Models\PublicHoliday::class => \App\Policies\PublicHolidayPolicy::class,
         \App\Models\Absence::class => \App\Policies\AbsencePolicy::class,
         \App\Models\Replacement::class => \App\Policies\ReplacementPolicy::class,
         \App\Models\Attendance::class => \App\Policies\AttendancePolicy::class,

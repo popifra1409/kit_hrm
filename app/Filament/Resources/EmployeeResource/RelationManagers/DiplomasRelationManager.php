@@ -150,23 +150,29 @@ class DiplomasRelationManager extends RelationManager
                         ->label('Valider')
                         ->icon('heroicon-o-check-badge')
                         ->color('success')
-                        ->visible(fn($record) => $record->isPending())
+                        ->visible(fn($record) => $record->isPending() && auth()->user()->can('validate_diplomas'))
                         ->requiresConfirmation()
                         ->modalDescription('Confirmez-vous avoir vérifié le document physique justificatif ?')
-                        ->action(fn($record) => $record->validate()),
+                        ->action(function ($record) {
+                            abort_unless(auth()->user()->can('validate_diplomas'), 403);
+                            $record->validate();
+                        }),
 
                     Tables\Actions\Action::make('reject')
                         ->label('Rejeter')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
-                        ->visible(fn($record) => $record->isPending())
+                        ->visible(fn($record) => $record->isPending() && auth()->user()->can('reject_diplomas'))
                         ->requiresConfirmation()
                         ->form([
                             Forms\Components\Textarea::make('reason')
                                 ->label('Motif du rejet')
                                 ->required(),
                         ])
-                        ->action(fn($record, array $data) => $record->reject($data['reason'])),
+                        ->action(function ($record, array $data) {
+                            abort_unless(auth()->user()->can('reject_diplomas'), 403);
+                            $record->reject($data['reason']);
+                        }),
 
                     Tables\Actions\EditAction::make()->label('Modifier'),
                     Tables\Actions\DeleteAction::make()->label('Supprimer'),

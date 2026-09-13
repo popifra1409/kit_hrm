@@ -25,12 +25,25 @@ class UserResource extends Resource
             ->schema([
                 Forms\Components\Select::make('employee_id')
                     ->label('Employé lié (compte mobile)')
-                    ->relationship('employee', 'matricule')
+                    ->options(fn() => \App\Models\Employee::where('is_active', true)
+                        ->get()
+                        ->mapWithKeys(fn($e) => [$e->id => $e->full_name . ' (' . $e->matricule . ')']))
                     ->searchable()
-                    ->preload()
-                    ->getOptionLabelFromRecordUsing(
-                        fn($record) => $record->full_name . ' (' . $record->matricule . ')'
-                    )
+                    ->getSearchResultsUsing(function (string $search) {
+                        return \App\Models\Employee::where('is_active', true)
+                            ->where(function ($q) use ($search) {
+                                $q->where('matricule', 'ilike', "%{$search}%")
+                                    ->orWhere('first_name', 'ilike', "%{$search}%")
+                                    ->orWhere('last_name', 'ilike', "%{$search}%");
+                            })
+                            ->limit(50)
+                            ->get()
+                            ->mapWithKeys(fn($e) => [$e->id => $e->full_name . ' (' . $e->matricule . ')']);
+                    })
+                    ->getOptionLabelUsing(function ($value) {
+                        $record = \App\Models\Employee::find($value);
+                        return $record ? $record->full_name . ' (' . $record->matricule . ')' : null;
+                    })
                     ->nullable()
                     ->helperText('Laissez vide pour un compte purement administratif (sans accès mobile employé).'),
 
