@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\CensusCampaign;
 use App\Models\CensusSubmission;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -28,6 +27,15 @@ class CensusController extends Controller
         $campaign = CensusCampaign::currentlyOpen();
 
         if (!$campaign) {
+            $ended = CensusCampaign::recentlyEnded();
+
+            if ($ended) {
+                return response()->json([
+                    'campaign' => null,
+                    'message' => "La campagne « {$ended->name} » est terminée depuis le {$ended->ends_at->format('d/m/Y à H:i')}. Contactez les RH si vous n'avez pas pu la compléter à temps.",
+                ]);
+            }
+
             return response()->json(['campaign' => null]);
         }
 
@@ -52,6 +60,14 @@ class CensusController extends Controller
                     'email' => $employee->email,
                     'address' => $employee->address,
                     'city' => $employee->city,
+                    'bank_name' => $employee->bank_name,
+                    'bank_account_number' => $employee->bank_account_number,
+                    'cnps_number' => $employee->cnps_number,
+                ],
+                'organizational' => [
+                    'current_department' => $employee->department?->name ?? $employee->currentService?->department?->name ?? null,
+                    'current_service' => $employee->currentService?->name ?? $employee->service,
+                    'current_job_title' => $employee->jobTitle?->name ?? $employee->job_title,
                 ],
                 'dependents' => $employee->dependents->map(fn($d) => [
                     'id' => $d->id,
@@ -89,8 +105,8 @@ class CensusController extends Controller
 
         $campaign = CensusCampaign::find($campaignId);
 
-        if (!$campaign || !$campaign->isOpen()) {
-            return response()->json(['message' => "Aucune campagne de recensement n'est actuellement ouverte."], 404);
+        if (!$campaign || !$campaign->isCurrentlyAccessible()) {
+            return response()->json(['message' => "Cette campagne de recensement n'est plus ouverte."], 404);
         }
 
         $existing = CensusSubmission::where('census_campaign_id', $campaign->id)
@@ -107,6 +123,14 @@ class CensusController extends Controller
             'personal.email' => ['nullable', 'email', 'max:255'],
             'personal.address' => ['nullable', 'string', 'max:255'],
             'personal.city' => ['nullable', 'string', 'max:255'],
+            'personal.bank_name' => ['nullable', 'string', 'max:255'],
+            'personal.bank_account_number' => ['nullable', 'string', 'max:255'],
+            'personal.cnps_number' => ['nullable', 'string', 'max:255'],
+
+            'organizational' => ['nullable', 'array'],
+            'organizational.declared_department' => ['nullable', 'string', 'max:255'],
+            'organizational.declared_service' => ['nullable', 'string', 'max:255'],
+            'organizational.declared_job_title' => ['nullable', 'string', 'max:255'],
 
             'dependents' => ['array'],
             'dependents.*.existing_id' => ['nullable', 'integer'],

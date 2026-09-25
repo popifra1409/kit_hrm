@@ -41,14 +41,14 @@ class ReviewCensusSubmission extends Page
                 ->color('success')
                 ->visible(fn() => $this->record->isSubmitted() && auth()->user()->can('validate_census_submissions'))
                 ->requiresConfirmation()
-                ->modalDescription('Le profil, les ayants droit et les diplômes de l\'employé seront mis à jour selon cette soumission.')
+                ->modalDescription('Le profil (dont banque/CNPS), les ayants droit et les diplômes seront mis à jour. L\'affectation déclarée par l\'employé ne sera PAS appliquée automatiquement — à vérifier manuellement contre les archives.')
                 ->action(function () {
                     app(CensusValidationService::class)->apply($this->record, auth()->id());
                     $this->record->refresh();
 
                     Notification::make()
                         ->title('Recensement validé')
-                        ->body('Le profil, les ayants droit et les diplômes ont été mis à jour.')
+                        ->body('Profil, ayants droit et diplômes mis à jour. Pensez à vérifier l\'affectation déclarée.')
                         ->success()
                         ->send();
                 }),
@@ -91,6 +91,16 @@ class ReviewCensusSubmission extends Page
             'email' => $employee->email,
             'address' => $employee->address,
             'city' => $employee->city,
+            'bank_name' => $employee->bank_name,
+            'bank_account_number' => $employee->bank_account_number,
+            'cnps_number' => $employee->cnps_number,
+        ];
+
+        $organizationalDeclared = $payload['organizational'] ?? [];
+        $organizationalCurrent = [
+            'current_department' => $employee->department,
+            'current_service' => $employee->service,
+            'current_job_title' => $employee->job_title,
         ];
 
         $existingDependents = $employee->dependents->keyBy('id');
@@ -120,6 +130,8 @@ class ReviewCensusSubmission extends Page
         return [
             'personalOld' => $personalOld,
             'personalNew' => $personalNew,
+            'organizationalCurrent' => $organizationalCurrent,
+            'organizationalDeclared' => $organizationalDeclared,
             'newDependents' => $newDependents,
             'updatedDependents' => $updatedDependents,
             'unaddressedDependents' => $this->record->isSubmitted() ? $service->getUnaddressedDependents($this->record) : collect(),

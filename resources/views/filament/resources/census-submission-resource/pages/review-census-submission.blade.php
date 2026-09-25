@@ -21,12 +21,38 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach(['phone' => 'Téléphone', 'email' => 'Email', 'address' => 'Adresse', 'city' => 'Ville'] as $key => $label)
+                    @foreach(['phone' => 'Téléphone', 'email' => 'Email', 'address' => 'Adresse', 'city' => 'Ville', 'bank_name' => 'Banque', 'bank_account_number' => 'N° de compte', 'cnps_number' => 'N° CNPS'] as $key => $label)
                         <tr class="border-b border-gray-100 dark:border-gray-800">
                             <td class="py-2 pr-4 font-medium">{{ $label }}</td>
                             <td class="py-2 pr-4 text-gray-500">{{ $personalOld[$key] ?? '—' }}</td>
                             <td class="py-2 pr-4 {{ ($personalOld[$key] ?? null) !== ($personalNew[$key] ?? null) ? 'font-semibold text-primary-600' : '' }}">
                                 {{ $personalNew[$key] ?? '—' }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </x-filament::section>
+
+        <x-filament::section heading="Affectation Organisationnelle (déclarée par l'employé)">
+            <div class="mb-3 p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20 text-xs text-warning-800 dark:text-warning-200">
+                ⚠️ Ces informations sont <strong>déclaratives uniquement</strong> et ne sont <strong>jamais appliquées automatiquement</strong>, même après validation du recensement. Vérifiez-les contre les archives RH avant de corriger manuellement la fiche employé si nécessaire.
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                        <th class="py-2 pr-4">Champ</th>
+                        <th class="py-2 pr-4">Actuel (en base)</th>
+                        <th class="py-2 pr-4">Déclaré par l'employé</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(['current_department' => ['declared_department', 'Département'], 'current_service' => ['declared_service', 'Service'], 'current_job_title' => ['declared_job_title', 'Poste']] as $currentKey => [$declaredKey, $label])
+                        <tr class="border-b border-gray-100 dark:border-gray-800">
+                            <td class="py-2 pr-4 font-medium">{{ $label }}</td>
+                            <td class="py-2 pr-4 text-gray-500">{{ $organizationalCurrent[$currentKey] ?? '—' }}</td>
+                            <td class="py-2 pr-4 {{ ($organizationalCurrent[$currentKey] ?? null) !== ($organizationalDeclared[$declaredKey] ?? null) ? 'font-semibold text-warning-700' : '' }}">
+                                {{ $organizationalDeclared[$declaredKey] ?? '—' }}
                             </td>
                         </tr>
                     @endforeach

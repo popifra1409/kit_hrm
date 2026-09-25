@@ -15,15 +15,24 @@ class CensusValidationService
             $employee = $submission->employee;
             $payload = $submission->payload;
 
+            // 1. Informations personnelles + banque + CNPS (appliquées directement)
+            // NB: les infos d'affectation/poste proposées ($payload['professional']) ne
+            // sont JAMAIS appliquées automatiquement ici — elles restent uniquement dans
+            // le payload pour que les RH les vérifient manuellement dans les archives
+            // avant de mettre à jour eux-mêmes la fiche employé si besoin.
             $personal = $payload['personal'] ?? [];
             $employee->fill([
                 'phone' => $personal['phone'] ?? $employee->phone,
                 'email' => $personal['email'] ?? $employee->email,
                 'address' => $personal['address'] ?? $employee->address,
                 'city' => $personal['city'] ?? $employee->city,
+                'bank_name' => $personal['bank_name'] ?? $employee->bank_name,
+                'bank_account_number' => $personal['bank_account_number'] ?? $employee->bank_account_number,
+                'cnps_number' => $personal['cnps_number'] ?? $employee->cnps_number,
             ]);
             $employee->save();
 
+            // 2. Ayants droit
             foreach ($payload['dependents'] ?? [] as $item) {
                 $documents = $item['documents'] ?? [];
 
@@ -63,6 +72,7 @@ class CensusValidationService
                 Dependent::create($data);
             }
 
+            // 3. Diplômes & formations
             foreach ($payload['diplomas'] ?? [] as $item) {
                 $data = [
                     'employee_id' => $employee->id,
