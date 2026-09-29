@@ -30,6 +30,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::delete('/auth/account', [AuthController::class, 'deleteAccount']);
     Route::put('/auth/password', [AuthController::class, 'changePassword']);
 
     Route::prefix('employee')->group(function () {

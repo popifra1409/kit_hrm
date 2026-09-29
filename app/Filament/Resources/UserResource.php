@@ -12,6 +12,8 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Models\AccountDeletion;
+use App\Services\AccountDeletionService;
 
 class UserResource extends Resource
 {
@@ -104,6 +106,48 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('delete_account')
+                    ->label('Supprimer le compte')
+                    ->icon('heroicon-o-user-minus')
+                    ->color('danger')
+                    ->visible(fn(User $record) => $record->employee_id !== null && auth()->user()->can('delete_user_accounts'))
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer ce compte utilisateur')
+                    ->modalDescription('Seul le compte de connexion sera supprimé — la fiche employé et toutes ses informations restent intactes en base.')
+                    ->form([
+                        Forms\Components\Select::make('reason')
+                            ->label('Motif')
+                            ->options(AccountDeletion::REASONS)
+                            ->required()
+                            ->native(false),
+
+                        Forms\Components\Textarea::make('notes')
+                            ->label('Précisions (optionnel)')
+                            ->rows(3),
+                    ])
+                    ->action(function (User $record, array $data) {
+                        try {
+                            app(AccountDeletionService::class)->delete(
+                                user: $record,
+                                reason: $data['reason'],
+                                notes: $data['notes'] ?? null,
+                                initiatedBy: 'admin',
+                                deletedBy: auth()->user(),
+                            );
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Compte supprimé')
+                                ->body("Le compte de {$record->name} a été supprimé. La fiche employé reste intacte.")
+                                ->success()
+                                ->send();
+                        } catch (\RuntimeException $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Suppression impossible')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

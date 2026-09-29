@@ -7,6 +7,9 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use App\Models\AccountDeletion;
+use App\Services\AccountDeletionService;
+
 
 /**
  * @tags Authentification
@@ -250,6 +253,52 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Mot de passe mis à jour avec succès.',
         ]);
+    }
+
+    /**
+     * Suppression du compte utilisateur par l'employé lui-même (auto-service).
+     *
+     * L'employé reste en base avec toutes ses informations — seul son compte de
+     * connexion (login mobile/web) est supprimé. Nécessite la confirmation du mot
+     * de passe actuel pour éviter toute suppression accidentelle.
+     *
+     * @bodyParam password string required Mot de passe actuel, pour confirmation.
+     * @bodyParam reason string required resignation|death|retirement|other
+     * @bodyParam notes string Précisions optionnelles.
+     *
+     * @response 200 {"message": "Votre compte a été supprimé."}
+     * @response 422 scenario="Mot de passe incorrect" {"message": "Mot de passe incorrect."}
+     */
+    public function deleteAccount(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'password' => ['required', 'string'],
+            'reason' => ['required', 'in:resignation,death,retirement,other'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Données invalides.', 'errors' => $validator->errors()], 422);
+        }
+
+        $user = $request->user();
+
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Mot de passe incorrect.'], 422);
+        }
+
+        try {
+            app(AccountDeletionService::class)->delete(
+                user: $user,
+                reason: $request->reason,
+                notes: $request->notes,
+                initiatedBy: 'self',
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        return response()->json(['message' => 'Votre compte a été supprimé.']);
     }
 
     private function formatUser(User $user): array

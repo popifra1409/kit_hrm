@@ -34,6 +34,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'create_users', 'module' => 'users', 'description' => 'Créer des utilisateurs'],
             ['name' => 'edit_users', 'module' => 'users', 'description' => 'Modifier les utilisateurs'],
             ['name' => 'delete_users', 'module' => 'users', 'description' => 'Supprimer les utilisateurs'],
+            ['name' => 'delete_user_accounts', 'module' => 'users', 'description' => "Supprimer le compte de connexion d'un employé (démission/décès/retraite) — l'employé reste en base"],
 
             // === EMPLOYÉS ===
             ['name' => 'view_employees', 'module' => 'employees', 'description' => 'Voir les employés'],
@@ -242,6 +243,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $drh->syncPermissions([
             // Utilisateurs (lecture seule)
             'view_users',
+            'delete_user_accounts',
             // Employés
             'view_employees',
             'create_employees',
