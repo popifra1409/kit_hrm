@@ -2,10 +2,15 @@
 
 namespace App\Enums;
 
+use App\Support\CameroonCivilServiceGrid;
+
 class EmployeeClassification
 {
     /**
-     * Nomenclature des catégories et échelons camerounais
+     * Nomenclature des catégories et échelons camerounais (ancienne version simplifiée).
+     *
+     * ⚠️ Pour la grille indiciaire OFFICIELLE des fonctionnaires (classes D, C, B1, B2, A1, A2 et
+     * échelons ST, 2/1 … CL Exc), utiliser getOfficialCategoryOptions() / getOfficialEchelonOptions().
      */
     public const CATEGORIES = [
         'A' => 'Catégorie A - Cadres supérieurs',
@@ -77,7 +82,7 @@ class EmployeeClassification
     }
 
     /**
-     * Obtenir les options pour Select (catégorie)
+     * Obtenir les options pour Select (catégorie) — ancienne nomenclature simplifiée
      */
     public static function getCategoryOptions(): array
     {
@@ -85,10 +90,26 @@ class EmployeeClassification
     }
 
     /**
-     * Obtenir les options pour Select (échelon)
+     * Obtenir les options pour Select (échelon) — ancienne nomenclature simplifiée
      */
     public static function getEchelonOptions(): array
     {
         return self::ECHELONS;
+    }
+
+    /**
+     * Classes de la grille indiciaire OFFICIELLE des fonctionnaires (D, C, B1, B2, A1, A2).
+     */
+    public static function getOfficialCategoryOptions(): array
+    {
+        return CameroonCivilServiceGrid::categoryOptions();
+    }
+
+    /**
+     * Échelons de la grille OFFICIELLE (dépendent de la classe : H.ECH n'existe que pour A2).
+     */
+    public static function getOfficialEchelonOptions(?string $category = null): array
+    {
+        return CameroonCivilServiceGrid::echelonOptions($category);
     }
 }

@@ -118,7 +118,7 @@ class EditEmployee extends EditRecord
         // Déterminer le type de classification s'il n'existe pas
         if (!isset($data['classification_type']) || !$data['classification_type']) {
             // Si category_number est une lettre (A, B, C, etc.) → cameroon
-            $data['classification_type'] = preg_match('/^[A-E]$/', $data['category_number'] ?? '') ? 'cameroon' : 'numeric';
+            $data['classification_type'] = preg_match('/^(D|C|B1|B2|A1|A2)$/', $data['category_number'] ?? '') ? 'cameroon' : 'numeric';
         }
 
         return $data;
@@ -491,24 +491,33 @@ class EditEmployee extends EditRecord
                                         ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                                         ->schema([
                                             Forms\Components\Select::make('category_number')
-                                                ->label('Catégorie')
-                                                ->options(\App\Enums\EmployeeClassification::getCategoryOptions())
+                                                ->label('Classe / Catégorie')
+                                                ->options(\App\Support\CameroonCivilServiceGrid::categoryOptions())
                                                 ->searchable()
                                                 ->reactive()
-                                                ->live(),
+                                                ->live()
+                                                ->afterStateUpdated(function (Forms\Set $set) {
+                                                    $set('echelon_number', null);
+                                                    $set('indice', null);
+                                                }),
 
                                             Forms\Components\Select::make('echelon_number')
                                                 ->label('Échelon')
-                                                ->options(\App\Enums\EmployeeClassification::getEchelonOptions())
+                                                ->options(fn(Forms\Get $get) => \App\Support\CameroonCivilServiceGrid::echelonOptions($get('category_number')))
                                                 ->searchable()
                                                 ->reactive()
-                                                ->live(),
+                                                ->live()
+                                                ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                                    $set('indice', \App\Models\SalaryGrid::lookupIndice('cameroon', $get('category_number'), $get('echelon_number')));
+                                                }),
 
                                             Forms\Components\TextInput::make('indice')
                                                 ->label('Indice')
                                                 ->numeric()
-                                                ->minValue(100)
-                                                ->placeholder('Ex: 350')
+                                                ->readOnly()
+                                                ->dehydrated()
+                                                ->placeholder('Se remplit après sélection')
+                                                ->helperText('Automatique — grille indiciaire officielle')
                                                 ->reactive()
                                                 ->live(),
                                         ]),
@@ -521,13 +530,13 @@ class EditEmployee extends EditRecord
                                             $echelon = $get('echelon_number');
 
                                             if ($category && $echelon) {
-                                                $classification = "{$category}{$echelon}";
-                                                $label = \App\Enums\EmployeeClassification::getLabel($classification);
+                                                $categoryLabel = \App\Support\CameroonCivilServiceGrid::categoryOptions()[$category] ?? $category;
+                                                $echelonLabel = \App\Support\CameroonCivilServiceGrid::echelonOptions($category)[$echelon] ?? $echelon;
 
                                                 return new \Illuminate\Support\HtmlString(
                                                     '<div class="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                    <p class="text-lg font-bold text-blue-900">' . $classification . '</p>
-                                    <p class="text-sm text-blue-700">' . $label . '</p>
+                                    <p class="text-lg font-bold text-blue-900">' . e($category) . ' · ' . e($echelon) . '</p>
+                                    <p class="text-sm text-blue-700">' . e($categoryLabel) . '<br>' . e($echelonLabel) . '</p>
                                     ' . ($get('indice') ? '<p class="text-sm text-blue-700 mt-1">🔢 Indice: ' . $get('indice') . '</p>' : '') . '
                                 </div>'
                                                 );
@@ -547,6 +556,9 @@ class EditEmployee extends EditRecord
                                                 ->searchable()
                                                 ->reactive()
                                                 ->live()
+                                                ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                                    $set('indice', \App\Models\SalaryGrid::lookupIndice('numeric', $get('category_number'), $get('echelon_number')));
+                                                })
                                                 ->helperText('Numéro de 1 à 12'),
 
                                             Forms\Components\Select::make('echelon_number')
@@ -555,13 +567,18 @@ class EditEmployee extends EditRecord
                                                 ->searchable()
                                                 ->reactive()
                                                 ->live()
+                                                ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                                    $set('indice', \App\Models\SalaryGrid::lookupIndice('numeric', $get('category_number'), $get('echelon_number')));
+                                                })
                                                 ->helperText('Numéro de 1 à 12'),
 
                                             Forms\Components\TextInput::make('indice')
                                                 ->label('Indice')
                                                 ->numeric()
-                                                ->minValue(100)
-                                                ->placeholder('Ex: 450')
+                                                ->readOnly()
+                                                ->dehydrated()
+                                                ->placeholder('Se remplit après sélection')
+                                                ->helperText('Automatique — indice fonctionnaire au salaire de base le plus proche')
                                                 ->reactive()
                                                 ->live(),
                                         ]),
@@ -596,7 +613,7 @@ class EditEmployee extends EditRecord
 
                                             if ($category && $echelon) {
                                                 try {
-                                                    $baseSalary = \App\Models\SalaryGrid::getBaseSalary($category, $echelon);
+                                                    $baseSalary = \App\Models\SalaryGrid::getBaseSalary($category, $echelon, $get('classification_type'));
 
                                                     $classification = $get('classification_type') === 'cameroon'
                                                         ? $category . $echelon

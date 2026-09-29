@@ -375,29 +375,37 @@ class CreateEmployee extends CreateRecord
                                 ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                                 ->schema([
                                     Forms\Components\Select::make('category_number')
-                                        ->label('Catégorie')
-                                        ->options(\App\Enums\EmployeeClassification::getCategoryOptions())
+                                        ->label('Classe / Catégorie')
+                                        ->options(\App\Support\CameroonCivilServiceGrid::categoryOptions())
                                         ->searchable()
                                         ->reactive()
                                         ->live()
-                                        ->helperText('A, B, C, D, E')
+                                        ->afterStateUpdated(function (Forms\Set $set) {
+                                            $set('echelon_number', null);
+                                            $set('indice', null);
+                                        })
+                                        ->helperText('D, C, B1, B2, A1, A2 — grille officielle du 02/02/2024')
                                         ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon'),
 
                                     Forms\Components\Select::make('echelon_number')
                                         ->label('Échelon')
-                                        ->options(\App\Enums\EmployeeClassification::getEchelonOptions())
+                                        ->options(fn(Forms\Get $get) => \App\Support\CameroonCivilServiceGrid::echelonOptions($get('category_number')))
                                         ->searchable()
                                         ->reactive()
                                         ->live()
-                                        ->helperText('1 à 8')
+                                        ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                            $set('indice', \App\Models\SalaryGrid::lookupIndice('cameroon', $get('category_number'), $get('echelon_number')));
+                                        })
+                                        ->helperText('ST, 2/1…2/7, 1/1…1/3, CL Exc')
                                         ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon'),
 
                                     Forms\Components\TextInput::make('indice')
                                         ->label('Indice')
                                         ->numeric()
-                                        ->minValue(100)
-                                        ->placeholder('Ex: 350, 450, 600')
-                                        ->helperText('100 à 1600')
+                                        ->readOnly()
+                                        ->dehydrated()
+                                        ->placeholder('Se remplit après sélection')
+                                        ->helperText('Automatique — grille indiciaire officielle')
                                         ->reactive()
                                         ->live(),
                                 ]),
@@ -410,13 +418,13 @@ class CreateEmployee extends CreateRecord
                                     $echelon = $get('echelon_number');
 
                                     if ($category && $echelon) {
-                                        $classification = "{$category}{$echelon}";
-                                        $label = \App\Enums\EmployeeClassification::getLabel($classification);
+                                        $categoryLabel = \App\Support\CameroonCivilServiceGrid::categoryOptions()[$category] ?? $category;
+                                        $echelonLabel = \App\Support\CameroonCivilServiceGrid::echelonOptions($category)[$echelon] ?? $echelon;
 
                                         return new \Illuminate\Support\HtmlString(
                                             '<div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
-                                    <p class="text-xl font-bold text-blue-900">' . $classification . '</p>
-                                    <p class="text-sm text-blue-700">' . $label . '</p>
+                                    <p class="text-xl font-bold text-blue-900">' . e($category) . ' · ' . e($echelon) . '</p>
+                                    <p class="text-sm text-blue-700">' . e($categoryLabel) . '<br>' . e($echelonLabel) . '</p>
                                     ' . ($get('indice') ? '<p class="text-sm text-blue-700 mt-2">🔢 Indice: ' . $get('indice') . '</p>' : '') . '
                                 </div>'
                                         );
@@ -436,6 +444,9 @@ class CreateEmployee extends CreateRecord
                                         ->searchable()
                                         ->reactive()
                                         ->live()
+                                        ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                            $set('indice', \App\Models\SalaryGrid::lookupIndice('numeric', $get('category_number'), $get('echelon_number')));
+                                        })
                                         ->suffix('/ 12')
                                         ->helperText('1 à 12')
                                         ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric'),
@@ -446,6 +457,9 @@ class CreateEmployee extends CreateRecord
                                         ->searchable()
                                         ->reactive()
                                         ->live()
+                                        ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                            $set('indice', \App\Models\SalaryGrid::lookupIndice('numeric', $get('category_number'), $get('echelon_number')));
+                                        })
                                         ->suffix('/ 12')
                                         ->helperText('1 à 12')
                                         ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric'),
@@ -453,10 +467,10 @@ class CreateEmployee extends CreateRecord
                                     Forms\Components\TextInput::make('indice')
                                         ->label('Indice')
                                         ->numeric()
-                                        ->minValue(100)
-                                        ->maxValue(1600)
-                                        ->placeholder('Ex: 350, 450, 600')
-                                        ->helperText('100 à 1600')
+                                        ->readOnly()
+                                        ->dehydrated()
+                                        ->placeholder('Se remplit après sélection')
+                                        ->helperText('Automatique — indice fonctionnaire au salaire de base le plus proche')
                                         ->reactive()
                                         ->live(),
                                 ]),
@@ -511,7 +525,7 @@ class CreateEmployee extends CreateRecord
 
                             if ($category && $echelon) {
                                 try {
-                                    $baseSalary = \App\Models\SalaryGrid::getBaseSalary($category, $echelon);
+                                    $baseSalary = \App\Models\SalaryGrid::getBaseSalary($category, $echelon, $type);
 
                                     $classification = $type === 'cameroon'
                                         ? $category . $echelon

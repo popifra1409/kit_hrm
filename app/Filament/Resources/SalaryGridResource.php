@@ -4,12 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SalaryGridResource\Pages;
 use App\Models\SalaryGrid;
+use App\Support\CameroonCivilServiceGrid;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Filters\Filter;
 use Illuminate\Database\Eloquent\Builder;
 
 class SalaryGridResource extends Resource
@@ -30,6 +30,45 @@ class SalaryGridResource extends Resource
         return 'Grille Salariale';
     }
 
+    /**
+     * Fonctionnaires : remplit indice + composantes + salaire de base depuis la grille officielle.
+     */
+    protected static function fillFromOfficialGrid(Forms\Get $get, Forms\Set $set): void
+    {
+        $row = CameroonCivilServiceGrid::find((string) $get('category'), (string) $get('echelon'));
+
+        if (!$row) {
+            return;
+        }
+
+        $set('indice', $row['indice']);
+        $set('salaire_indiciaire_brut', $row['salaire_indiciaire_brut']);
+        $set('complement_forfaitaire', $row['complement_forfaitaire']);
+        $set('indemnite_logement', $row['indemnite_logement']);
+        $set('base_salary', $row['salaire_indiciaire_brut']);
+    }
+
+    /**
+     * Contractuels : l'indice est retrouvé par correspondance de salaire dans la grille
+     * officielle des fonctionnaires (indice au salaire indiciaire brut le plus proche).
+     */
+    protected static function syncNumericIndiceFromSalary($state, Forms\Set $set): void
+    {
+        if ($state === null || $state === '') {
+            return;
+        }
+
+        $set('indice', CameroonCivilServiceGrid::nearestIndiceForSalary((float) $state));
+    }
+
+    protected static function resetDerivedFields(Forms\Set $set): void
+    {
+        $set('indice', null);
+        $set('salaire_indiciaire_brut', null);
+        $set('complement_forfaitaire', null);
+        $set('indemnite_logement', null);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -45,6 +84,11 @@ class SalaryGridResource extends Resource
                             ->default('numeric')
                             ->reactive()
                             ->live()
+                            ->afterStateUpdated(function (Forms\Set $set) {
+                                $set('category', null);
+                                $set('echelon', null);
+                                static::resetDerivedFields($set);
+                            })
                             ->inline()
                             ->required(),
                     ])
@@ -57,16 +101,23 @@ class SalaryGridResource extends Resource
                             ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                             ->schema([
                                 Forms\Components\Select::make('category')
-                                    ->label('Catégorie')
-                                    ->options(\App\Enums\EmployeeClassification::getCategoryOptions())
+                                    ->label('Classe / Catégorie')
+                                    ->options(CameroonCivilServiceGrid::categoryOptions())
                                     ->searchable()
+                                    ->live()
+                                    ->afterStateUpdated(function (Forms\Set $set) {
+                                        $set('echelon', null);
+                                        static::resetDerivedFields($set);
+                                    })
                                     ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                                     ->native(false),
 
                                 Forms\Components\Select::make('echelon')
                                     ->label('Échelon')
-                                    ->options(\App\Enums\EmployeeClassification::getEchelonOptions())
+                                    ->options(fn(Forms\Get $get) => CameroonCivilServiceGrid::echelonOptions($get('category')))
                                     ->searchable()
+                                    ->live()
+                                    ->afterStateUpdated(fn(Forms\Get $get, Forms\Set $set) => static::fillFromOfficialGrid($get, $set))
                                     ->required(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
                                     ->native(false),
 
@@ -77,12 +128,11 @@ class SalaryGridResource extends Resource
                                         $echelon = $get('echelon');
 
                                         if ($category && $echelon) {
-                                            $classification = "{$category}{$echelon}";
                                             return new \Illuminate\Support\HtmlString(
-                                                '<div class="p-2 bg-blue-100 text-blue-900 rounded font-bold">' . $classification . '</div>'
+                                                '<div class="p-2 bg-blue-100 text-blue-900 rounded font-bold">' . e($category) . ' · ' . e($echelon) . '</div>'
                                             );
                                         }
-                                        return 'Sélectionnez catégorie et échelon';
+                                        return 'Sélectionnez classe et échelon';
                                     }),
                             ]),
 
@@ -113,7 +163,7 @@ class SalaryGridResource extends Resource
 
                                         if ($category && $echelon) {
                                             return new \Illuminate\Support\HtmlString(
-                                                '<div class="p-2 bg-purple-100 text-purple-900 rounded font-bold">Cat. ' . $category . ' / Éch. ' . $echelon . '</div>'
+                                                '<div class="p-2 bg-purple-100 text-purple-900 rounded font-bold">Cat. ' . e($category) . ' / Éch. ' . e($echelon) . '</div>'
                                             );
                                         }
                                         return 'Sélectionnez catégorie et échelon';
@@ -122,15 +172,74 @@ class SalaryGridResource extends Resource
                     ])
                     ->icon('heroicon-o-currency-dollar'),
 
+                Forms\Components\Section::make('Indice')
+                    ->schema([
+                        Forms\Components\TextInput::make('indice')
+                            ->label('Indice')
+                            ->numeric()
+                            ->minValue(0)
+                            ->readOnly(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
+                            ->dehydrated()
+                            ->helperText(fn(Forms\Get $get) => $get('classification_type') === 'numeric'
+                                ? "Calculé automatiquement : indice de la grille officielle des fonctionnaires dont le salaire indiciaire brut est le plus proche du salaire de base saisi ci-dessous."
+                                : 'Repris de la grille officielle du 02/02/2024 — modifiable en cas de révision de la grille'),
+
+                        Forms\Components\Grid::make(3)
+                            ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                            ->schema([
+                                Forms\Components\TextInput::make('salaire_indiciaire_brut')
+                                    ->label('Salaire indiciaire brut (1)')
+                                    ->numeric()
+                                    ->prefix('FCFA')
+                                    ->step(1)
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(fn($state, Forms\Set $set) => $set('base_salary', $state)),
+
+                                Forms\Components\TextInput::make('complement_forfaitaire')
+                                    ->label('Complément forfaitaire (2)')
+                                    ->numeric()
+                                    ->prefix('FCFA')
+                                    ->step(1)
+                                    ->live(onBlur: true),
+
+                                Forms\Components\TextInput::make('indemnite_logement')
+                                    ->label('Indemnité de logement (3)')
+                                    ->numeric()
+                                    ->prefix('FCFA')
+                                    ->step(1)
+                                    ->live(onBlur: true),
+                            ]),
+
+                        Forms\Components\Placeholder::make('total_display')
+                            ->label('Total brut (1) + (2) + (3)')
+                            ->visible(fn(Forms\Get $get) => $get('classification_type') === 'cameroon')
+                            ->content(function (Forms\Get $get) {
+                                $total = (float) $get('salaire_indiciaire_brut')
+                                    + (float) $get('complement_forfaitaire')
+                                    + (float) $get('indemnite_logement');
+
+                                return number_format($total, 0, ',', ' ') . ' FCFA';
+                            }),
+                    ])
+                    ->icon('heroicon-o-hashtag'),
+
                 Forms\Components\Section::make('Salaire de Base')
                     ->schema([
                         Forms\Components\TextInput::make('base_salary')
                             ->label('Salaire de Base')
-                            ->required()
+                            ->required(fn(Forms\Get $get) => $get('classification_type') === 'numeric')
                             ->numeric()
                             ->prefix('FCFA')
-                            ->step(1000)
-                            ->helperText('Montant en FCFA')
+                            ->step(1)
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
+                                if ($get('classification_type') === 'numeric') {
+                                    static::syncNumericIndiceFromSalary($state, $set);
+                                }
+                            })
+                            ->helperText(fn(Forms\Get $get) => $get('classification_type') === 'cameroon'
+                                ? 'Facultatif — repris automatiquement du salaire indiciaire brut de la grille officielle.'
+                                : "Montant en FCFA — l'indice ci-dessus se met à jour automatiquement à la saisie.")
                             ->columnSpanFull(),
                     ])
                     ->icon('heroicon-o-banknotes'),
@@ -173,8 +282,7 @@ class SalaryGridResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->icon('heroicon-o-document-text')
-                    ->collapsible()
-                    ->collapsed(),
+                    ->collapsible(),
             ]);
     }
 
@@ -184,7 +292,8 @@ class SalaryGridResource extends Resource
             ->modifyQueryUsing(
                 fn(Builder $query) => $query
                     ->orderBy('classification_type', 'asc')
-                    ->orderBy('category', 'asc')
+                    ->orderByRaw("CASE WHEN classification_type = 'cameroon' THEN category END ASC")
+                    ->orderBy('indice', 'asc')
                     ->orderBy('echelon', 'asc')
             )
             ->columns([
@@ -215,43 +324,45 @@ class SalaryGridResource extends Resource
 
                 Tables\Columns\TextColumn::make('indice')
                     ->label('Indice')
-                    ->getStateUsing(function (SalaryGrid $record) {
-                        if ($record->classification_type === 'cameroon') {
-                            return "{$record->category}{$record->echelon}";
-                        }
-                        return "C{$record->category}E{$record->echelon}";
-                    })
                     ->badge()
                     ->color('info')
+                    ->sortable()
+                    ->placeholder('—')
                     ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->where(function ($q) use ($search) {
-                            // Recherche par nomenclature camerounaise (A1, B2, etc.)
-                            if (preg_match('/^([A-E])([1-8])$/i', $search, $matches)) {
-                                $q->where('classification_type', 'cameroon')
-                                    ->where('category', strtoupper($matches[1]))
-                                    ->where('echelon', $matches[2]);
-                            }
-                            // Recherche par numérique (C1E2, etc.)
-                            elseif (preg_match('/C?(\d+)[_\-\s]*E?(\d+)/i', $search, $matches)) {
-                                $q->where('classification_type', 'numeric')
-                                    ->where('category', $matches[1])
-                                    ->where('echelon', $matches[2]);
-                            }
-                        });
+                        return is_numeric($search) ? $query->where('indice', (int) $search) : $query;
                     }),
 
                 Tables\Columns\TextColumn::make('base_salary')
                     ->label('Salaire de Base')
                     ->money('XAF')
                     ->sortable()
-                    ->searchable()
                     ->weight('bold')
                     ->size('lg')
                     ->color('success')
+                    ->placeholder('—')
                     ->description(
                         fn(SalaryGrid $record) =>
-                        'Soit ' . number_format($record->base_salary / 1000, 0, ',', ' ') . 'K FCFA'
+                        'Soit ' . number_format(((float) $record->base_salary) / 1000, 0, ',', ' ') . 'K FCFA'
                     ),
+
+                Tables\Columns\TextColumn::make('complement_forfaitaire')
+                    ->label('Compl. forfaitaire')
+                    ->money('XAF')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('indemnite_logement')
+                    ->label('Indemnité logement')
+                    ->money('XAF')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('total_salary')
+                    ->label('Total brut')
+                    ->getStateUsing(fn(SalaryGrid $record) => $record->classification_type === 'cameroon' ? $record->total_salary : null)
+                    ->money('XAF')
+                    ->placeholder('—')
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('effective_date')
                     ->label('Date Application')
@@ -288,7 +399,6 @@ class SalaryGridResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                // ✅ FILTRE SIMPLE PAR TYPE
                 Tables\Filters\SelectFilter::make('classification_type')
                     ->label('Type de Classification')
                     ->options([
@@ -296,23 +406,23 @@ class SalaryGridResource extends Resource
                         'numeric' => '🔢 Classification Numérique',
                     ]),
 
-                // ✅ FILTRE SIMPLE PAR CATÉGORIE (tous les types)
+                // L'opérateur + préserve les clés (array_merge les renuméroterait : "1" deviendrait "0").
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Catégorie')
                     ->options(function () {
-                        $cameroon = \App\Enums\EmployeeClassification::getCategoryOptions();
-                        $numeric = array_combine(range(1, 12), range(1, 12));
-                        return array_merge($cameroon, $numeric);
+                        return CameroonCivilServiceGrid::categoryOptions()
+                            + array_combine(range(1, 12), range(1, 12));
                     })
                     ->searchable(),
 
-                // ✅ FILTRE SIMPLE PAR ÉCHELON
                 Tables\Filters\SelectFilter::make('echelon')
                     ->label('Échelon')
-                    ->options(array_combine(range(1, 12), range(1, 12)))
+                    ->options(function () {
+                        return CameroonCivilServiceGrid::allEchelonOptions()
+                            + array_combine(range(1, 12), range(1, 12));
+                    })
                     ->searchable(),
 
-                // ✅ FILTRE STATUT
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Statut')
                     ->placeholder('Tous')

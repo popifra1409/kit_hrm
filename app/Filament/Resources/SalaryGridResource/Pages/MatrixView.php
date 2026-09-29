@@ -4,7 +4,7 @@ namespace App\Filament\Resources\SalaryGridResource\Pages;
 
 use App\Filament\Resources\SalaryGridResource;
 use App\Models\SalaryGrid;
-use App\Enums\EmployeeClassification;
+use App\Support\CameroonCivilServiceGrid;
 use Filament\Actions;
 use Filament\Resources\Pages\Page;
 
@@ -34,7 +34,7 @@ class MatrixView extends Page
 
     public function getViewData(): array
     {
-        // ✅ GRILLES CAMEROUNAISES (A1, A2, B1, etc.)
+        // ✅ GRILLES CAMEROUNAISES (D, C, B1, B2, A1, A2)
         $cameroonGrids = SalaryGrid::where('classification_type', 'cameroon')
             ->where('is_active', true)
             ->orderBy('category')
@@ -53,8 +53,10 @@ class MatrixView extends Page
         return [
             'cameroonGrids' => $cameroonGrids,
             'numericGrids' => $numericGrids,
-            'cameroonCategories' => array_keys(EmployeeClassification::getCategoryOptions()),
-            'cameroonEchelons' => array_keys(EmployeeClassification::getEchelonOptions()),
+            'cameroonCategories' => array_keys(CameroonCivilServiceGrid::categoryOptions()),
+            // Union de tous les échelons (H.ECH n'existe que pour A2 — sa colonne
+            // affichera "-" pour les autres classes, ce qui est normal).
+            'cameroonEchelons' => array_keys(CameroonCivilServiceGrid::allEchelonOptions()),
             'numericCategories' => range(1, 12),
             'numericEchelons' => range(1, 12),
         ];
