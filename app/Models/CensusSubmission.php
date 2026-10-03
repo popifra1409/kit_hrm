@@ -174,12 +174,14 @@ class CensusSubmission extends Model
         'email',
         'address',
         'city',
-        // Dans payload['organizational'] — jamais appliqués, déclaratif uniquement
+        // Dans payload['organizational']
+        // — declared_department/declared_service : jamais appliqués (déclaratif)
+        // — les 5 suivants : appliqués réellement à la validation finale
         'declared_department',
         'declared_service',
-        'declared_job_title',
-        'declared_trade_body',
-        'declared_qualification',
+        'declared_job_title_id',
+        'declared_trade_body_id',
+        'declared_qualification_id',
         'declared_personnel_type',
         'declared_administrative_status',
     ];

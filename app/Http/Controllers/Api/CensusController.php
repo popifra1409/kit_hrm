@@ -109,17 +109,39 @@ class CensusController extends Controller
                         ->map(fn($row) => ['category' => $row->category, 'echelon' => $row->echelon, 'indice' => $row->indice]),
                 ],
 
-                // Valeurs ACTUELLES données à titre de référence — l'employé déclare ce
-                // qu'il croit exact, les RH vérifient contre les archives et corrigent
-                // manuellement si besoin. Jamais appliqué automatiquement.
+                // "current_department"/"current_service" : affichés à titre indicatif
+                // uniquement, jamais appliqués (structure d'affectation pas encore
+                // convertie en liste déroulante — à faire évoluer plus tard si besoin).
+                //
+                // Les 5 champs suivants (trade_body, qualification, job_title,
+                // personnel_type, administrative_status) sont en revanche appliqués
+                // réellement à la validation finale — voir "classification_options"
+                // ci-dessous pour les listes de choix correspondantes.
                 'organizational' => [
                     'current_department' => $employee->department?->name ?? $employee->currentService?->department?->name ?? null,
                     'current_service' => $employee->currentService?->name ?? $employee->service?->name,
-                    'current_job_title' => $employee->jobTitle?->name,
-                    'current_trade_body' => $employee->tradeBody?->name,
-                    'current_qualification' => $employee->qualification?->name,
+                    'current_job_title_id' => $employee->job_title_id,
+                    'current_trade_body_id' => $employee->trade_body_id,
+                    'current_qualification_id' => $employee->qualification_id,
                     'current_personnel_type' => $employee->personnel_type,
-                    'current_administrative_status' => $employee->administrative_status_label,
+                    'current_administrative_status' => $employee->administrative_status,
+                ],
+
+                'classification_options' => [
+                    'trade_bodies' => \App\Models\TradeBody::orderBy('name')->get(['id', 'name']),
+                    'qualifications' => \App\Models\Qualification::orderBy('name')->get(['id', 'name']),
+                    'job_titles' => \App\Models\JobTitle::orderBy('name')->get(['id', 'name']),
+                    'personnel_types' => [
+                        ['value' => 'soignant', 'label' => 'Soignant'],
+                        ['value' => 'non_soignant', 'label' => 'Non Soignant'],
+                        ['value' => 'paramedical', 'label' => 'Paramédical'],
+                        ['value' => 'autres', 'label' => 'Autres'],
+                    ],
+                    'administrative_statuses' => [
+                        ['value' => 'fonctionnaire_affecte', 'label' => 'Fonctionnaire Affecté'],
+                        ['value' => 'fonctionnaire_detache', 'label' => 'Fonctionnaire Détaché'],
+                        ['value' => 'contractuel_structure', 'label' => 'Contractuel de la Structure'],
+                    ],
                 ],
                 'dependents' => $employee->dependents->map(fn($d) => [
                     'id' => $d->id,
@@ -178,7 +200,7 @@ class CensusController extends Controller
             'personal.last_name' => ['nullable', 'string', 'max:255'],
             'personal.gender' => ['nullable', 'in:M,F'],
             'personal.birth_date' => ['nullable', 'date'],
-            'personal.marital_status' => ['nullable', 'string', 'max:255'],
+            'personal.marital_status' => ['nullable', 'in:single,married,divorced,widowed'],
             'personal.children_under_6' => ['nullable', 'integer', 'min:0'],
             'personal.total_children' => ['nullable', 'integer', 'min:0'],
             'personal.id_card_number' => ['nullable', 'string', 'max:255'],
@@ -194,16 +216,18 @@ class CensusController extends Controller
 
             'photo' => ['nullable', 'image', 'max:4096'],
 
-            // Déclaratif uniquement — jamais appliqué automatiquement avant le
-            // contrôle final de l'administrateur (voir CensusValidationService)
             'organizational' => ['nullable', 'array'],
+            // Département/service : toujours déclaratif, texte libre, jamais appliqué.
             'organizational.declared_department' => ['nullable', 'string', 'max:255'],
             'organizational.declared_service' => ['nullable', 'string', 'max:255'],
-            'organizational.declared_job_title' => ['nullable', 'string', 'max:255'],
-            'organizational.declared_trade_body' => ['nullable', 'string', 'max:255'],
-            'organizational.declared_qualification' => ['nullable', 'string', 'max:255'],
-            'organizational.declared_personnel_type' => ['nullable', 'string', 'max:255'],
-            'organizational.declared_administrative_status' => ['nullable', 'string', 'max:255'],
+            // Les 5 champs suivants sont désormais appliqués réellement à la validation
+            // finale (voir CensusValidationService) — validés par ID/valeur fermée pour
+            // garantir une correspondance correcte avec les vraies tables.
+            'organizational.declared_job_title_id' => ['nullable', 'integer', 'exists:job_titles,id'],
+            'organizational.declared_trade_body_id' => ['nullable', 'integer', 'exists:trade_bodies,id'],
+            'organizational.declared_qualification_id' => ['nullable', 'integer', 'exists:qualifications,id'],
+            'organizational.declared_personnel_type' => ['nullable', 'in:soignant,non_soignant,paramedical,autres'],
+            'organizational.declared_administrative_status' => ['nullable', 'in:fonctionnaire_affecte,fonctionnaire_detache,contractuel_structure'],
 
             'dependents' => ['array'],
             'dependents.*.existing_id' => ['nullable', 'integer'],

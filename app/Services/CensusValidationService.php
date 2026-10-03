@@ -63,10 +63,11 @@ class CensusValidationService
     /**
      * Validation finale : applique réellement les informations personnelles
      * (dont catégorie/échelon/indice et matricule fonction publique), bancaires/
-     * CNPS, la photo, les ayants droit et les diplômes. Les informations
-     * organisationnelles déclarées (département/service/poste/corps de métier/
-     * qualification/statut) restent volontairement non appliquées — toujours
-     * affichées pour vérification manuelle par les RH contre les archives.
+     * CNPS, la photo, les ayants droit, les diplômes, ainsi que corps de métier/
+     * qualification/poste/type de personnel/statut administratif. Seuls
+     * département et service restent volontairement déclaratifs — toujours
+     * affichés pour vérification manuelle par les RH contre les archives (leur
+     * structure d'affectation n'est pas encore convertie en liste déroulante).
      */
     public function apply(CensusSubmission $submission, int $validatorId): void
     {
@@ -111,6 +112,27 @@ class CensusValidationService
 
             if (!empty($payload['photo_path'])) {
                 $employee->photo = $payload['photo_path'];
+            }
+
+            // Corps de métier / Qualification / Poste / Type de personnel / Statut
+            // administratif : désormais appliqués réellement (contrairement à
+            // département/service, qui restent purement déclaratifs pour l'instant).
+            $organizational = $payload['organizational'] ?? [];
+
+            if (!empty($organizational['declared_trade_body_id'])) {
+                $employee->trade_body_id = $organizational['declared_trade_body_id'];
+            }
+            if (!empty($organizational['declared_qualification_id'])) {
+                $employee->qualification_id = $organizational['declared_qualification_id'];
+            }
+            if (!empty($organizational['declared_job_title_id'])) {
+                $employee->job_title_id = $organizational['declared_job_title_id'];
+            }
+            if (!empty($organizational['declared_personnel_type'])) {
+                $employee->personnel_type = $organizational['declared_personnel_type'];
+            }
+            if (!empty($organizational['declared_administrative_status'])) {
+                $employee->administrative_status = $organizational['declared_administrative_status'];
             }
 
             $employee->save();
