@@ -5,34 +5,117 @@ namespace App\Services;
 use App\Models\CensusSubmission;
 use App\Models\Dependent;
 use App\Models\EmployeeDiploma;
+use App\Models\SalaryGrid;
 use Illuminate\Support\Facades\DB;
 
 class CensusValidationService
 {
+    // ========================================
+    // ÉTAPE 1 — CARRIÈRE
+    // ========================================
+
+    public function validateCareer(CensusSubmission $submission, int $validatorId): void
+    {
+        $submission->update([
+            'status' => CensusSubmission::STATUS_CAREER_VALIDATED,
+            'career_validated_by' => $validatorId,
+            'career_validated_at' => now(),
+        ]);
+    }
+
+    public function rejectCareer(CensusSubmission $submission, int $validatorId, string $reason): void
+    {
+        $submission->update([
+            'status' => CensusSubmission::STATUS_CAREER_REJECTED,
+            'career_validated_by' => $validatorId,
+            'career_validated_at' => now(),
+            'career_rejection_reason' => $reason,
+        ]);
+    }
+
+    // ========================================
+    // ÉTAPE 2 — SOLDE
+    // ========================================
+
+    public function validateSolde(CensusSubmission $submission, int $validatorId): void
+    {
+        $submission->update([
+            'status' => CensusSubmission::STATUS_SOLDE_VALIDATED,
+            'solde_validated_by' => $validatorId,
+            'solde_validated_at' => now(),
+        ]);
+    }
+
+    public function rejectSolde(CensusSubmission $submission, int $validatorId, string $reason): void
+    {
+        $submission->update([
+            'status' => CensusSubmission::STATUS_SOLDE_REJECTED,
+            'solde_validated_by' => $validatorId,
+            'solde_validated_at' => now(),
+            'solde_rejection_reason' => $reason,
+        ]);
+    }
+
+    // ========================================
+    // ÉTAPE 3 — CONTRÔLE FINAL ADMINISTRATEUR
+    // ========================================
+
+    /**
+     * Validation finale : applique réellement les informations personnelles
+     * (dont catégorie/échelon/indice et matricule fonction publique), bancaires/
+     * CNPS, la photo, les ayants droit et les diplômes. Les informations
+     * organisationnelles déclarées (département/service/poste/corps de métier/
+     * qualification/statut) restent volontairement non appliquées — toujours
+     * affichées pour vérification manuelle par les RH contre les archives.
+     */
     public function apply(CensusSubmission $submission, int $validatorId): void
     {
         DB::transaction(function () use ($submission, $validatorId) {
             $employee = $submission->employee;
             $payload = $submission->payload;
-
-            // 1. Informations personnelles + banque + CNPS (appliquées directement)
-            // NB: les infos d'affectation/poste proposées ($payload['professional']) ne
-            // sont JAMAIS appliquées automatiquement ici — elles restent uniquement dans
-            // le payload pour que les RH les vérifient manuellement dans les archives
-            // avant de mettre à jour eux-mêmes la fiche employé si besoin.
             $personal = $payload['personal'] ?? [];
-            $employee->fill([
-                'phone' => $personal['phone'] ?? $employee->phone,
-                'email' => $personal['email'] ?? $employee->email,
-                'address' => $personal['address'] ?? $employee->address,
-                'city' => $personal['city'] ?? $employee->city,
-                'bank_name' => $personal['bank_name'] ?? $employee->bank_name,
-                'bank_account_number' => $personal['bank_account_number'] ?? $employee->bank_account_number,
-                'cnps_number' => $personal['cnps_number'] ?? $employee->cnps_number,
-            ]);
+
+            $employee->fill(array_filter([
+                'matricule_fonction_publique' => $personal['matricule_fonction_publique'] ?? null,
+                'first_name' => $personal['first_name'] ?? null,
+                'last_name' => $personal['last_name'] ?? null,
+                'gender' => $personal['gender'] ?? null,
+                'birth_date' => $personal['birth_date'] ?? null,
+                'marital_status' => $personal['marital_status'] ?? null,
+                'children_under_6' => $personal['children_under_6'] ?? null,
+                'total_children' => $personal['total_children'] ?? null,
+                'id_card_number' => $personal['id_card_number'] ?? null,
+                'recruitment_date' => $personal['recruitment_date'] ?? null,
+                'service_start_date' => $personal['service_start_date'] ?? null,
+                'phone' => $personal['phone'] ?? null,
+                'email' => $personal['email'] ?? null,
+                'address' => $personal['address'] ?? null,
+                'city' => $personal['city'] ?? null,
+                'bank_name' => $personal['bank_name'] ?? null,
+                'bank_account_number' => $personal['bank_account_number'] ?? null,
+                'cnps_number' => $personal['cnps_number'] ?? null,
+            ], fn($v) => $v !== null));
+
+            // Catégorie/échelon/indice : recalculés à CE moment précis (pas de simple
+            // recopie de la valeur soumise), au cas où la grille salariale aurait changé
+            // entre la soumission de l'employé et la validation finale.
+            if (!empty($personal['category_number']) && !empty($personal['echelon_number'])) {
+                $employee->category_number = $personal['category_number'];
+                $employee->echelon_number = $personal['echelon_number'];
+                $employee->indice = SalaryGrid::lookupIndice(
+                    $employee->classification_type,
+                    $personal['category_number'],
+                    $personal['echelon_number']
+                );
+            }
+
+            if (!empty($payload['photo_path'])) {
+                $employee->photo = $payload['photo_path'];
+            }
+
             $employee->save();
 
-            // 2. Ayants droit
+            // Ayants droit
             foreach ($payload['dependents'] ?? [] as $item) {
                 $documents = $item['documents'] ?? [];
 
@@ -72,7 +155,7 @@ class CensusValidationService
                 Dependent::create($data);
             }
 
-            // 3. Diplômes & formations
+            // Diplômes & formations
             foreach ($payload['diplomas'] ?? [] as $item) {
                 $data = [
                     'employee_id' => $employee->id,
@@ -106,11 +189,21 @@ class CensusValidationService
             }
 
             $submission->update([
-                'status' => 'validated',
+                'status' => CensusSubmission::STATUS_VALIDATED,
                 'validated_by' => $validatorId,
                 'validated_at' => now(),
             ]);
         });
+    }
+
+    public function reject(CensusSubmission $submission, int $validatorId, string $reason): void
+    {
+        $submission->update([
+            'status' => CensusSubmission::STATUS_REJECTED,
+            'validated_by' => $validatorId,
+            'validated_at' => now(),
+            'rejection_reason' => $reason,
+        ]);
     }
 
     public function getUnaddressedDependents(CensusSubmission $submission): \Illuminate\Support\Collection

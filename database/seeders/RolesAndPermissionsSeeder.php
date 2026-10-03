@@ -206,6 +206,12 @@ class RolesAndPermissionsSeeder extends Seeder
             // === PARAMÉTRAGE CONGÉS & RECHERCHE DE PROFILS ===
             ['name' => 'manage_leave_settings', 'module' => 'leaves', 'description' => 'Modifier les règles de calcul des congés (jours de base, bonus, seuils)'],
             ['name' => 'search_employee_profiles', 'module' => 'employees', 'description' => 'Rechercher des profils professionnels (redéploiement)'],
+
+            ['name' => 'validate_census_career', 'module' => 'census', 'description' => 'Valider les informations de carrière d\'un recensement (étape 1/3)'],
+            ['name' => 'reject_census_career', 'module' => 'census', 'description' => 'Rejeter les informations de carrière d\'un recensement (étape 1/3)'],
+            ['name' => 'validate_census_solde', 'module' => 'census', 'description' => 'Valider les informations de solde d\'un recensement (étape 2/3)'],
+            ['name' => 'reject_census_solde', 'module' => 'census', 'description' => 'Rejeter les informations de solde d\'un recensement (étape 2/3)'],
+
         ];
 
         foreach ($permissions as $permissionData) {

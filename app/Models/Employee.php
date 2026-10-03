@@ -41,6 +41,7 @@ class Employee extends Model
         'contract_number',
         'bank_account_number',
         'bank_name',
+        'cnps_number',
         'phone',
         'email',
         'address',

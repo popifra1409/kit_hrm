@@ -11,12 +11,17 @@ use Filament\Forms\Components\Tabs;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
+use Filament\Actions;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
 use Filament\Notifications\Notification;
 use App\Models\SystemSetting;
+use App\Models\Employee;
+use App\Models\User;
 
-class HospitalSettings extends Page implements HasForms
+class HospitalSettings extends Page implements HasForms, HasActions
 {
-    use InteractsWithForms;
+    use InteractsWithForms, InteractsWithActions;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
     protected static ?string $navigationLabel = 'Configuration Hôpital';
@@ -53,7 +58,11 @@ class HospitalSettings extends Page implements HasForms
             'hospital_cnps_number' => SystemSetting::get('hospital_cnps_number'),
 
             // Images - décoder le JSON si nécessaire
+            // Comptes utilisateurs
+            'default_temporary_password' => SystemSetting::get('default_temporary_password', 'Hgy@2026!'),
+
             'hospital_logo' => $this->decodeIfJson(SystemSetting::get('hospital_logo')),
+            'hospital_favicon' => $this->decodeIfJson(SystemSetting::get('hospital_favicon')),
             'hospital_stamp' => $this->decodeIfJson(SystemSetting::get('hospital_stamp')),
             'hospital_header_image' => $this->decodeIfJson(SystemSetting::get('hospital_header_image')),
         ]);
@@ -195,6 +204,24 @@ class HospitalSettings extends Page implements HasForms
                                     ->columns(3),
                             ]),
 
+                        Tabs\Tab::make('Comptes Utilisateurs')
+                            ->icon('heroicon-o-user-group')
+                            ->schema([
+                                Section::make('Mot de Passe Temporaire par Défaut')
+                                    ->description("Utilisé lors de la création en masse des comptes employés (bouton en haut de page). Chaque employé devra ensuite l'utiliser, avec son matricule, pour activer son compte et choisir son propre mot de passe définitif.")
+                                    ->schema([
+                                        TextInput::make('default_temporary_password')
+                                            ->label('Mot de passe temporaire par défaut')
+                                            ->required()
+                                            ->minLength(8)
+                                            ->password()
+                                            ->revealable()
+                                            ->maxLength(255)
+                                            ->helperText('Minimum 8 caractères. Communiquez-le aux employés avec leur matricule pour la première connexion.')
+                                            ->columnSpanFull(),
+                                    ]),
+                            ]),
+
                         Tabs\Tab::make('Images et Logos')
                             ->icon('heroicon-o-photo')
                             ->schema([
@@ -203,41 +230,55 @@ class HospitalSettings extends Page implements HasForms
                                         FileUpload::make('hospital_logo')
                                             ->label('Logo de la structure')
                                             ->image()
+                                            ->disk('public')
+                                            ->visibility('public')
                                             ->directory('hospital')
                                             ->imageEditor()
                                             ->maxSize(2048)
                                             ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/svg+xml'])
-                                            ->helperText('Logo principal (format PNG transparent recommandé, max 2MB)')
+                                            ->openable()
+                                            ->downloadable()
+                                            ->helperText('Logo principal (format PNG transparent recommandé, max 2MB). Cliquez sur la vignette pour remplacer ou retirer l\'image.')
                                             ->columnSpanFull(),
 
                                         FileUpload::make('hospital_favicon')
                                             ->label('Icône de la structure')
                                             ->image()
-                                            ->directory('hopital')
+                                            ->disk('public')
+                                            ->visibility('public')
+                                            ->directory('hospital')
                                             ->maxSize(512)
-                                            ->default(fn() => \App\Models\SystemSetting::get('hospital_favicon'))
-                                            ->afterStateUpdated(fn($state) => \App\Models\SystemSetting::set('hospital_favicon', $state, 'identity', 'text'))
-                                            ->dehydrated(false)
-                                            ->helperText('Icône dans l\'onglet du navigateur (32x32px)'),
+                                            ->openable()
+                                            ->downloadable()
+                                            ->helperText('Icône dans l\'onglet du navigateur (32x32px)')
+                                            ->columnSpanFull(),
 
                                         FileUpload::make('hospital_stamp')
                                             ->label('Cachet Officiel')
                                             ->image()
+                                            ->disk('public')
+                                            ->visibility('public')
                                             ->directory('hospital')
                                             ->imageEditor()
                                             ->maxSize(2048)
                                             ->acceptedFileTypes(['image/png', 'image/jpeg'])
-                                            ->helperText('Cachet pour les documents officiels (PNG transparent recommandé)')
+                                            ->openable()
+                                            ->downloadable()
+                                            ->helperText('Cachet pour les documents officiels (PNG transparent recommandé). Cliquez sur la vignette pour remplacer ou retirer l\'image.')
                                             ->columnSpanFull(),
 
                                         FileUpload::make('hospital_header_image')
                                             ->label('Image d\'En-tête Documents')
                                             ->image()
+                                            ->disk('public')
+                                            ->visibility('public')
                                             ->directory('hospital')
                                             ->imageEditor()
                                             ->maxSize(2048)
                                             ->acceptedFileTypes(['image/png', 'image/jpeg'])
-                                            ->helperText('En-tête pour les documents PDF (recommandé: 1200x200px)')
+                                            ->openable()
+                                            ->downloadable()
+                                            ->helperText('En-tête pour les documents PDF (recommandé: 1200x200px). Cliquez sur la vignette pour remplacer ou retirer l\'image.')
                                             ->columnSpanFull(),
                                     ]),
                             ]),
@@ -282,7 +323,7 @@ class HospitalSettings extends Page implements HasForms
 
     protected function getFieldType($key): string
     {
-        if (in_array($key, ['hospital_logo', 'hospital_stamp', 'hospital_header_image'])) {
+        if (in_array($key, ['hospital_logo', 'hospital_favicon', 'hospital_stamp', 'hospital_header_image'])) {
             return 'file';
         }
 
@@ -296,6 +337,101 @@ class HospitalSettings extends Page implements HasForms
                 ->label('Enregistrer la Configuration')
                 ->submit('save')
                 ->color('success'),
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('bulk_create_accounts')
+                ->label('Créer les comptes employés manquants')
+                ->icon('heroicon-o-user-plus')
+                ->color('warning')
+                ->visible(fn() => auth()->user()?->can('create_users') ?? false)
+                ->requiresConfirmation()
+                ->modalHeading('Créer les comptes utilisateurs manquants')
+                ->modalDescription(function () {
+                    $count = Employee::where('is_active', true)->whereDoesntHave('user')->count();
+                    return "Un compte sera créé pour chacun des {$count} employé(s) actif(s) n'en ayant pas encore, avec le mot de passe temporaire défini dans l'onglet « Comptes Utilisateurs » (pensez à l'enregistrer avant de lancer cette action si vous venez de le modifier). Chaque employé devra ensuite l'activer avec son matricule.";
+                })
+                ->modalSubmitActionLabel('Créer les comptes')
+                ->action(function () {
+                    // Cette action peut traiter plusieurs centaines d'employés ; on retire
+                    // la limite de temps par défaut (30s) par sécurité.
+                    set_time_limit(300);
+
+                    $defaultPassword = SystemSetting::get('default_temporary_password');
+
+                    if (!$defaultPassword || strlen($defaultPassword) < 8) {
+                        Notification::make()
+                            ->title('Mot de passe temporaire manquant ou trop court')
+                            ->body('Renseignez et enregistrez un mot de passe temporaire par défaut (8 caractères minimum) dans l\'onglet « Comptes Utilisateurs » avant de lancer cette action.')
+                            ->danger()
+                            ->send();
+                        return;
+                    }
+
+                    // ⚠️ Point critique de performance : bcrypt est volontairement lent
+                    // (~100-300ms par hachage). Avec des centaines d'employés, le hacher
+                    // une fois par utilisateur dans la boucle dépasse largement les 30
+                    // secondes d'exécution PHP par défaut. On le hache UNE SEULE FOIS ici,
+                    // puis on réutilise le même hash pour tous : le cast 'hashed' du modèle
+                    // User détecte qu'une valeur déjà hachée n'a pas besoin de l'être à
+                    // nouveau (Hash::needsRehash() renvoie false), donc rien n'est cassé.
+                    $hashedPassword = \Illuminate\Support\Facades\Hash::make($defaultPassword);
+
+                    $created = 0;
+                    $skippedNoMatricule = 0;
+                    $failed = 0;
+                    $firstError = null;
+
+                    Employee::where('is_active', true)
+                        ->whereDoesntHave('user')
+                        ->chunkById(100, function ($employees) use ($hashedPassword, &$created, &$skippedNoMatricule, &$failed, &$firstError) {
+                            foreach ($employees as $employee) {
+                                if (!$employee->matricule) {
+                                    $skippedNoMatricule++;
+                                    continue;
+                                }
+
+                                try {
+                                    $user = User::create([
+                                        'employee_id' => $employee->id,
+                                        'name' => $employee->full_name,
+                                        'email' => $employee->email,
+                                        'password' => $hashedPassword,
+                                        'activated_at' => null,
+                                    ]);
+
+                                    $user->assignRole('employee');
+                                    $created++;
+                                } catch (\Throwable $e) {
+                                    $failed++;
+                                    \Illuminate\Support\Facades\Log::error('Échec création compte employé (recensement en masse)', [
+                                        'employee_id' => $employee->id,
+                                        'matricule' => $employee->matricule,
+                                        'error' => $e->getMessage(),
+                                    ]);
+                                    $firstError ??= $e->getMessage();
+                                }
+                            }
+                        });
+
+                    $body = "{$created} compte(s) créé(s).";
+                    if ($skippedNoMatricule > 0) {
+                        $body .= " {$skippedNoMatricule} employé(s) ignoré(s) (matricule manquant).";
+                    }
+                    if ($failed > 0) {
+                        $body .= " {$failed} échec(s). Première erreur : {$firstError}";
+                    }
+
+                    Notification::make()
+                        ->title('Création des comptes terminée')
+                        ->body($body)
+                        ->color($failed > 0 ? 'warning' : 'success')
+                        ->persistent()
+                        ->send();
+                }),
         ];
     }
 }
