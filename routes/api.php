@@ -20,7 +20,12 @@ Route::get('/app-info', [AppInfoController::class, 'show']);
 // AUTHENTIFICATION MOBILE (publique)
 // ========================================
 Route::prefix('auth')->group(function () {
-    Route::post('/activate', [AuthController::class, 'activate']);
+    // Activation en deux étapes : (1) identifiants + nouveau mot de passe,
+    // (2) date de recrutement + petit calcul. Limitées par IP en plus du
+    // blocage par compte géré dans AuthController.
+    Route::post('/activate', [AuthController::class, 'activate'])->middleware('throttle:10,1');
+    Route::post('/activate/captcha', [AuthController::class, 'refreshActivationCaptcha'])->middleware('throttle:20,1');
+    Route::post('/activate/verify', [AuthController::class, 'verifyActivation'])->middleware('throttle:10,1');
     Route::post('/login', [AuthController::class, 'login']); // matricule + password
 });
 

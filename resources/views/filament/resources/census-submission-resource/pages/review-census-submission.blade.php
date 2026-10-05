@@ -56,7 +56,7 @@
                 <div class="space-y-2 mb-4">
                     @foreach($newDependents as $item)
                         <div class="p-3 rounded-lg bg-success-50 dark:bg-success-900/20 text-sm">
-                            <strong>{{ $item['first_name'] ?? '' }} {{ $item['last_name'] }}</strong> — {{ $item['relationship'] }}, né(e) le {{ $item['birth_date'] }}
+                            <strong>{{ $item['last_name'] }} {{ $item['first_name'] ?? '' }}</strong> — {{ $item['relationship'] }}, né(e) le {{ \Illuminate\Support\Carbon::parse($item['birth_date'])->format('d-m-Y') }}
                         </div>
                     @endforeach
                 </div>

@@ -7,6 +7,7 @@ use App\Models\CensusCampaign;
 use App\Models\CensusSubmission;
 use App\Models\SalaryGrid;
 use App\Support\CameroonCivilServiceGrid;
+use App\Support\OrganizationalAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -109,40 +110,18 @@ class CensusController extends Controller
                         ->map(fn($row) => ['category' => $row->category, 'echelon' => $row->echelon, 'indice' => $row->indice]),
                 ],
 
-                // "current_department"/"current_service" : affichés à titre indicatif
-                // uniquement, jamais appliqués (structure d'affectation pas encore
-                // convertie en liste déroulante — à faire évoluer plus tard si besoin).
-                //
-                // Les 5 champs suivants (trade_body, qualification, job_title,
-                // personnel_type, administrative_status) sont en revanche appliqués
-                // réellement à la validation finale — voir "classification_options"
-                // ci-dessous pour les listes de choix correspondantes.
-                'organizational' => [
-                    'current_department' => $employee->department?->name ?? $employee->currentService?->department?->name ?? null,
-                    'current_service' => $employee->currentService?->name ?? $employee->service?->name,
-                    'current_job_title_id' => $employee->job_title_id,
-                    'current_trade_body_id' => $employee->trade_body_id,
-                    'current_qualification_id' => $employee->qualification_id,
-                    'current_personnel_type' => $employee->personnel_type,
-                    'current_administrative_status' => $employee->administrative_status,
-                ],
+                // Affectation ACTUELLE de l'employé (pré-remplissage des menus en cascade) :
+                // branche, direction, département OU sous-direction, service, secteur,
+                // corps de métier, qualification, poste, type de personnel, statut.
+                // Tout ceci est appliqué réellement à la validation finale ; seuls
+                // département/service/secteur sont stockés sur l'employé, la direction
+                // et la sous-direction se déduisent du service.
+                'organizational' => OrganizationalAssignment::currentFor($employee),
 
-                'classification_options' => [
-                    'trade_bodies' => \App\Models\TradeBody::orderBy('name')->get(['id', 'name']),
-                    'qualifications' => \App\Models\Qualification::orderBy('name')->get(['id', 'name']),
-                    'job_titles' => \App\Models\JobTitle::orderBy('name')->get(['id', 'name']),
-                    'personnel_types' => [
-                        ['value' => 'soignant', 'label' => 'Soignant'],
-                        ['value' => 'non_soignant', 'label' => 'Non Soignant'],
-                        ['value' => 'paramedical', 'label' => 'Paramédical'],
-                        ['value' => 'autres', 'label' => 'Autres'],
-                    ],
-                    'administrative_statuses' => [
-                        ['value' => 'fonctionnaire_affecte', 'label' => 'Fonctionnaire Affecté'],
-                        ['value' => 'fonctionnaire_detache', 'label' => 'Fonctionnaire Détaché'],
-                        ['value' => 'contractuel_structure', 'label' => 'Contractuel de la Structure'],
-                    ],
-                ],
+                // Listes à plat avec l'identifiant du parent : le web et le mobile
+                // filtrent localement la cascade, sans appel serveur à chaque choix.
+                'organization_options' => OrganizationalAssignment::options(),
+
                 'dependents' => $employee->dependents->map(fn($d) => [
                     'id' => $d->id,
                     'relationship' => $d->relationship,
@@ -216,13 +195,16 @@ class CensusController extends Controller
 
             'photo' => ['nullable', 'image', 'max:4096'],
 
+            // Affectation organisationnelle : appliquée réellement à la validation finale
+            // (voir CensusValidationService). Validée par identifiant/valeur fermée, puis
+            // contrôlée dans sa cohérence d'ensemble plus bas.
             'organizational' => ['nullable', 'array'],
-            // Département/service : toujours déclaratif, texte libre, jamais appliqué.
-            'organizational.declared_department' => ['nullable', 'string', 'max:255'],
-            'organizational.declared_service' => ['nullable', 'string', 'max:255'],
-            // Les 5 champs suivants sont désormais appliqués réellement à la validation
-            // finale (voir CensusValidationService) — validés par ID/valeur fermée pour
-            // garantir une correspondance correcte avec les vraies tables.
+            'organizational.declared_branch_type' => ['nullable', 'in:medical,administrative'],
+            'organizational.declared_direction_id' => ['nullable', 'integer', 'exists:directions,id'],
+            'organizational.declared_department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'organizational.declared_sub_direction_id' => ['nullable', 'integer', 'exists:sub_directions,id'],
+            'organizational.declared_service_id' => ['nullable', 'integer', 'exists:services,id'],
+            'organizational.declared_sector_id' => ['nullable', 'integer', 'exists:sectors,id'],
             'organizational.declared_job_title_id' => ['nullable', 'integer', 'exists:job_titles,id'],
             'organizational.declared_trade_body_id' => ['nullable', 'integer', 'exists:trade_bodies,id'],
             'organizational.declared_qualification_id' => ['nullable', 'integer', 'exists:qualifications,id'],
@@ -254,6 +236,18 @@ class CensusController extends Controller
         }
 
         $data = $validator->validated();
+
+        // Le serveur ne se fie jamais aux listes déroulantes du client : la chaîne
+        // choisie (service ∈ département/sous-direction, secteur ∈ service,
+        // qualification ∈ corps de métier…) doit être cohérente.
+        $chainError = OrganizationalAssignment::validate($data['organizational'] ?? []);
+
+        if ($chainError) {
+            return response()->json([
+                'message' => $chainError,
+                'errors' => ['organizational' => [$chainError]],
+            ], 422);
+        }
         unset($data['photo']); // traité séparément ci-dessous, pas stocké tel quel dans le payload
 
         if ($request->hasFile('photo')) {

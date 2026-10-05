@@ -150,7 +150,7 @@ class CensusSubmission extends Model
     //
     // Structure du payload (inchangée dans sa forme, enrichie en contenu) :
     //   payload['personal']      → champs ci-dessous marqués (P), dont bank/cnps = Solde
-    //   payload['organizational']→ tous les champs "declared_*"  = Carrière (jamais appliqués)
+    //   payload['organizational']→ tous les champs "declared_*"  = Carrière (appliqués à la validation finale)
     //   payload['photo_path']    → photo de profil, appliquée à la validation finale
     //   payload['dependents'], payload['diplomas'] → toujours Carrière
 
@@ -174,14 +174,16 @@ class CensusSubmission extends Model
         'email',
         'address',
         'city',
-        // Dans payload['organizational']
-        // — declared_department/declared_service : jamais appliqués (déclaratif)
-        // — les 5 suivants : appliqués réellement à la validation finale
-        'declared_department',
-        'declared_service',
-        'declared_job_title_id',
+        // Dans payload['organizational'] — tous appliqués à la validation finale
+        'declared_branch_type',
+        'declared_direction_id',
+        'declared_department_id',
+        'declared_sub_direction_id',
+        'declared_service_id',
+        'declared_sector_id',
         'declared_trade_body_id',
         'declared_qualification_id',
+        'declared_job_title_id',
         'declared_personnel_type',
         'declared_administrative_status',
     ];

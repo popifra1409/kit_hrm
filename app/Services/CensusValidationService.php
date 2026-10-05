@@ -6,6 +6,7 @@ use App\Models\CensusSubmission;
 use App\Models\Dependent;
 use App\Models\EmployeeDiploma;
 use App\Models\SalaryGrid;
+use App\Support\OrganizationalAssignment;
 use Illuminate\Support\Facades\DB;
 
 class CensusValidationService
@@ -64,10 +65,10 @@ class CensusValidationService
      * Validation finale : applique réellement les informations personnelles
      * (dont catégorie/échelon/indice et matricule fonction publique), bancaires/
      * CNPS, la photo, les ayants droit, les diplômes, ainsi que corps de métier/
-     * qualification/poste/type de personnel/statut administratif. Seuls
-     * département et service restent volontairement déclaratifs — toujours
-     * affichés pour vérification manuelle par les RH contre les archives (leur
-     * structure d'affectation n'est pas encore convertie en liste déroulante).
+     * qualification/poste/type de personnel/statut administratif, ainsi que
+     * l'affectation organisationnelle (département, service, secteur).
+     *
+     * @throws \RuntimeException si l'affectation soumise est devenue incohérente
      */
     public function apply(CensusSubmission $submission, int $validatorId): void
     {
@@ -114,26 +115,20 @@ class CensusValidationService
                 $employee->photo = $payload['photo_path'];
             }
 
-            // Corps de métier / Qualification / Poste / Type de personnel / Statut
-            // administratif : désormais appliqués réellement (contrairement à
-            // département/service, qui restent purement déclaratifs pour l'instant).
+            // Affectation organisationnelle (branche, département, service, secteur,
+            // corps de métier, qualification, poste, type de personnel, statut).
+            // La cohérence de la chaîne est revérifiée ICI, au dernier moment : entre
+            // la soumission et la validation finale, l'organigramme a pu changer.
+            // Une exception annule toute la transaction (rien n'est appliqué à moitié).
             $organizational = $payload['organizational'] ?? [];
 
-            if (!empty($organizational['declared_trade_body_id'])) {
-                $employee->trade_body_id = $organizational['declared_trade_body_id'];
+            $chainError = OrganizationalAssignment::validate($organizational);
+
+            if ($chainError) {
+                throw new \RuntimeException("Affectation incohérente — {$chainError}");
             }
-            if (!empty($organizational['declared_qualification_id'])) {
-                $employee->qualification_id = $organizational['declared_qualification_id'];
-            }
-            if (!empty($organizational['declared_job_title_id'])) {
-                $employee->job_title_id = $organizational['declared_job_title_id'];
-            }
-            if (!empty($organizational['declared_personnel_type'])) {
-                $employee->personnel_type = $organizational['declared_personnel_type'];
-            }
-            if (!empty($organizational['declared_administrative_status'])) {
-                $employee->administrative_status = $organizational['declared_administrative_status'];
-            }
+
+            OrganizationalAssignment::applyTo($employee, $organizational);
 
             $employee->save();
 
