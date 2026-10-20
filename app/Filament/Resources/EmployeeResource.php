@@ -7,6 +7,7 @@ use App\Filament\Resources\EmployeeResource\RelationManagers;
 use App\Models\Employee;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Field;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -49,15 +50,29 @@ class EmployeeResource extends Resource
                         Forms\Components\TextInput::make('matricule')
                             ->label('Matricule')
                             ->required()
-                            ->unique(ignoreRecord: true),
+                            ->reactive()
+                            ->afterStateUpdated(fn($state) => is_string($state) ? trim($state) : $state)
+                            ->rule(fn(Field $component) => Employee::matriculeUniqueRule($component->getRecord()?->id)),
 
                         Forms\Components\TextInput::make('first_name')
                             ->label('Prénom')
-                            ->required(),
+                            ->maxLength(255),
 
                         Forms\Components\TextInput::make('last_name')
                             ->label('Nom')
                             ->required(),
+
+                        Forms\Components\Select::make('sector_id')
+                            ->label('Secteur / Unité')
+                            ->relationship(
+                                'sector',
+                                'name',
+                                fn($query) => $query->where('is_active', true)
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->helperText('Optionnel : secteur ou unité opérationnelle'),
 
                         // Ajoutez les autres champs...
                     ])
@@ -194,7 +209,6 @@ class EmployeeResource extends Resource
                     ->query(function (Builder $query) {
                         return $query->where(function ($q) {
                             $q->whereNull('last_name')
-                                ->orWhereNull('first_name')
                                 ->orWhereNull('birth_date')
                                 ->orWhereNull('gender')
                                 ->orWhereNull('recruitment_date')
@@ -210,11 +224,10 @@ class EmployeeResource extends Resource
                     ->query(function (Builder $query) {
                         return $query
                             ->whereNotNull('last_name')
-                            ->whereNotNull('first_name')
                             ->whereNotNull('birth_date')
                             ->whereNotNull('gender')
                             ->whereNotNull('recruitment_date')
-                            ->whereNotNull('position_id')
+                            ->whereNotNull('job_title_id')
                             ->whereNotNull('current_service_id');
                     })
                     ->toggle(),

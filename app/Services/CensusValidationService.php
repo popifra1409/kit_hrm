@@ -64,7 +64,8 @@ class CensusValidationService
     /**
      * Validation finale : applique réellement les informations personnelles
      * (dont catégorie/échelon/indice et matricule fonction publique), bancaires/
-     * CNPS, la photo, les ayants droit, les diplômes, ainsi que corps de métier/
+     * CNPS, la photo, le numéro de contrat et ses pièces (contrat, prise de service),
+     * les ayants droit, les diplômes, ainsi que corps de métier/
      * qualification/poste/type de personnel/statut administratif, ainsi que
      * l'affectation organisationnelle (département, service, secteur).
      *
@@ -113,6 +114,26 @@ class CensusValidationService
 
             if (!empty($payload['photo_path'])) {
                 $employee->photo = $payload['photo_path'];
+            }
+
+            // Contrat de travail et prise de service : numéro et pièces déclarés au
+            // recensement. Une pièce absente de la soumission laisse en place celle
+            // déjà enregistrée sur la fiche.
+            $contract = $payload['contract'] ?? [];
+
+            if (!empty($contract['contract_number'])) {
+                $employee->contract_number = $contract['contract_number'];
+            }
+
+            foreach (
+                [
+                    'document_path' => 'contract_document_path',
+                    'service_start_document_path' => 'service_start_document_path',
+                ] as $payloadKey => $column
+            ) {
+                if (!empty($contract[$payloadKey])) {
+                    $employee->$column = $contract[$payloadKey];
+                }
             }
 
             // Affectation organisationnelle (branche, département, service, secteur,
@@ -220,6 +241,34 @@ class CensusValidationService
             'validated_by' => $validatorId,
             'validated_at' => now(),
             'rejection_reason' => $reason,
+        ]);
+    }
+
+    // ========================================
+    // ANNULATION — hors circuit, à la demande des RH
+    // ========================================
+
+    /**
+     * Annule un recensement encore en attente d'une étape : le circuit de validation
+     * est remis à zéro et l'employé peut reprendre sa saisie depuis le début.
+     *
+     * Le payload est volontairement conservé — il reste lisible dans la revue jusqu'à
+     * ce que l'employé resoumette. Aucune donnée n'ayant été appliquée à la fiche
+     * employé avant la validation finale, il n'y a rien à « défaire » de ce côté.
+     */
+    public function cancel(CensusSubmission $submission, int $validatorId, string $reason): void
+    {
+        $submission->update([
+            'status' => CensusSubmission::STATUS_CANCELED,
+            'canceled_by' => $validatorId,
+            'canceled_at' => now(),
+            'cancellation_reason' => $reason,
+            'career_validated_by' => null,
+            'career_validated_at' => null,
+            'solde_validated_by' => null,
+            'solde_validated_at' => null,
+            'validated_by' => null,
+            'validated_at' => null,
         ]);
     }
 

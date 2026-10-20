@@ -34,6 +34,17 @@
             @if($this->record->rejection_reason)
                 <p class="text-sm text-danger-600 mt-2">Motif rejet final : {{ $this->record->rejection_reason }}</p>
             @endif
+
+            @if($this->record->status === App\Models\CensusSubmission::STATUS_CANCELED)
+                <div class="mt-3 rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
+                    <p class="font-semibold">
+                        ↩️ Annulé {{ $this->record->canceled_at?->format('d/m/Y \à H:i') }}
+                        par {{ $this->record->canceledBy?->name ?? 'les RH' }}
+                    </p>
+                    <p class="mt-1">{{ $this->record->cancellation_reason }}</p>
+                    <p class="mt-1 text-gray-500">L'employé peut reprendre son recensement ; cette saisie reste consultable ici jusqu'à sa nouvelle soumission.</p>
+                </div>
+            @endif
         </x-filament::section>
 
         @if(!empty($payload['photo_path'] ?? null))
@@ -41,6 +52,30 @@
                 <img src="{{ Illuminate\Support\Facades\Storage::url($payload['photo_path']) }}" alt="" class="w-24 h-24 rounded-full object-cover border" />
             </x-filament::section>
         @endif
+
+        @php
+            $contractDocs = [
+                'Contrat de travail' => $payload['contract']['document_path'] ?? $employee->contract_document_path ?? null,
+                'Prise de service' => $payload['contract']['service_start_document_path'] ?? $employee->service_start_document_path ?? null,
+            ];
+        @endphp
+
+        <x-filament::section heading="📄 Contrat de travail & prise de service — pièces">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                @foreach($contractDocs as $label => $path)
+                    <div class="p-3 rounded-lg bg-gray-50 dark:bg-white/5 text-sm">
+                        <p class="font-semibold mb-1">{{ $label }}</p>
+                        @if($path)
+                            <a href="{{ Illuminate\Support\Facades\Storage::url($path) }}" target="_blank" rel="noreferrer" class="text-primary-600 underline break-all">
+                                {{ basename($path) }}
+                            </a>
+                        @else
+                            <p class="text-gray-500">Non fournie</p>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </x-filament::section>
 
         @if(!$this->record->isValidated())
             <p class="text-xs text-gray-500 -mb-2">

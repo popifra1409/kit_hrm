@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
+use App\Filament\Resources\EmployeeResource\Components\OrganizationalCascade;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Forms;
@@ -106,13 +107,16 @@ class EditEmployee extends EditRecord
         $data['category_number'] = (string) ($data['category_number'] ?? '');
         $data['echelon_number'] = (string) ($data['echelon_number'] ?? '');
 
-        // ✅ DÉTERMINER LA BRANCHE CORRECTEMENT
-        // Si le record a un department_id → médical
-        // Sinon → administratif
-        if ($this->record && $this->record->department_id) {
-            $data['branch_type'] = 'medical';
-        } else {
-            $data['branch_type'] = 'administrative';
+        // ✅ BRANCHE ET CHAÎNE D'AFFECTATION : même source que l'API du recensement
+        // (la direction et la sous-direction se déduisent du service du record).
+        if ($this->record) {
+            $current = \App\Support\OrganizationalAssignment::currentFor($this->record);
+
+            $data['branch_type'] = $current['branch_type'];
+            $data['direction_id'] = $current['direction_id'];
+            $data['department_id'] = $current['department_id'];
+            $data['sub_direction_id'] = $current['sub_direction_id'];
+            $data['current_service_id'] = $current['service_id'];
         }
 
         // Déterminer le type de classification s'il n'existe pas
@@ -136,10 +140,6 @@ class EditEmployee extends EditRecord
             $data['classification_type'] = 'numeric';
         }
 
-        // ⚠️ IMPORTANT : Ne pas sauvegarder branch_type (ce n'est pas une colonne BD)
-        // On la supprime pour éviter les erreurs
-        unset($data['branch_type']);
-
         return $data;
     }
 
@@ -157,7 +157,9 @@ class EditEmployee extends EditRecord
                                     Forms\Components\TextInput::make('matricule')
                                         ->label('Matricule')
                                         ->required()
-                                        ->unique(ignoreRecord: true)
+                                        ->reactive()
+                                        ->afterStateUpdated(fn($state) => is_string($state) ? trim($state) : $state)
+                                        ->rule(fn(\Filament\Forms\Components\Field $component) => \App\Models\Employee::matriculeUniqueRule($component->getRecord()?->id))
                                         ->maxLength(50),
 
                                     Forms\Components\TextInput::make('last_name')
@@ -167,7 +169,8 @@ class EditEmployee extends EditRecord
 
                                     Forms\Components\TextInput::make('first_name')
                                         ->label('Prénom(s)')
-                                        ->maxLength(255),
+                                        ->maxLength(255)
+                                        ->helperText('Optionnel — certains employés n\'ont pas de prénom'),
                                 ]),
 
                             Forms\Components\Grid::make(4)
@@ -224,89 +227,7 @@ class EditEmployee extends EditRecord
                     Forms\Components\Tabs\Tab::make('Affectation')
                         ->icon('heroicon-o-building-office-2')
                         ->schema([
-                            Forms\Components\ToggleButtons::make('branch_type')
-                                ->label('Branche')
-                                ->options([
-                                    'medical' => 'Médical',
-                                    'administrative' => 'Administratif',
-                                ])
-                                ->icons([
-                                    'medical' => 'heroicon-o-heart',
-                                    'administrative' => 'heroicon-o-building-office',
-                                ])
-                                ->colors([
-                                    'medical' => 'success',
-                                    'administrative' => 'primary',
-                                ])
-                                ->inline()
-                                ->reactive()
-                                ->afterStateUpdated(fn($set) => [
-                                    $set('department_id', null),
-                                    $set('current_service_id', null),
-                                    $set('sector_id', null),
-                                ])
-                                ->live()
-                                ->columnSpanFull()
-                                ->default(
-                                    fn($record) =>
-                                    $record && $record->isMedical() ? 'medical' : 'administrative'
-                                ),
-
-                            Forms\Components\Grid::make(2)
-                                ->schema([
-                                    Forms\Components\Select::make('department_id')
-                                        ->label('Département Médical')
-                                        ->options(
-                                            \App\Models\Department::where('is_active', true)
-                                                ->pluck('name', 'id')
-                                        )
-                                        ->searchable()
-                                        ->preload()
-                                        ->native(false)
-                                        ->visible(fn(Forms\Get $get) => $get('branch_type') === 'medical')
-                                        ->reactive()
-                                        ->getOptionLabelUsing(fn($value) => \App\Models\Department::find($value)?->name)
-                                        ->afterStateUpdated(fn($set) => $set('current_service_id', null)),
-
-                                    Forms\Components\Select::make('current_service_id')
-                                        ->label('Service')
-                                        ->options(function (Forms\Get $get) {
-                                            if ($get('branch_type') === 'medical' && $get('department_id')) {
-                                                return \App\Models\Service::where('department_id', $get('department_id'))
-                                                    ->where('type', 'medical')
-                                                    ->where('is_active', true)
-                                                    ->pluck('name', 'id');
-                                            } elseif ($get('branch_type') === 'administrative') {
-                                                return \App\Models\Service::whereIn('type', ['administrative', 'support', 'technical'])
-                                                    ->where('is_active', true)
-                                                    ->pluck('name', 'id');
-                                            }
-                                            return [];
-                                        })
-                                        ->searchable()
-                                        ->preload()
-                                        ->native(false)
-                                        ->reactive()
-                                        ->getOptionLabelUsing(fn($value) => \App\Models\Service::find($value)?->name)
-                                        ->afterStateUpdated(fn($set) => $set('sector_id', null)),
-                                ]),
-
-                            Forms\Components\Grid::make(2)
-                                ->schema([
-                                    Forms\Components\Select::make('sector_id')
-                                        ->label('Secteur / Unité')
-                                        ->relationship('sector', 'name', function ($query, Forms\Get $get) {
-                                            if ($get('current_service_id')) {
-                                                return $query->where('service_id', $get('current_service_id'))
-                                                    ->where('is_active', true);
-                                            }
-                                            return $query;
-                                        })
-                                        ->searchable()
-                                        ->preload()
-                                        ->native(false)
-                                        ->visible(fn(Forms\Get $get) => $get('current_service_id')),
-                                ]),
+                            ...OrganizationalCascade::fields(requireService: false),
 
                             Forms\Components\Grid::make(2)
                                 ->schema([
@@ -409,6 +330,27 @@ class EditEmployee extends EditRecord
                                         ->label('Date de Prise de Service')
                                         ->native(false)
                                         ->displayFormat('d/m/Y'),
+                                ]),
+
+                            Forms\Components\Grid::make(2)
+                                ->schema([
+                                    Forms\Components\FileUpload::make('contract_document_path')
+                                        ->label('Contrat de travail (document)')
+                                        ->directory('employees/contracts')
+                                        ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                                        ->maxSize(4096)
+                                        ->downloadable()
+                                        ->openable()
+                                        ->helperText('PDF, JPG ou PNG - Max: 4MB'),
+
+                                    Forms\Components\FileUpload::make('service_start_document_path')
+                                        ->label('Attestation de prise de service')
+                                        ->directory('employees/service-start')
+                                        ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                                        ->maxSize(4096)
+                                        ->downloadable()
+                                        ->openable()
+                                        ->helperText('PDF, JPG ou PNG - Max: 4MB'),
                                 ]),
 
                             Forms\Components\Grid::make(3)

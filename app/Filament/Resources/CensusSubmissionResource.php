@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CensusSubmissionResource\Pages;
 use App\Models\CensusSubmission;
 use App\Models\CensusCampaign;
+use App\Services\CensusValidationService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -50,16 +52,14 @@ class CensusSubmissionResource extends Resource
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Statut')
-                    ->formatStateUsing(fn($state) => match ($state) {
-                        'submitted' => '⏳ En attente',
-                        'validated' => '✅ Validé',
-                        'rejected' => '❌ Rejeté',
-                        default => $state,
-                    })
+                    // Libellé complet du circuit (les 8 statuts) : trois seulement
+                    // étaient traduits, « career_validated » s'affichait en brut.
+                    ->formatStateUsing(fn(CensusSubmission $record) => $record->stage_label)
                     ->colors([
-                        'warning' => 'submitted',
-                        'success' => 'validated',
-                        'danger' => 'rejected',
+                        'warning' => fn(CensusSubmission $record) => $record->isCancelable(),
+                        'success' => fn(CensusSubmission $record) => $record->isValidated(),
+                        'danger' => fn(CensusSubmission $record) => $record->isRejected(),
+                        'gray' => fn(CensusSubmission $record) => $record->status === CensusSubmission::STATUS_CANCELED,
                     ]),
 
                 Tables\Columns\TextColumn::make('submitted_at')
@@ -79,9 +79,14 @@ class CensusSubmissionResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Statut')
                     ->options([
-                        'submitted' => 'En attente',
+                        'submitted' => 'En attente — Carrière',
+                        'career_validated' => 'En attente — Solde',
+                        'solde_validated' => 'En attente — validation finale',
+                        'career_rejected' => 'Rejeté — Carrière',
+                        'solde_rejected' => 'Rejeté — Solde',
                         'validated' => 'Validé',
-                        'rejected' => 'Rejeté',
+                        'rejected' => 'Rejeté définitivement',
+                        'canceled' => 'Annulé par les RH',
                     ]),
             ])
             ->actions([
@@ -89,6 +94,34 @@ class CensusSubmissionResource extends Resource
                     ->label('Examiner')
                     ->icon('heroicon-o-magnifying-glass')
                     ->url(fn(CensusSubmission $record) => static::getUrl('review', ['record' => $record])),
+
+                // Annulation RH : seul moyen de rendre la main à l'employé sans passer
+                // par un rejet (qui, lui, reste un constat négatif avec motif d'étape).
+                Tables\Actions\Action::make('cancel')
+                    ->label('Annuler')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->authorize('cancel')
+                    ->visible(fn(CensusSubmission $record) => $record->isCancelable() && auth()->user()->can('cancel_census_submissions'))
+                    ->modalHeading('Annuler ce recensement')
+                    ->modalDescription('Le circuit de validation est remis à zéro et l\'employé reprend son recensement depuis le début. Rien n\'a été appliqué à sa fiche : les données ne sont écrites qu\'à la validation finale.')
+                    ->modalSubmitActionLabel('Annuler le recensement')
+                    ->form([
+                        Forms\Components\Textarea::make('reason')
+                            ->label('Motif (affiché à l\'employé)')
+                            ->required()
+                            ->rows(3)
+                            ->maxLength(1000),
+                    ])
+                    ->action(function (CensusSubmission $record, array $data) {
+                        app(CensusValidationService::class)->cancel($record, auth()->id(), $data['reason']);
+
+                        Notification::make()
+                            ->title('Recensement annulé')
+                            ->body("L'employé peut reprendre son recensement.")
+                            ->success()
+                            ->send();
+                    }),
             ])
             ->defaultSort('submitted_at', 'desc');
     }

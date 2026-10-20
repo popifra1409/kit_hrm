@@ -31,4 +31,13 @@ class CensusSubmissionPolicy
     {
         return $user->hasRole('super_admin');
     }
+
+    /**
+     * Annulation RH : droits + dossier encore en attente d'une étape. Vérifiée aussi
+     * côté action Filament, car une action masquée reste appelable par requête directe.
+     */
+    public function cancel(User $user, CensusSubmission $censusSubmission): bool
+    {
+        return $user->can('cancel_census_submissions') && $censusSubmission->isCancelable();
+    }
 }

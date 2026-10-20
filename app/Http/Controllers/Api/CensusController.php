@@ -47,7 +47,7 @@ class CensusController extends Controller
             ->where('employee_id', $employee->id)
             ->first();
 
-        $employee->loadMissing(['dependents', 'diplomas', 'tradeBody', 'qualification']);
+        $employee->loadMissing(['dependents', 'diplomas', 'tradeBody', 'qualification', 'contractType']);
 
         return response()->json([
             'campaign' => [
@@ -59,6 +59,7 @@ class CensusController extends Controller
             'submission_status' => $submission?->status,
             'stage_label' => $submission?->stage_label,
             'rejection_reason' => $submission?->rejection_reason_for_employee,
+            'cancellation_reason' => $submission?->cancellation_reason,
             'current_data' => [
                 'personal' => [
                     'photo_url' => $employee->photo ? Storage::url($employee->photo) : null,
@@ -80,6 +81,19 @@ class CensusController extends Controller
                     'bank_name' => $employee->bank_name,
                     'bank_account_number' => $employee->bank_account_number,
                     'cnps_number' => $employee->cnps_number,
+                ],
+
+                // Contrat de travail et prise de service : le numéro est celui de la
+                // fiche, les deux pièces sont jointes par l'agent et vérifiées par les RH.
+                'contract' => [
+                    'contract_number' => $employee->contract_number,
+                    'contract_type' => $employee->contractType?->name,
+                    'contract_document_url' => $employee->contract_document_path
+                        ? Storage::url($employee->contract_document_path)
+                        : null,
+                    'service_start_document_url' => $employee->service_start_document_path
+                        ? Storage::url($employee->service_start_document_path)
+                        : null,
                 ],
 
                 // Classification salariale : le TYPE (cameroon/numeric) est fixé
@@ -195,6 +209,14 @@ class CensusController extends Controller
 
             'photo' => ['nullable', 'image', 'max:4096'],
 
+            // Contrat de travail : numéro laissé libre (les RH le corrigent à la revue)
+            // et pièce jointe. Le document de la prise de service accompagne la date
+            // déjà déclarée dans « personal ».
+            'contract' => ['nullable', 'array'],
+            'contract.contract_number' => ['nullable', 'string', 'max:255'],
+            'contract_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:4096'],
+            'service_start_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:4096'],
+
             // Affectation organisationnelle : appliquée réellement à la validation finale
             // (voir CensusValidationService). Validée par identifiant/valeur fermée, puis
             // contrôlée dans sa cohérence d'ensemble plus bas.
@@ -253,6 +275,24 @@ class CensusController extends Controller
         if ($request->hasFile('photo')) {
             $data['photo_path'] = $request->file('photo')->store('census/profile-photos', 'public');
         }
+
+        // Contrat : numéro normalisé (les espaces autour d'une saisie ne sont pas une
+        // donnée) + pièces stockées dans le payload. Elles ne gagnent la fiche employé
+        // qu'à la validation finale, comme la photo et les actes.
+        $contract = $data['contract'] ?? [];
+        $contractNumber = trim((string) ($contract['contract_number'] ?? ''));
+        $contract['contract_number'] = $contractNumber !== '' ? $contractNumber : null;
+
+        if ($request->hasFile('contract_document')) {
+            $contract['document_path'] = $request->file('contract_document')->store('census/contracts', 'public');
+        }
+
+        if ($request->hasFile('service_start_document')) {
+            $contract['service_start_document_path'] = $request->file('service_start_document')
+                ->store('census/service-start', 'public');
+        }
+
+        $data['contract'] = $contract;
 
         // Indice calculé côté serveur (jamais confié au client) à partir du type de
         // classification FIXE de l'employé + de la catégorie/échelon qu'il vient de
@@ -315,6 +355,9 @@ class CensusController extends Controller
                 'rejected_by' => null,
                 'rejected_at' => null,
                 'rejection_reason' => null,
+                'canceled_by' => null,
+                'canceled_at' => null,
+                'cancellation_reason' => null,
             ]
         );
 

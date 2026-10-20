@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Models\AccountDeletion;
@@ -584,18 +585,26 @@ class AuthController extends Controller
 
     private function formatUser(User $user): array
     {
-        $user->loadMissing('employee', 'roles');
+        $user->loadMissing(['employee.jobTitle', 'employee.department', 'employee.currentService', 'roles']);
+        $employee = $user->employee;
 
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'roles' => $user->roles->pluck('name'),
-            'employee' => $user->employee ? [
-                'id' => $user->employee->id,
-                'matricule' => $user->employee->matricule,
-                'full_name' => $user->employee->full_name,
-                'photo' => $user->employee->photo,
+            'employee' => $employee ? [
+                'id' => $employee->id,
+                'matricule' => $employee->matricule,
+                'full_name' => $employee->full_name,
+                // Chemin relatif → URL publique, sinon le <img> de la SPA casse ;
+                // et certains enregistrements pointent vers un fichier supprimé.
+                'photo' => ($employee->photo && Storage::disk('public')->exists($employee->photo))
+                    ? Storage::disk('public')->url($employee->photo)
+                    : null,
+                'job_title' => $employee->jobTitle?->name,
+                'department' => $employee->department?->name,
+                'service' => $employee->currentService?->name,
             ] : null,
         ];
     }

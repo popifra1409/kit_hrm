@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
+use App\Filament\Resources\EmployeeResource\Components\OrganizationalCascade;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Forms;
 use Filament\Forms\Components\Wizard;
@@ -28,7 +29,9 @@ class CreateEmployee extends CreateRecord
                             Forms\Components\TextInput::make('matricule')
                                 ->label('Matricule')
                                 ->required()
-                                ->unique(ignoreRecord: true)
+                                ->reactive()
+                                ->afterStateUpdated(fn($state) => is_string($state) ? trim($state) : $state)
+                                ->rule(fn(\Filament\Forms\Components\Field $component) => \App\Models\Employee::matriculeUniqueRule($component->getRecord()?->id))
                                 ->maxLength(50)
                                 ->placeholder('Ex: EMP001')
                                 ->helperText('Identifiant unique de l\'employé'),
@@ -107,140 +110,61 @@ class CreateEmployee extends CreateRecord
             Wizard\Step::make('Affectation Organisationnelle')
                 ->description('Rattachement hiérarchique et poste')
                 ->icon('heroicon-o-building-office-2')
-                ->schema([
-                    Forms\Components\ToggleButtons::make('branch_type')
-                        ->label('Branche d\'Affectation')
-                        ->options([
-                            'medical' => 'Branche Médicale',
-                            'administrative' => 'Branche Administrative',
-                        ])
-                        ->icons([
-                            'medical' => 'heroicon-o-heart',
-                            'administrative' => 'heroicon-o-building-office',
-                        ])
-                        ->colors([
-                            'medical' => 'success',
-                            'administrative' => 'primary',
-                        ])
-                        ->inline()
-                        ->required()
-                        ->reactive()
-                        ->afterStateUpdated(fn($set) => [
-                            $set('department_id', null),
-                            $set('current_service_id', null),
-                            $set('sector_id', null),
-                        ])
-                        ->live()
-                        ->columnSpanFull()
-                        ->default('medical'),
+                ->schema(array_merge(
+                    OrganizationalCascade::fields(requireService: true),
+                    [
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\Select::make('trade_body_id')
+                                    ->label('Corps de Métier')
+                                    ->relationship('tradeBody', 'name', fn($query) => $query->where('is_active', true))
+                                    ->searchable()
+                                    ->preload()
+                                    ->native(false)
+                                    ->reactive()
+                                    ->afterStateUpdated(fn($set) => $set('qualification_id', null))
+                                    ->helperText('Médecin, Technicien, Agent administratif...'),
 
-                    Forms\Components\Grid::make(2)
-                        ->schema([
-                            Forms\Components\Select::make('department_id')
-                                ->label('Département Médical')
-                                ->relationship('department', 'name')
-                                ->searchable()
-                                ->preload()
-                                ->native(false)
-                                ->visible(fn(Forms\Get $get) => $get('branch_type') === 'medical')
-                                ->reactive()
-                                ->afterStateUpdated(fn($set) => $set('current_service_id', null))
-                                ->helperText('Sélectionnez le département médical'),
-
-                            Forms\Components\Select::make('current_service_id')
-                                ->label('Service')
-                                ->options(function (Forms\Get $get) {
-                                    if ($get('branch_type') === 'medical' && $get('department_id')) {
-                                        return \App\Models\Service::where('department_id', $get('department_id'))
-                                            ->where('type', 'medical')
+                                Forms\Components\Select::make('qualification_id')
+                                    ->label('Qualification')
+                                    ->options(function (Forms\Get $get) {
+                                        if (!$get('trade_body_id')) {
+                                            return [];
+                                        }
+                                        return \App\Models\Qualification::where('trade_body_id', $get('trade_body_id'))
                                             ->where('is_active', true)
+                                            ->orderBy('level_rank')
                                             ->pluck('name', 'id');
-                                    } elseif ($get('branch_type') === 'administrative') {
-                                        return \App\Models\Service::whereIn('type', ['administrative', 'support', 'technical'])
-                                            ->where('is_active', true)
-                                            ->pluck('name', 'id');
-                                    }
-                                    return [];
-                                })
-                                ->searchable()
-                                ->preload()
-                                ->native(false)
-                                ->reactive()
-                                ->afterStateUpdated(fn($set) => $set('sector_id', null))
-                                ->helperText(
-                                    fn(Forms\Get $get) =>
-                                    $get('branch_type') === 'medical'
-                                        ? 'Service médical du département'
-                                        : 'Service administratif, support ou technique'
-                                ),
-                        ]),
+                                    })
+                                    ->searchable()
+                                    ->preload()
+                                    ->native(false)
+                                    ->disabled(fn(Forms\Get $get) => !$get('trade_body_id'))
+                                    ->helperText('Choisissez d\'abord le corps de métier'),
+                            ]),
 
-                    Forms\Components\Grid::make(2)
-                        ->schema([
-                            Forms\Components\Select::make('sector_id')
-                                ->label('Secteur / Unité Opérationnelle')
-                                ->relationship('sector', 'name', function ($query, Forms\Get $get) {
-                                    if ($get('current_service_id')) {
-                                        return $query->where('service_id', $get('current_service_id'))
-                                            ->where('is_active', true);
-                                    }
-                                    return $query;
-                                })
-                                ->searchable()
-                                ->preload()
-                                ->native(false)
-                                ->visible(fn(Forms\Get $get) => $get('current_service_id'))
-                                ->helperText('Optionnel : Secteur ou unité spécifique'),
-
-                            Forms\Components\Select::make('trade_body_id')
-                                ->label('Corps de Métier')
-                                ->relationship('tradeBody', 'name', fn($query) => $query->where('is_active', true))
-                                ->searchable()
-                                ->preload()
-                                ->native(false)
-                                ->reactive()
-                                ->afterStateUpdated(fn($set) => $set('qualification_id', null))
-                                ->helperText('Médecin, Technicien, Agent administratif...'),
-
-                            Forms\Components\Select::make('qualification_id')
-                                ->label('Qualification')
-                                ->options(function (Forms\Get $get) {
-                                    if (!$get('trade_body_id')) {
-                                        return [];
-                                    }
-                                    return \App\Models\Qualification::where('trade_body_id', $get('trade_body_id'))
-                                        ->where('is_active', true)
-                                        ->orderBy('level_rank')
-                                        ->pluck('name', 'id');
-                                })
-                                ->searchable()
-                                ->preload()
-                                ->native(false)
-                                ->disabled(fn(Forms\Get $get) => !$get('trade_body_id'))
-                                ->helperText('Choisissez d\'abord le corps de métier'),
-                        ]),
-
-                    Forms\Components\Grid::make(2)
-                        ->schema([
-                            Forms\Components\Select::make('job_title_id')
-                                ->label('Poste Hiérarchique')
-                                ->relationship(
-                                    'jobTitle',
-                                    'name',
-                                    fn($query) =>
-                                    $query->where('is_active', true)->orderBy('hierarchy_level')
-                                )
-                                ->searchable()
-                                ->preload()
-                                ->native(false)
-                                ->required()
-                                ->getOptionLabelFromRecordUsing(
-                                    fn($record) =>
-                                    '🏆 ' . $record->name . ' (Niveau ' . $record->hierarchy_level . ')'
-                                )
-                                ->helperText('Fonction et niveau hiérarchique'),
-                        ]),
-                ]),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\Select::make('job_title_id')
+                                    ->label('Poste Hiérarchique')
+                                    ->relationship(
+                                        'jobTitle',
+                                        'name',
+                                        fn($query) =>
+                                        $query->where('is_active', true)->orderBy('hierarchy_level')
+                                    )
+                                    ->searchable()
+                                    ->preload()
+                                    ->native(false)
+                                    ->required()
+                                    ->getOptionLabelFromRecordUsing(
+                                        fn($record) =>
+                                        '🏆 ' . $record->name . ' (Niveau ' . $record->hierarchy_level . ')'
+                                    )
+                                    ->helperText('Fonction et niveau hiérarchique'),
+                            ]),
+                    ]
+                )),
 
             // ========================================
             // ÉTAPE 3 : EMPLOI ET CONTRAT
@@ -304,6 +228,27 @@ class CreateEmployee extends CreateRecord
                                 ->native(false)
                                 ->displayFormat('d/m/Y')
                                 ->default(now()),
+                        ]),
+
+                    Forms\Components\Grid::make(2)
+                        ->schema([
+                            Forms\Components\FileUpload::make('contract_document_path')
+                                ->label('Contrat de travail (document)')
+                                ->directory('employees/contracts')
+                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                                ->maxSize(4096)
+                                ->downloadable()
+                                ->openable()
+                                ->helperText('PDF, JPG ou PNG - Max: 4MB'),
+
+                            Forms\Components\FileUpload::make('service_start_document_path')
+                                ->label("Attestation de prise de service")
+                                ->directory('employees/service-start')
+                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                                ->maxSize(4096)
+                                ->downloadable()
+                                ->openable()
+                                ->helperText('PDF, JPG ou PNG - Max: 4MB'),
                         ]),
 
                     Forms\Components\Grid::make(2)

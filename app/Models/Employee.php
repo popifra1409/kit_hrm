@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Closure;
 
 class Employee extends Model
 {
@@ -64,6 +65,8 @@ class Employee extends Model
         'fingerprint_enrolled',
         'fingerprint_enrolled_at',
         'id_card_number',
+        'contract_document_path',
+        'service_start_document_path',
     ];
 
     protected $casts = [
@@ -93,7 +96,16 @@ class Employee extends Model
     protected function fullName(): Attribute
     {
         return Attribute::make(
-            get: fn() => $this->last_name . ' ' . $this->first_name,
+            get: function () {
+                $last = trim((string) $this->last_name);
+                $first = trim((string) $this->first_name);
+
+                if ($first === '' || $first === 'N/A') {
+                    return $last;
+                }
+
+                return $last !== '' ? "$last $first" : $first;
+            },
         );
     }
 
@@ -612,6 +624,44 @@ class Employee extends Model
     }
 
     // ========================================
+    // VALIDATION
+    // ========================================
+
+    /**
+     * Règle d'unicité du matricule, alignée sur l'index unique de la table.
+     *
+     * La comparaison ignore les espaces de bordure : l'index unique compare les
+     * valeurs brutes, donc « 0969 » et « 0969  » y cohabitent alors qu'ils désignent
+     * le même agent pour l'API de connexion. Sans ce trim, le formulaire laisserait
+     * passer un doublon qui échouerait à l'enregistrement (ConstraintViolationException).
+     *
+     * Les employés archivés comptent : la ressource neutralise SoftDeletingScope pour
+     * l'affichage, mais la contrainte de base de données, elle, reste valable.
+     *
+     * @param  int|null  $ignoreId  Matricule de l'employé en cours de modification, à exclure.
+     */
+    public static function matriculeUniqueRule(?int $ignoreId = null): Closure
+    {
+        return function (string $attribute, $value, Closure $fail) use ($ignoreId) {
+            $matricule = trim((string) $value);
+
+            if ($matricule === '') {
+                return;
+            }
+
+            $conflict = static::query()
+                ->withTrashed()
+                ->when($ignoreId, fn($query) => $query->whereKeyNot($ignoreId))
+                ->pluck('matricule')
+                ->first(fn($stored) => trim((string) $stored) === $matricule);
+
+            if ($conflict !== null) {
+                $fail('Ce matricule est déjà utilisé par un autre employé (archivé compris).');
+            }
+        };
+    }
+
+    // ========================================
     // BOOT
     // ========================================
 
@@ -620,6 +670,10 @@ class Employee extends Model
         parent::boot();
 
         static::saving(function ($employee) {
+            if ($employee->isDirty('matricule')) {
+                $employee->matricule = trim((string) $employee->matricule);
+            }
+
             // Calculer automatiquement la date de retraite
             if ($employee->birth_date && $employee->retirement_age) {
                 $employee->retirement_date = $employee->birth_date->copy()->addYears($employee->retirement_age);

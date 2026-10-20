@@ -23,6 +23,9 @@ class CensusSubmission extends Model
         'rejected_by',
         'rejected_at',
         'rejection_reason',
+        'canceled_by',
+        'canceled_at',
+        'cancellation_reason',
     ];
 
     protected $casts = [
@@ -32,6 +35,7 @@ class CensusSubmission extends Model
         'solde_validated_at' => 'datetime',
         'validated_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'canceled_at' => 'datetime',
     ];
 
     /**
@@ -43,6 +47,8 @@ class CensusSubmission extends Model
      *   solde_rejected    → renvoyé à l'employé (étape Solde)
      *   validated         → validé définitivement, données appliquées
      *   rejected          → rejeté définitivement par l'admin
+     *   canceled          → annulé par les RH avant toute application : l'employé
+     *                       reprend un recensement vierge de toute validation
      */
     public const STATUS_SUBMITTED = 'submitted';
     public const STATUS_CAREER_VALIDATED = 'career_validated';
@@ -51,6 +57,7 @@ class CensusSubmission extends Model
     public const STATUS_SOLDE_REJECTED = 'solde_rejected';
     public const STATUS_VALIDATED = 'validated';
     public const STATUS_REJECTED = 'rejected';
+    public const STATUS_CANCELED = 'canceled';
 
     public function employee()
     {
@@ -80,6 +87,11 @@ class CensusSubmission extends Model
     public function rejectedBy()
     {
         return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function canceledBy()
+    {
+        return $this->belongsTo(User::class, 'canceled_by');
     }
 
     // --- Lecture de l'étape courante ---
@@ -114,6 +126,21 @@ class CensusSubmission extends Model
     }
 
     /**
+     * Les RH peuvent-ils encore annuler ce recensement ? Uniquement tant qu'il est
+     * en attente d'une étape : une fois validé, les données sont appliquées à la
+     * fiche employé et seul un nouveau recensement (campagne suivante) pourra les
+     * corriger ; un rejet leave déjà la main à l'employé.
+     */
+    public function isCancelable(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_SUBMITTED,
+            self::STATUS_CAREER_VALIDATED,
+            self::STATUS_SOLDE_VALIDATED,
+        ], true);
+    }
+
+    /**
      * L'employé peut-il encore modifier et resoumettre (tant que ce n'est pas
      * validé définitivement) ?
      */
@@ -142,6 +169,7 @@ class CensusSubmission extends Model
             self::STATUS_SOLDE_REJECTED => 'Rejeté — étape Solde',
             self::STATUS_VALIDATED => 'Validé définitivement',
             self::STATUS_REJECTED => 'Rejeté définitivement',
+            self::STATUS_CANCELED => 'Annulé par les RH — recensement à reprendre',
             default => $this->status,
         };
     }

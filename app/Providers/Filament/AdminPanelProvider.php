@@ -44,10 +44,19 @@ class AdminPanelProvider extends PanelProvider
             })
             ->brandLogoHeight('2.5rem')
             ->favicon(function () {
-                $faviconPath = \App\Models\SystemSetting::get('favicon_path');
-                if ($faviconPath) {
-                    return asset('storage/' . $faviconPath);
+                // Clés telles que les enregistre la page « Infos de la structure »
+                // (hospital_favicon / hospital_logo) — favicon_path n'existe pas.
+                $disk = \Illuminate\Support\Facades\Storage::disk('public');
+
+                foreach (['hospital_favicon', 'hospital_logo'] as $key) {
+                    $path = \App\Models\SystemSetting::get($key);
+                    $path = is_array($path) ? ($path[0] ?? null) : $path;
+
+                    if (is_string($path) && $path !== '' && $disk->exists($path)) {
+                        return $disk->url($path);
+                    }
                 }
+
                 return asset('favicon.ico');
             })
 

@@ -16,15 +16,19 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
 {
     public function model(array $row)
     {
+        // Normaliser le matricule (espaces en début/fin)
+        $matricule = trim((string) ($row['matricule'] ?? ''));
+
         // Ignorer la ligne d'en-tête si présente
-        if ($row['matricule'] == 'Matricule' || empty($row['matricule'])) {
+        if ($matricule == 'Matricule' || $matricule === '') {
             return null;
         }
 
         // ✅ Éviter les doublons : ignorer la ligne si ce matricule existe déjà
-        if (\App\Models\Employee::where('matricule', $row['matricule'])->exists()) {
+        // (y compris chez les employés archivés, car l'index unique en BD les inclut)
+        if (\App\Models\Employee::withTrashed()->whereRaw('BTRIM(matricule) = BTRIM(?)', [$matricule])->exists()) {
             \Log::warning('Import employés : matricule déjà existant, ligne ignorée', [
-                'matricule' => $row['matricule'],
+                'matricule' => $matricule,
             ]);
             return null;
         }
@@ -94,7 +98,7 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
         $retirementDate = $this->parseDate($row['date_de_retraite'] ?? null);
 
         return new Employee([
-            'matricule' => $row['matricule'],
+            'matricule' => $matricule,
             'first_name' => $firstName ?: 'N/A',
             'last_name' => $lastName,
             'category_recruitment' => $row['categorie_echelon_recrutement'] ?? null,

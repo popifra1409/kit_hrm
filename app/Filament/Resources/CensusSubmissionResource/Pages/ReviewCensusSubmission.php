@@ -60,9 +60,15 @@ class ReviewCensusSubmission extends Page implements HasForms
             }
         }
 
+        // Le formulaire ne fait foi que pour le numéro : les chemins des pièces jointes
+        // restent dans le payload et sont fusionnés à l'enregistrement.
+        $contract = $payload['contract'] ?? [];
+        $contract['contract_number'] ??= $this->record->employee?->contract_number;
+
         $this->form->fill([
             'personal' => $payload['personal'] ?? [],
             'organizational' => $organizational,
+            'contract' => ['contract_number' => $contract['contract_number']],
         ]);
     }
 
@@ -134,6 +140,20 @@ class ReviewCensusSubmission extends Page implements HasForms
                     ->dehydrated()
                     ->collapsible(),
 
+                Forms\Components\Section::make('📄 Contrat de travail (modifiable, appliqué à la validation finale)')
+                    ->description("Les pièces jointes soumises par l'employé (contrat, prise de service) sont affichées ci-dessus. Le type de contrat se change sur la fiche employé.")
+                    ->schema([
+                        Forms\Components\Grid::make(2)->schema([
+                            Forms\Components\TextInput::make('contract.contract_number')
+                                ->label('N° de contrat')
+                                ->maxLength(255)
+                                ->placeholder('Ex: CT-2024-001'),
+                        ]),
+                    ])
+                    ->disabled(!$canEdit)
+                    ->dehydrated()
+                    ->collapsible(),
+
                 Forms\Components\Section::make('🏥 Carrière — Affectation organisationnelle (modifiable, appliquée à la validation finale)')
                     ->description("Branche médicale : Direction → Département → Service → Secteur. Branche administrative : Direction → Sous-direction → Service → Secteur. Chaque liste se filtre selon le niveau précédent.")
                     ->schema([
@@ -164,7 +184,7 @@ class ReviewCensusSubmission extends Page implements HasForms
                                 ->searchable()
                                 ->native(false)
                                 ->live()
-                                ->disabled(fn(Forms\Get $get) => !$get(self::ORG . 'branch_type') && !$get(self::ORG . 'direction_id'))
+                                ->helperText('Facultatif : restreint le département / la sous-direction puis le service.')
                                 ->afterStateUpdated(fn(Forms\Set $set) => self::resetBelow($set, ['department', 'sub_direction', 'service', 'sector'])),
 
                             Forms\Components\Select::make('organizational.declared_department_id')
@@ -195,7 +215,7 @@ class ReviewCensusSubmission extends Page implements HasForms
                                 ->searchable()
                                 ->native(false)
                                 ->live()
-                                ->disabled(fn(Forms\Get $get) => !$get(self::ORG . 'direction_id') && !$get(self::ORG . 'sub_direction_id'))
+                                ->helperText('Facultatif : restreint la liste des services.')
                                 ->afterStateUpdated(fn(Forms\Set $set) => self::resetBelow($set, ['service', 'sector'])),
 
                             Forms\Components\Select::make('organizational.declared_service_id')
@@ -205,19 +225,18 @@ class ReviewCensusSubmission extends Page implements HasForms
                                 ->searchable()
                                 ->native(false)
                                 ->live()
-                                ->disabled(fn(Forms\Get $get) => !$get(self::ORG . 'service_id')
-                                    && !$get(self::ORG . 'department_id')
-                                    && !$get(self::ORG . 'sub_direction_id'))
                                 ->afterStateUpdated(fn(Forms\Set $set) => self::resetBelow($set, ['sector'])),
 
                             Forms\Components\Select::make('organizational.declared_sector_id')
-                                ->label('Secteur / Unité')
-                                ->visible(fn(Forms\Get $get) => (bool) $get(self::ORG . 'service_id'))
+                                ->label('Unité / Secteur')
                                 ->options(fn(Forms\Get $get) => self::sectorOptions($get))
                                 ->getOptionLabelUsing(fn($value) => Sector::find($value)?->name)
                                 ->searchable()
                                 ->native(false)
-                                ->helperText('Optionnel : seulement pour les services qui ont des secteurs ou unités.'),
+                                ->disabled(fn(Forms\Get $get) => !$get(self::ORG . 'service_id'))
+                                ->helperText(fn(Forms\Get $get) => $get(self::ORG . 'service_id')
+                                    ? 'Optionnel : seulement pour les services qui ont des secteurs ou unités.'
+                                    : "Choisissez d'abord un service."),
                         ]),
                     ])
                     ->disabled(!$canEdit)
@@ -283,7 +302,8 @@ class ReviewCensusSubmission extends Page implements HasForms
 
     /**
      * Enregistre les corrections du formulaire dans le payload de la soumission,
-     * sans toucher aux ayants droit/diplômes/photo qui n'y figurent pas. Appelé
+     * sans toucher aux ayants droit/diplômes/photo ni aux chemins des pièces
+     * jointes du contrat, qui n'ont pas de champ dans ce formulaire. Appelé
      * juste avant chaque action de validation (Carrière/Solde/Finale).
      */
     protected function persistEditedPayload(): void
@@ -300,6 +320,7 @@ class ReviewCensusSubmission extends Page implements HasForms
             'payload' => array_merge($this->record->payload ?? [], [
                 'personal' => array_merge($this->record->payload['personal'] ?? [], $formState['personal'] ?? []),
                 'organizational' => $this->mergeOrganizational($formState['organizational'] ?? []),
+                'contract' => array_merge($this->record->payload['contract'] ?? [], $formState['contract'] ?? []),
             ]),
         ]);
 
@@ -410,27 +431,39 @@ class ReviewCensusSubmission extends Page implements HasForms
 
     private static function subDirectionOptions(Forms\Get $get): array
     {
+        // La sous-direction n'attend pas la direction : la direction filtre quand elle
+        // est choisie, sinon toutes les sous-directions actives restent accessibles.
         $direction = $get(self::ORG . 'direction_id');
-        $options = $direction ? self::pluckNames(SubDirection::active()->where('direction_id', $direction)) : [];
+        $options = self::pluckNames(
+            $direction ? SubDirection::active()->where('direction_id', $direction) : SubDirection::active()
+        );
 
         return self::withSelected($options, SubDirection::class, $get(self::ORG . 'sub_direction_id'));
     }
 
     private static function serviceOptions(Forms\Get $get): array
     {
+        // La branche seule suffit pour proposer des services ; le département (médical)
+        // ou la sous-direction (administratif) ne fait que restreindre la liste.
         $branch = $get(self::ORG . 'branch_type');
         $options = [];
 
-        if ($branch === OrganizationalAssignment::BRANCH_MEDICAL && ($department = $get(self::ORG . 'department_id'))) {
-            $options = self::pluckNames(
-                Service::active()->where('type', 'medical')->where('department_id', $department)
-            );
-        } elseif ($branch === OrganizationalAssignment::BRANCH_ADMINISTRATIVE && ($subDirection = $get(self::ORG . 'sub_direction_id'))) {
-            $options = self::pluckNames(
-                Service::active()
-                    ->whereIn('type', OrganizationalAssignment::ADMINISTRATIVE_SERVICE_TYPES)
-                    ->where('sub_direction_id', $subDirection)
-            );
+        if ($branch === OrganizationalAssignment::BRANCH_MEDICAL) {
+            $query = Service::active()->where('type', 'medical');
+
+            if ($department = $get(self::ORG . 'department_id')) {
+                $query->where('department_id', $department);
+            }
+
+            $options = self::pluckNames($query);
+        } elseif ($branch === OrganizationalAssignment::BRANCH_ADMINISTRATIVE) {
+            $query = Service::active()->whereIn('type', OrganizationalAssignment::ADMINISTRATIVE_SERVICE_TYPES);
+
+            if ($subDirection = $get(self::ORG . 'sub_direction_id')) {
+                $query->where('sub_direction_id', $subDirection);
+            }
+
+            $options = self::pluckNames($query);
         }
 
         return self::withSelected($options, Service::class, $get(self::ORG . 'service_id'));
@@ -551,6 +584,25 @@ class ReviewCensusSubmission extends Page implements HasForms
                     $service->reject($this->record, auth()->id(), $data['reason']);
                     $this->record->refresh();
                     Notification::make()->title('Recensement rejeté')->warning()->send();
+                }),
+
+            // Annulation : remise à zéro du circuit pour que l'employé reprenne son
+            // recensement. Contrairement au rejet, aucun constat d'étape — simple
+            // remise en saisie (motif affiché à l'employé).
+            Actions\Action::make('cancel')
+                ->label('↩️ Annuler le recensement')
+                ->color('danger')
+                ->authorize('cancel')
+                ->visible(fn() => $this->record->isCancelable() && auth()->user()->can('cancel_census_submissions'))
+                ->requiresConfirmation()
+                ->modalHeading('Annuler ce recensement')
+                ->modalDescription("Le circuit de validation est remis à zéro et l'employé reprend son recensement depuis le début. Rien n'a été appliqué à sa fiche : les données ne sont écrites qu'à la validation finale.")
+                ->modalSubmitActionLabel('Annuler le recensement')
+                ->form([Forms\Components\Textarea::make('reason')->label("Motif (affiché à l'employé)")->required()->rows(3)])
+                ->action(function (array $data) use ($service) {
+                    $service->cancel($this->record, auth()->id(), $data['reason']);
+                    $this->record->refresh();
+                    Notification::make()->title('Recensement annulé')->body("L'employé peut le reprendre.")->success()->send();
                 }),
         ];
     }
