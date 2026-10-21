@@ -198,6 +198,10 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'reject_census_submissions', 'module' => 'employees', 'description' => 'Rejeter une soumission de recensement'],
             ['name' => 'cancel_census_submissions', 'module' => 'employees', 'description' => 'Annuler un recensement en attente pour que l\'employé le reprenne'],
 
+            // === ACTIVATION DES COMPTES EMPLOYÉS ===
+            ['name' => 'view_account_activation_requests', 'module' => 'employees', 'description' => 'Voir les demandes d\'activation vérifiées au guichet RH'],
+            ['name' => 'validate_account_activations', 'module' => 'employees', 'description' => 'Valider ou rejeter une demande d\'activation après vérification d\'identité'],
+
             // === VALIDATION AYANTS DROIT & DIPLÔMES (distinct de la simple édition) ===
             ['name' => 'validate_dependents', 'module' => 'health', 'description' => 'Valider un ayant droit après vérification des documents'],
             ['name' => 'reject_dependents', 'module' => 'health', 'description' => 'Rejeter un ayant droit'],
@@ -266,6 +270,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'validate_census_submissions',
             'reject_census_submissions',
             'cancel_census_submissions',
+            'view_account_activation_requests',
+            'validate_account_activations',
             // Congés & Absences
             'view_leaves',
             'create_leaves',

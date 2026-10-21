@@ -26,6 +26,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/activate', [AuthController::class, 'activate'])->middleware('throttle:10,1');
     Route::post('/activate/captcha', [AuthController::class, 'refreshActivationCaptcha'])->middleware('throttle:20,1');
     Route::post('/activate/verify', [AuthController::class, 'verifyActivation'])->middleware('throttle:10,1');
+    // Secours pour l'employé qui ne retrouve pas sa date de recrutement : demande
+    // vérifiée au guichet RH. Volontairement hors blocage par compte : enregistrer
+    // une demande n'ouvre aucun compte, et c'est justement la sortie quand l'employé
+    // a épuisé ses 5 tentatives.
+    Route::post('/activate/request', [AuthController::class, 'requestActivationReview'])->middleware('throttle:8,1');
     Route::post('/login', [AuthController::class, 'login']); // matricule + password
 });
 

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Models\AccountActivationRequest;
 use App\Models\AccountDeletion;
 use App\Services\AccountDeletionService;
 
@@ -168,12 +169,15 @@ class AuthController extends Controller
      * L'employé confirme sa date de recrutement et résout le petit calcul. Si
      * tout est correct, le nouveau mot de passe est enregistré, le compte est
      * définitivement activé et un token est retourné (comme à la connexion).
-     * Après 5 échecs, le compte est bloqué 30 minutes pour l'activation.
+     * La date est acceptée à l'année près (±1 an) : un employé qui ne se souvient
+     * que de son année d'entrée peut activer son compte seul. Après 5 échecs, le
+     * compte est bloqué 30 minutes pour l'activation ; l'employé peut alors passer
+     * par une demande vérifiée au guichet RH (POST /auth/activate/request).
      *
      * @unauthenticated
      *
      * @bodyParam verification_token string required Jeton reçu à l'étape 1.
-     * @bodyParam recruitment_date string required Date de recrutement (AAAA-MM-JJ). Example: 2015-09-01
+     * @bodyParam recruitment_date string required Date de recrutement (AAAA-MM-JJ) ; seule l'année est comparée, à ±1 an près. Example: 2015-09-01
      * @bodyParam captcha_id string required Identifiant du calcul affiché.
      * @bodyParam captcha_answer integer required Résultat du calcul. Example: 19
      *
@@ -189,7 +193,7 @@ class AuthController extends Controller
      *   }
      * }
      * @response 410 scenario="Session expirée" {"message": "La session d'activation a expiré. Veuillez recommencer."}
-     * @response 422 scenario="Calcul ou date incorrects" {"message": "La date de recrutement saisie ne correspond pas à nos enregistrements.", "remaining_attempts": 3, "captcha": {"id": "Qw27Zp...", "question": "15 - 6 = ?"}}
+     * @response 422 scenario="Calcul ou année incorrects" {"message": "Cette année ne correspond pas à nos enregistrements. Si tu ne te souviens vraiment pas, demande une vérification aux Ressources Humaines.", "remaining_attempts": 3, "captcha": {"id": "Qw27Zp...", "question": "15 - 6 = ?"}}
      * @response 429 scenario="Compte temporairement bloqué" {"message": "Trop de tentatives échouées. Réessayez dans 30 minutes ou contactez les Ressources Humaines."}
      */
     public function verifyActivation(Request $request)
@@ -250,15 +254,35 @@ class AuthController extends Controller
 
         // Contrôle B — la date de recrutement
         $recorded = $user->employee->recruitment_date?->toDateString();
+        $declared = $request->recruitment_date;
 
-        if (!$recorded || $recorded !== $request->recruitment_date) {
+        if (!$recorded) {
             $this->registerActivationFailure($user);
 
             return $this->activationFailureResponse(
-                'La date de recrutement saisie ne correspond pas à nos enregistrements.',
+                'Aucune date de recrutement n\'est enregistrée pour votre compte. Contactez les Ressources Humaines.',
                 $request->verification_token,
                 $user
             );
+        }
+
+        if ($recorded !== $declared) {
+            // La plupart des employés ne se souviennent que de l'ANNÉE de recrutement :
+            // c'est ce tolérant qui rend la vérification utilisable par un employé peu
+            // à l'aise avec l'informatique. Le risque reste contenu par le mot de passe
+            // temporaire (étape 1), le calcul à usage unique et le blocage après 5 échecs.
+            $yearMatches = abs((int) substr($declared, 0, 4) - (int) substr($recorded, 0, 4)) <= 1;
+
+            if (!$yearMatches) {
+                $this->registerActivationFailure($user);
+
+                return $this->activationFailureResponse(
+                    'Cette année ne correspond pas à nos enregistrements. Si vous ne vous rappelez vraiment pas, '
+                        . 'demandez une vérification aux Ressources Humaines.',
+                    $request->verification_token,
+                    $user
+                );
+            }
         }
 
         // Tout est correct : on applique enfin le mot de passe choisi et on active.
@@ -281,6 +305,123 @@ class AuthController extends Controller
             'token' => $token,
             'user' => $this->formatUser($user),
         ]);
+    }
+
+    /**
+     * Activer un compte — secours : demande de vérification au guichet des RH
+     *
+     * Pour l'employé qui ne retrouve vraiment pas sa date de recrutement : il résout
+     * le calcul, une demande est enregistrée avec une référence lisible, et
+     * un agent des RH ouvre le compte après avoir vérifié l'identité en personne.
+     * Le mot de passe choisi à l'étape 1 n'est appliqué qu'à cette validation ;
+     * en attendant, seul le mot de passe temporaire donne accès au compte.
+     *
+     * @unauthenticated
+     *
+     * @bodyParam verification_token string required Jeton reçu à l'étape 1.
+     * @bodyParam captcha_id string required Identifiant du calcul affiché.
+     * @bodyParam captcha_answer integer required Résultat du calcul. Example: 19
+     * @bodyParam self_declared_date string nullable Ce que l'employé croit se rappeler, pour l'agent uniquement. Example: 2015-01-01
+     *
+     * @response 201 scenario="Demande enregistrée" {
+     *   "message": "Votre demande est enregistrée...",
+     *   "reference": "RH-7K4QF2",
+     *   "expires_at": "2026-10-28T10:00:00+01:00"
+     * }
+     * @response 200 scenario="Demande déjà en attente" {"message": "...", "reference": "RH-7K4QF2", "expires_at": "..."}
+     * @response 409 scenario="Compte déjà activé" {"message": "Ce compte a déjà été activé. Utilisez la connexion normale."}
+     * @response 410 scenario="Session expirée" {"message": "La session d'activation a expiré. Veuillez recommencer."}
+     * @response 422 scenario="Calcul incorrect" {"message": "Le résultat du calcul est incorrect.", "captcha": {"id": "Qw27Zp...", "question": "15 - 6 = ?"}}
+     */
+    public function requestActivationReview(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'verification_token' => ['required', 'string', 'size:64', 'alpha_num'],
+            'captcha_id' => ['required', 'string', 'size:32', 'alpha_num'],
+            'captcha_answer' => ['required', 'integer'],
+            'self_declared_date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Données invalides.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $sessionKey = $this->activationCacheKey($request->verification_token);
+        $pending = Cache::get($sessionKey);
+
+        if (!$pending) {
+            return $this->activationExpiredResponse();
+        }
+
+        $user = User::with('employee')->find($pending['user_id']);
+
+        if (!$user || !$user->employee) {
+            Cache::forget($sessionKey);
+
+            return $this->activationExpiredResponse();
+        }
+
+        if ($user->isActivated()) {
+            Cache::forget($sessionKey);
+
+            return response()->json([
+                'message' => 'Ce compte a déjà été activé. Utilisez la connexion normale.',
+            ], 409);
+        }
+
+        // Le calcul reste obligatoire : il prouve qu'une personne physique est devant
+        // l'écran et empêche l'engorgement de la file d'attente des RH.
+        $captcha = Cache::pull($this->activationCaptchaKey($request->captcha_id));
+
+        $captchaOk = $captcha
+            && hash_equals((string) $captcha['token'], (string) $request->verification_token)
+            && (int) $captcha['answer'] === (int) $request->captcha_answer;
+
+        if (!$captchaOk) {
+            // Aucun échec comptabilisé : cette route n'ouvre rien, elle enregistre juste
+            // une demande qu'un agent devra refuser ou confirmer.
+            return response()->json([
+                'message' => 'Le résultat du calcul est incorrect.',
+                'captcha' => $this->makeActivationCaptcha($request->verification_token),
+            ], 422);
+        }
+
+        $review = AccountActivationRequest::where('user_id', $user->id)
+            ->where('status', AccountActivationRequest::STATUS_PENDING)
+            ->latest('id')
+            ->first();
+
+        if ($review) {
+            // L'employé a peut-être repris l'étape 1 entre-temps : on garde la même
+            // référence, mais le mot de passe enregistré est celui choisi maintenant.
+            $review->forceFill([
+                'requested_password_hash' => $pending['password_hash'],
+                'self_declared_date' => $request->self_declared_date,
+                'expires_at' => now()->addDays(AccountActivationRequest::VALIDITY_DAYS),
+            ])->save();
+        } else {
+            $review = AccountActivationRequest::create([
+                'reference' => AccountActivationRequest::generateReference(),
+                'user_id' => $user->id,
+                'employee_id' => $user->employee->id,
+                'matricule' => $user->employee->matricule,
+                'requested_password_hash' => $pending['password_hash'],
+                'self_declared_date' => $request->self_declared_date,
+                'status' => AccountActivationRequest::STATUS_PENDING,
+                'expires_at' => now()->addDays(AccountActivationRequest::VALIDITY_DAYS),
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Votre demande est enregistrée. Présentez-vous aux Ressources Humaines avec cette référence '
+                . 'et votre matricule : dès qu\'elles auront vérifié votre identité, votre compte s\'ouvrira avec le '
+                . 'mot de passe que vous avez choisi.',
+            'reference' => $review->reference,
+            'expires_at' => $review->expires_at?->toIso8601String(),
+        ], $review->wasRecentlyCreated ? 201 : 200);
     }
 
     // ------------------------------------------------------------------
