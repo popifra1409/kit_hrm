@@ -24,13 +24,14 @@ class CensusValidationService
         ]);
     }
 
-    public function rejectCareer(CensusSubmission $submission, int $validatorId, string $reason): void
+    public function rejectCareer(CensusSubmission $submission, int $validatorId, string $reason, array $fields = []): void
     {
         $submission->update([
             'status' => CensusSubmission::STATUS_CAREER_REJECTED,
             'career_validated_by' => $validatorId,
             'career_validated_at' => now(),
             'career_rejection_reason' => $reason,
+            'career_rejection_fields' => $this->cleanFields($fields, CensusSubmission::CORRECTABLE_CAREER_FIELDS),
         ]);
     }
 
@@ -47,13 +48,14 @@ class CensusValidationService
         ]);
     }
 
-    public function rejectSolde(CensusSubmission $submission, int $validatorId, string $reason): void
+    public function rejectSolde(CensusSubmission $submission, int $validatorId, string $reason, array $fields = []): void
     {
         $submission->update([
             'status' => CensusSubmission::STATUS_SOLDE_REJECTED,
             'solde_validated_by' => $validatorId,
             'solde_validated_at' => now(),
             'solde_rejection_reason' => $reason,
+            'solde_rejection_fields' => $this->cleanFields($fields, CensusSubmission::CORRECTABLE_SOLDE_FIELDS),
         ]);
     }
 
@@ -234,14 +236,27 @@ class CensusValidationService
         });
     }
 
-    public function reject(CensusSubmission $submission, int $validatorId, string $reason): void
+    public function reject(CensusSubmission $submission, int $validatorId, string $reason, array $fields = []): void
     {
         $submission->update([
             'status' => CensusSubmission::STATUS_REJECTED,
             'validated_by' => $validatorId,
             'validated_at' => now(),
             'rejection_reason' => $reason,
+            'rejection_fields' => $this->cleanFields($fields, CensusSubmission::correctableFields()),
         ]);
+    }
+
+    /**
+     * Le formulaire Filament décide de ce qui est proposé ; ici on ne stocke que des
+     * clés connues, pour qu'un en-tête API manipulé ne puisse pas faire apparaître un
+     * champ fantôme chez l'employé.
+     */
+    private function cleanFields(array $fields, array $catalog): ?array
+    {
+        $kept = array_values(array_intersect($fields, array_keys($catalog)));
+
+        return $kept !== [] ? $kept : null;
     }
 
     // ========================================

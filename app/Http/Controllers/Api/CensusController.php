@@ -59,6 +59,7 @@ class CensusController extends Controller
             'submission_status' => $submission?->status,
             'stage_label' => $submission?->stage_label,
             'rejection_reason' => $submission?->rejection_reason_for_employee,
+            'rejection_fields' => $submission?->rejection_fields_for_employee ?? [],
             'cancellation_reason' => $submission?->cancellation_reason,
             'current_data' => [
                 'personal' => [
@@ -207,6 +208,12 @@ class CensusController extends Controller
             'personal.bank_account_number' => ['nullable', 'string', 'max:255'],
             'personal.cnps_number' => ['nullable', 'string', 'max:255'],
 
+            // Le compte bancaire n'est pas une saisie comme les autres : le virement du
+            // salaire dépend du compte que les GRH détiennent. Le formulaire web affiche
+            // un avertissement et une case de reconnaissance dès que l'un de ces trois
+            // champs change ; le serveur l'exige aussi, le client ne faisant pas foi.
+            'bank_change_acknowledged' => ['nullable', 'boolean'],
+
             'photo' => ['nullable', 'image', 'max:4096'],
 
             // Contrat de travail : numéro laissé libre (les RH le corrigent à la revue)
@@ -294,6 +301,37 @@ class CensusController extends Controller
 
         $data['contract'] = $contract;
 
+        // Comparaison avec la fiche en cours : une valeur laissée identique n'est pas
+        // une modification, et une case vide ne doit pas être exigée pour rien.
+        $bankChanges = [];
+
+        foreach (['bank_name', 'bank_account_number', 'cnps_number'] as $bankField) {
+            $submitted = trim((string) ($data['personal'][$bankField] ?? ''));
+            $recorded = trim((string) ($employee->{$bankField} ?? ''));
+
+            if ($submitted !== '' && $submitted !== $recorded) {
+                $bankChanges[] = $bankField;
+            }
+        }
+
+        unset($data['bank_change_acknowledged']);
+
+        if ($bankChanges !== []) {
+            if (!$request->boolean('bank_change_acknowledged')) {
+                return response()->json([
+                    'message' => "Vous avez modifié vos informations bancaires ou CNPS : confirmez avoir lu l'avertissement sur le virement du salaire avant de soumettre.",
+                    'errors' => ['bank_change_acknowledged' => ["Cochez la confirmation pour soumettre."]],
+                ], 422);
+            }
+
+            // Trace pour l'agent qui validera l'étape Solde : quoi a changé, et que
+            // l'agent a bien été averti.
+            $data['bank_change'] = [
+                'fields' => $bankChanges,
+                'acknowledged_at' => now()->toIso8601String(),
+            ];
+        }
+
         // Indice calculé côté serveur (jamais confié au client) à partir du type de
         // classification FIXE de l'employé + de la catégorie/échelon qu'il vient de
         // choisir. Stocké dans le payload pour affichage immédiat côté RH.
@@ -347,14 +385,17 @@ class CensusController extends Controller
                 'career_validated_by' => null,
                 'career_validated_at' => null,
                 'career_rejection_reason' => null,
+                'career_rejection_fields' => null,
                 'solde_validated_by' => null,
                 'solde_validated_at' => null,
                 'solde_rejection_reason' => null,
+                'solde_rejection_fields' => null,
                 'validated_by' => null,
                 'validated_at' => null,
                 'rejected_by' => null,
                 'rejected_at' => null,
                 'rejection_reason' => null,
+                'rejection_fields' => null,
                 'canceled_by' => null,
                 'canceled_at' => null,
                 'cancellation_reason' => null,

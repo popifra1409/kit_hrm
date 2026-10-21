@@ -130,6 +130,21 @@ class ReviewCensusSubmission extends Page implements HasForms
 
                 Forms\Components\Section::make('💰 Solde — Banque & CNPS (modifiable)')
                     ->schema([
+                        // Trace du changement déclaré par l'agent : le virement du salaire
+                        // dépend du compte détenu par les GRH, l'étape Solde doit le voir.
+                        Forms\Components\Placeholder::make('bank_change_notice')
+                            ->hidden(fn () => empty($this->record->payload['bank_change']['fields']))
+                            ->content(function () {
+                                $change = $this->record->payload['bank_change'] ?? [];
+                                $labels = collect($change['fields'] ?? [])
+                                    ->map(fn ($key) => CensusSubmission::fieldLabel($key))
+                                    ->implode(', ');
+                                $when = isset($change['acknowledged_at'])
+                                    ? \Illuminate\Support\Carbon::parse($change['acknowledged_at'])->format('d/m/Y \à H:i')
+                                    : '—';
+
+                                return "⚠️ Modification déclarée par l'agent : {$labels}. Reconnaissance de l'avertissement lue le {$when}. Vérifier la demande de changement d'informations bancaires déposée auprès du Directeur Général avant de valider le solde.";
+                            }),
                         Forms\Components\Grid::make(3)->schema([
                             Forms\Components\TextInput::make('personal.bank_name')->label('Banque'),
                             Forms\Components\TextInput::make('personal.bank_account_number')->label('N° de compte'),
@@ -513,9 +528,16 @@ class ReviewCensusSubmission extends Page implements HasForms
                 ->color('danger')
                 ->visible(fn() => $this->record->isAwaitingCareer() && auth()->user()->can('reject_census_career'))
                 ->requiresConfirmation()
-                ->form([Forms\Components\Textarea::make('reason')->label('Motif du rejet')->required()])
+                ->form([
+                    Forms\Components\Textarea::make('reason')->label('Motif du rejet')->required()->rows(3),
+                    Forms\Components\CheckboxList::make('fields')
+                        ->label('Champs à faire corriger par l\'agent (facultatif)')
+                        ->options(CensusSubmission::correctableFields('career'))
+                        ->columns(2)
+                        ->helperText('Ces champs seront encadrés dans le formulaire de l\'agent, et il repartira sur l\'étape concernée.'),
+                ])
                 ->action(function (array $data) use ($service) {
-                    $service->rejectCareer($this->record, auth()->id(), $data['reason']);
+                    $service->rejectCareer($this->record, auth()->id(), $data['reason'], $data['fields'] ?? []);
                     $this->record->refresh();
                     Notification::make()->title('Carrière rejetée')->warning()->send();
                 }),
@@ -540,9 +562,15 @@ class ReviewCensusSubmission extends Page implements HasForms
                 ->color('danger')
                 ->visible(fn() => $this->record->isAwaitingSolde() && auth()->user()->can('reject_census_solde'))
                 ->requiresConfirmation()
-                ->form([Forms\Components\Textarea::make('reason')->label('Motif du rejet')->required()])
+                ->form([
+                    Forms\Components\Textarea::make('reason')->label('Motif du rejet')->required()->rows(3),
+                    Forms\Components\CheckboxList::make('fields')
+                        ->label('Champs à faire corriger par l\'agent (facultatif)')
+                        ->options(CensusSubmission::correctableFields('solde'))
+                        ->helperText('Un compte bancaire different de celui des GRH bloque le virement du salaire : à signaler ici.'),
+                ])
                 ->action(function (array $data) use ($service) {
-                    $service->rejectSolde($this->record, auth()->id(), $data['reason']);
+                    $service->rejectSolde($this->record, auth()->id(), $data['reason'], $data['fields'] ?? []);
                     $this->record->refresh();
                     Notification::make()->title('Solde rejetée')->warning()->send();
                 }),
@@ -579,9 +607,16 @@ class ReviewCensusSubmission extends Page implements HasForms
                 ->color('danger')
                 ->visible(fn() => $this->record->isAwaitingFinalAdmin() && auth()->user()->can('reject_census_submissions'))
                 ->requiresConfirmation()
-                ->form([Forms\Components\Textarea::make('reason')->label('Motif du rejet')->required()])
+                ->form([
+                    Forms\Components\Textarea::make('reason')->label('Motif du rejet')->required()->rows(3),
+                    Forms\Components\CheckboxList::make('fields')
+                        ->label('Champs à faire corriger par l\'agent (facultatif)')
+                        ->options(CensusSubmission::correctableFields())
+                        ->columns(2)
+                        ->helperText('Le contrôle final porte sur tout le dossier : la liste reprend les champs des deux étapes.'),
+                ])
                 ->action(function (array $data) use ($service) {
-                    $service->reject($this->record, auth()->id(), $data['reason']);
+                    $service->reject($this->record, auth()->id(), $data['reason'], $data['fields'] ?? []);
                     $this->record->refresh();
                     Notification::make()->title('Recensement rejeté')->warning()->send();
                 }),
