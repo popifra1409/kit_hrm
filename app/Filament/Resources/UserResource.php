@@ -102,52 +102,81 @@ class UserResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
-            ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('delete_account')
-                    ->label('Supprimer le compte')
-                    ->icon('heroicon-o-user-minus')
-                    ->color('danger')
-                    ->visible(fn(User $record) => $record->employee_id !== null && auth()->user()->can('delete_user_accounts'))
-                    ->requiresConfirmation()
-                    ->modalHeading('Supprimer ce compte utilisateur')
-                    ->modalDescription('Seul le compte de connexion sera supprimé — la fiche employé et toutes ses informations restent intactes en base.')
-                    ->form([
-                        Forms\Components\Select::make('reason')
-                            ->label('Motif')
-                            ->options(AccountDeletion::REASONS)
-                            ->required()
-                            ->native(false),
+                // Un compte créé pour un employé n'existe qu'une fois son mot de passe
+                // temporaire changé : « en attente » regroupe les accès pas encore pris.
+                Tables\Filters\TernaryFilter::make('activated_at')
+                    ->label('Statut du compte')
+                    ->placeholder('Tous les comptes')
+                    ->trueLabel('Comptes activés')
+                    ->falseLabel("Comptes en attente d'activation")
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNotNull('activated_at'),
+                        false: fn (Builder $query) => $query->whereNull('activated_at'),
+                        blank: fn (Builder $query) => $query,
+                    ),
 
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Précisions (optionnel)')
-                            ->rows(3),
+                Tables\Filters\SelectFilter::make('employee_id')
+                    ->label('Compte lié à un employé')
+                    ->options([
+                        'linked' => 'Avec fiche employé',
+                        'unlinked' => 'Sans fiche employé (administration)',
                     ])
-                    ->action(function (User $record, array $data) {
-                        try {
-                            app(AccountDeletionService::class)->delete(
-                                user: $record,
-                                reason: $data['reason'],
-                                notes: $data['notes'] ?? null,
-                                initiatedBy: 'admin',
-                                deletedBy: auth()->user(),
-                            );
-
-                            \Filament\Notifications\Notification::make()
-                                ->title('Compte supprimé')
-                                ->body("Le compte de {$record->name} a été supprimé. La fiche employé reste intacte.")
-                                ->success()
-                                ->send();
-                        } catch (\RuntimeException $e) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Suppression impossible')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        'linked' => $query->whereNotNull('employee_id'),
+                        'unlinked' => $query->whereNull('employee_id'),
+                        default => $query,
                     }),
+            ])
+            ->actionsColumnLabel('Actions')
+            ->actionsPosition(Tables\Enums\ActionsPosition::BeforeCells)
+            ->actions([
+                // Un seul bouton « ⋮ » en tête de ligne : la ligne reste lisible et le
+                // groupement accueille les actions sans tout décaler à droite.
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('delete_account')
+                        ->label('Supprimer le compte')
+                        ->icon('heroicon-o-user-minus')
+                        ->color('danger')
+                        ->visible(fn(User $record) => $record->employee_id !== null && auth()->user()->can('delete_user_accounts'))
+                        ->requiresConfirmation()
+                        ->modalHeading('Supprimer ce compte utilisateur')
+                        ->modalDescription('Seul le compte de connexion sera supprimé — la fiche employé et toutes ses informations restent intactes en base.')
+                        ->form([
+                            Forms\Components\Select::make('reason')
+                                ->label('Motif')
+                                ->options(AccountDeletion::REASONS)
+                                ->required()
+                                ->native(false),
+
+                            Forms\Components\Textarea::make('notes')
+                                ->label('Précisions (optionnel)')
+                                ->rows(3),
+                        ])
+                        ->action(function (User $record, array $data) {
+                            try {
+                                app(AccountDeletionService::class)->delete(
+                                    user: $record,
+                                    reason: $data['reason'],
+                                    notes: $data['notes'] ?? null,
+                                    initiatedBy: 'admin',
+                                    deletedBy: auth()->user(),
+                                );
+
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Compte supprimé')
+                                    ->body("Le compte de {$record->name} a été supprimé. La fiche employé reste intacte.")
+                                    ->success()
+                                    ->send();
+                            } catch (\RuntimeException $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Suppression impossible')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
