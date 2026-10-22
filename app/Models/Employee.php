@@ -359,6 +359,15 @@ class Employee extends Model
     }
 
     // ========================================
+    // RELATIONS - RECENSEMENT
+    // ========================================
+
+    public function censusSubmissions()
+    {
+        return $this->hasMany(CensusSubmission::class);
+    }
+
+    // ========================================
     // RELATIONS - ASSURANCE SANTÉ
     // ========================================
 

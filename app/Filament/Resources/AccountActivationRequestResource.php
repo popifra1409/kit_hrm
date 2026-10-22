@@ -72,7 +72,7 @@ class AccountActivationRequestResource extends Resource
                     ->label('Référence')
                     ->searchable()
                     ->copyable()
-                    ->mono(),
+                    ->fontFamily('mono'),
 
                 Tables\Columns\TextColumn::make('employee.full_name')
                     ->label('Employé')

@@ -105,6 +105,9 @@ class DependentsRelationManager extends RelationManager
 
                         Forms\Components\FileUpload::make('birth_certificate_path')
                             ->label('Acte de Naissance')
+                            // Pour un père ou une mère, la pièce produite n'est pas la leur :
+                            // c'est l'acte de l'agent qui établit la filiation.
+                            ->helperText("Père ou mère : acte de naissance de l'agent, qui prouve la filiation. La même pièce couvre les deux parents.")
                             ->directory('dependents/documents')
                             ->acceptedFileTypes(['application/pdf', 'image/*'])
                             ->maxSize(5120)

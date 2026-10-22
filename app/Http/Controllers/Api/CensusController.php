@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CensusCampaign;
 use App\Models\CensusSubmission;
+use App\Models\Dependent;
 use App\Models\SalaryGrid;
 use App\Support\CameroonCivilServiceGrid;
 use App\Support\OrganizationalAssignment;
@@ -148,6 +149,9 @@ class CensusController extends Controller
                     'phone' => $d->phone,
                     'email' => $d->email,
                     'address' => $d->address,
+                    // Le web s'en sert pour ne pas redemander une pièce déjà au dossier :
+                    // l'acte de naissance qui prouve la filiation sert aux deux parents.
+                    'has_birth_certificate' => !empty($d->birth_certificate_path),
                 ]),
                 'diplomas' => $employee->diplomas->map(fn($d) => [
                     'id' => $d->id,
@@ -346,6 +350,13 @@ class CensusController extends Controller
             );
         }
 
+        // Pièces des ayants droit. Un père ou une mère se justifie par l'acte de
+        // naissance DE L'EMPLOYÉ : une seule pièce sert donc aux deux parents, et un
+        // parent déjà au dossier en tient lieu pour l'autre. Les lignes déjà créées
+        // gardent leur propre fichier, rien n'est réécrit.
+        $parentRelations = ['father', 'mother'];
+        $declaredActs = [];
+
         foreach ($data['dependents'] ?? [] as $index => &$dependent) {
             foreach (['photo', 'id_card', 'birth_certificate', 'marriage_certificate'] as $docKey) {
                 $file = $request->file("dependents.{$index}.{$docKey}");
@@ -354,9 +365,42 @@ class CensusController extends Controller
                 }
             }
 
+            if (in_array($dependent['relationship'] ?? '', $parentRelations, true)
+                && !empty($dependent['documents']['birth_certificate'])) {
+                $declaredActs[] = $dependent['documents']['birth_certificate'];
+            }
+        }
+        unset($dependent);
+
+        $needInheritedAct = collect($data['dependents'] ?? [])->contains(
+            fn(array $d) => empty($d['existing_id'])
+                && in_array($d['relationship'] ?? '', $parentRelations, true)
+                && empty($d['documents']['birth_certificate'])
+        );
+
+        $inheritedAct = $needInheritedAct && !$declaredActs
+            ? Dependent::where('employee_id', $employee->id)
+                ->whereIn('relationship', $parentRelations)
+                ->whereNotNull('birth_certificate_path')
+                ->value('birth_certificate_path')
+            : null;
+
+        foreach ($data['dependents'] ?? [] as $index => &$dependent) {
+            if (empty($dependent['existing_id'])
+                && in_array($dependent['relationship'] ?? '', $parentRelations, true)
+                && empty($dependent['documents']['birth_certificate'])) {
+                $reused = $declaredActs[0] ?? $inheritedAct;
+
+                if ($reused) {
+                    $dependent['documents']['birth_certificate'] = $reused;
+                }
+            }
+
             if (empty($dependent['existing_id']) && empty($dependent['documents']['birth_certificate'] ?? null)) {
                 return response()->json([
-                    'message' => "Un acte de naissance est requis pour chaque nouvel ayant droit (position {$index}).",
+                    'message' => in_array($dependent['relationship'] ?? '', $parentRelations, true)
+                        ? "L'acte de naissance de l'employé est requis pour justifier la filiation (position {$index})."
+                        : "Un acte de naissance est requis pour chaque nouvel ayant droit (position {$index}).",
                 ], 422);
             }
         }
