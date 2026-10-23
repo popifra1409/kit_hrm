@@ -100,10 +100,12 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->navigationGroups([
-                // Groupes ouverts : les plus consultés au quotidien
-                NavigationGroup::make('👥 Gestion du Personnel')->collapsed(false),
-                NavigationGroup::make('🌴 Congés & Absences')->collapsed(false),
-                NavigationGroup::make('💰 Gestion de la Paie')->collapsed(false),
+                // Groupes ouverts : les plus consultés au quotidien.
+                // Pas de collapsed(false) : cette méthode appelle aussi collapsible(false),
+                // ce qui supprimerait le chevron de repli du groupe.
+                NavigationGroup::make('👥 Gestion du Personnel'),
+                NavigationGroup::make('🌴 Congés & Absences'),
+                NavigationGroup::make('💰 Gestion de la Paie'),
                 NavigationGroup::make('📈 Carrière & Avancements')->collapsed(true),
                 NavigationGroup::make('🗂️ Recensement & Activation')->collapsed(true),
                 NavigationGroup::make('🏢 Structure Organisationnelle')->collapsed(true),
