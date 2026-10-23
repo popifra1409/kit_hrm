@@ -27,11 +27,16 @@ Route::prefix('auth')->group(function () {
     Route::post('/activate/captcha', [AuthController::class, 'refreshActivationCaptcha'])->middleware('throttle:20,1');
     Route::post('/activate/verify', [AuthController::class, 'verifyActivation'])->middleware('throttle:10,1');
     // Secours pour l'employé qui ne retrouve pas sa date de recrutement : demande
-    // vérifiée au guichet RH. Volontairement hors blocage par compte : enregistrer
+    // vérifiée par le Service RH. Volontairement hors blocage par compte : enregistrer
     // une demande n'ouvre aucun compte, et c'est justement la sortie quand l'employé
     // a épuisé ses 5 tentatives.
     Route::post('/activate/request', [AuthController::class, 'requestActivationReview'])->middleware('throttle:8,1');
-    Route::post('/login', [AuthController::class, 'login']); // matricule + password
+    // Mot de passe oublié : la même file d'attente du Service RH, la même vérification
+    // d'identité. Rien n'est modifié sur le compte avant la validation de l'agent.
+    Route::post('/forgot-password/captcha', [AuthController::class, 'forgotPasswordCaptcha'])->middleware('throttle:20,1');
+    Route::post('/forgot-password', [AuthController::class, 'requestPasswordReset'])->middleware('throttle:8,1');
+    // Connexion : limite par IP en plus du blocage par compte (5 échecs, puis 45 minutes).
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 });
 
 // ========================================

@@ -46,4 +46,15 @@ class AccountActivationRequestPolicy
     {
         return $user->can('validate_account_activations') && $accountActivationRequest->isPending();
     }
+
+    /**
+     * Régénérer un mot de passe temporaire : uniquement sur une réinitialisation
+     * déjà validée, le mot de passe généré n'étant conservé nulle part.
+     */
+    public function regenerate(User $user, AccountActivationRequest $accountActivationRequest): bool
+    {
+        return $user->can('validate_account_activations')
+            && $accountActivationRequest->isPasswordReset()
+            && $accountActivationRequest->status === AccountActivationRequest::STATUS_VALIDATED;
+    }
 }

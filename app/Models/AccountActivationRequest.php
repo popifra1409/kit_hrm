@@ -11,6 +11,7 @@ class AccountActivationRequest extends Model
         'user_id',
         'employee_id',
         'matricule',
+        'type',
         'requested_password_hash',
         'self_declared_date',
         'status',
@@ -34,6 +35,12 @@ class AccountActivationRequest extends Model
     public const STATUS_PENDING = 'pending';
     public const STATUS_VALIDATED = 'validated';
     public const STATUS_REJECTED = 'rejected';
+
+    /** Compte jamais ouvert : l'agent applique le mot de passe choisi par l'employé. */
+    public const TYPE_ACTIVATION = 'activation';
+
+    /** Mot de passe oublié : l'agent génère un mot de passe temporaire à remettre. */
+    public const TYPE_PASSWORD_RESET = 'password_reset';
 
     /** Passé ce délai, le mot de passe choisi n'est plus applicable : l'employé relance sa demande. */
     public const VALIDITY_DAYS = 7;
@@ -72,6 +79,11 @@ class AccountActivationRequest extends Model
         return $this->isPending() && !$this->isExpired();
     }
 
+    public function isPasswordReset(): bool
+    {
+        return $this->type === self::TYPE_PASSWORD_RESET;
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
@@ -82,8 +94,16 @@ class AccountActivationRequest extends Model
         };
     }
 
+    public function getTypeLabelAttribute(): string
+    {
+        return match ($this->type) {
+            self::TYPE_PASSWORD_RESET => 'Réinitialisation du mot de passe',
+            default => 'Activation du compte',
+        };
+    }
+
     /**
-     * Référence courte, lisible à voix haute au guichet, sans lettres ambiguës.
+     * Référence courte, lisible à voix haute au Service RH, sans lettres ambiguës.
      */
     public static function generateReference(): string
     {

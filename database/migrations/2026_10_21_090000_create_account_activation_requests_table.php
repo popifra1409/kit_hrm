@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('account_activation_requests', function (Blueprint $table) {
             $table->id();
 
-            // Référence lisible que l'employé montre au guichet (ex. "RH-7K4QF2").
+            // Référence lisible que l'employé montre au Service RH (ex. "RH-7K4QF2").
             $table->string('reference', 12)->unique();
 
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();

@@ -23,10 +23,14 @@ class AuthController extends Controller
     /** Durée de validité de la session d'activation entre l'étape 1 et l'étape 2. */
     private const ACTIVATION_SESSION_MINUTES = 15;
 
-    /** Échecs de vérification tolérés par compte avant blocage temporaire. */
-    private const ACTIVATION_MAX_FAILURES = 5;
+    /**
+     * Échecs tolérés avant blocage temporaire, et durée du blocage. Le même barème
+     * s'applique à la connexion et à l'activation : un seul chiffre à expliquer au
+     * personnel comme aux employés.
+     */
+    private const MAX_FAILURES = 5;
 
-    private const ACTIVATION_LOCK_MINUTES = 30;
+    private const LOCK_MINUTES = 45;
 
     /**
      * Activer un compte — étape 1/2 : identifiants et nouveau mot de passe
@@ -92,7 +96,7 @@ class AuthController extends Controller
         }
 
         if ($this->activationLocked($user)) {
-            return $this->activationLockedResponse();
+            return $this->activationLockedResponse($user);
         }
 
         if (!Hash::check($request->temporary_password, $user->password)) {
@@ -124,7 +128,7 @@ class AuthController extends Controller
             'message' => 'Identifiants vérifiés. Une dernière vérification est nécessaire pour activer votre compte.',
             'verification_token' => $verificationToken,
             'expires_in' => self::ACTIVATION_SESSION_MINUTES * 60,
-            'captcha' => $this->makeActivationCaptcha($verificationToken),
+            'captcha' => $this->makeCaptcha($verificationToken),
         ]);
     }
 
@@ -159,7 +163,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'captcha' => $this->makeActivationCaptcha($request->verification_token),
+            'captcha' => $this->makeCaptcha($request->verification_token),
         ]);
     }
 
@@ -171,8 +175,8 @@ class AuthController extends Controller
      * définitivement activé et un token est retourné (comme à la connexion).
      * La date est acceptée à l'année près (±1 an) : un employé qui ne se souvient
      * que de son année d'entrée peut activer son compte seul. Après 5 échecs, le
-     * compte est bloqué 30 minutes pour l'activation ; l'employé peut alors passer
-     * par une demande vérifiée au guichet RH (POST /auth/activate/request).
+     * compte est bloqué 45 minutes pour l'activation ; l'employé peut alors passer
+     * par une demande vérifiée par le Service RH (POST /auth/activate/request).
      *
      * @unauthenticated
      *
@@ -235,12 +239,12 @@ class AuthController extends Controller
 
         if ($this->activationLocked($user)) {
             Cache::forget($sessionKey);
-            return $this->activationLockedResponse();
+            return $this->activationLockedResponse($user);
         }
 
         // Contrôle A — le calcul — vérifié en premier pour ne jamais permettre de "tester"
         //    des dates sans l'avoir résolu. Chaque calcul est à usage unique.
-        $captcha = Cache::pull($this->activationCaptchaKey($request->captcha_id));
+        $captcha = Cache::pull($this->captchaKey($request->captcha_id));
 
         $captchaOk = $captcha
             && hash_equals((string) $captcha['token'], (string) $request->verification_token)
@@ -308,7 +312,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Activer un compte — secours : demande de vérification au guichet des RH
+     * Activer un compte — secours : demande de vérification au Service RH
      *
      * Pour l'employé qui ne retrouve vraiment pas sa date de recrutement : il résout
      * le calcul, une demande est enregistrée avec une référence lisible, et
@@ -374,7 +378,7 @@ class AuthController extends Controller
 
         // Le calcul reste obligatoire : il prouve qu'une personne physique est devant
         // l'écran et empêche l'engorgement de la file d'attente des RH.
-        $captcha = Cache::pull($this->activationCaptchaKey($request->captcha_id));
+        $captcha = Cache::pull($this->captchaKey($request->captcha_id));
 
         $captchaOk = $captcha
             && hash_equals((string) $captcha['token'], (string) $request->verification_token)
@@ -385,11 +389,12 @@ class AuthController extends Controller
             // une demande qu'un agent devra refuser ou confirmer.
             return response()->json([
                 'message' => 'Le résultat du calcul est incorrect.',
-                'captcha' => $this->makeActivationCaptcha($request->verification_token),
+                'captcha' => $this->makeCaptcha($request->verification_token),
             ], 422);
         }
 
         $review = AccountActivationRequest::where('user_id', $user->id)
+            ->where('type', AccountActivationRequest::TYPE_ACTIVATION)
             ->where('status', AccountActivationRequest::STATUS_PENDING)
             ->latest('id')
             ->first();
@@ -408,6 +413,7 @@ class AuthController extends Controller
                 'user_id' => $user->id,
                 'employee_id' => $user->employee->id,
                 'matricule' => $user->employee->matricule,
+                'type' => AccountActivationRequest::TYPE_ACTIVATION,
                 'requested_password_hash' => $pending['password_hash'],
                 'self_declared_date' => $request->self_declared_date,
                 'status' => AccountActivationRequest::STATUS_PENDING,
@@ -416,12 +422,146 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'message' => 'Votre demande est enregistrée. Présentez-vous aux Ressources Humaines avec cette référence '
-                . 'et votre matricule : dès qu\'elles auront vérifié votre identité, votre compte s\'ouvrira avec le '
+            'message' => 'Votre demande est enregistrée. Présentez-vous au Service RH avec cette référence '
+                . 'et votre matricule : dès que l\'agent aura vérifié votre identité, votre compte s\'ouvrira avec le '
                 . 'mot de passe que vous avez choisi.',
             'reference' => $review->reference,
             'expires_at' => $review->expires_at?->toIso8601String(),
         ], $review->wasRecentlyCreated ? 201 : 200);
+    }
+
+    /**
+     * Réinitialisation — calcul anti-robot préalable
+     *
+     * @unauthenticated
+     *
+     * @bodyParam matricule string required Le matricule du compte à réinitialiser. Example: 98240812A
+     *
+     * @response 200 scenario="Calcul fourni" {"captcha": {"id": "Qw27Zp...", "question": "15 - 6 = ?"}}
+     */
+    public function forgotPasswordCaptcha(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'matricule' => ['required', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Données invalides.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        return response()->json([
+            'captcha' => $this->makeCaptcha($this->passwordResetCaptchaBinding($request->matricule)),
+        ]);
+    }
+
+    /**
+     * Réinitialisation — demande vérifiée par le Service RH
+     *
+     * Pour l'employé qui a oublié le mot de passe de son compte. Rien n'est modifié
+     * sur le compte ici : une demande est enregistrée, l'agent vérifie l'identité de
+     * la personne venue au Service RH, puis génère le mot de passe temporaire.
+     *
+     * @unauthenticated
+     *
+     * @bodyParam matricule string required Le matricule du compte à réinitialiser. Example: 98240812A
+     * @bodyParam captcha_id string required Identifiant du calcul affiché.
+     * @bodyParam captcha_answer integer required Résultat du calcul. Example: 19
+     *
+     * @response 201 scenario="Demande enregistrée" {
+     *   "message": "Votre demande est enregistrée...",
+     *   "reference": "RH-7K4QF2",
+     *   "expires_at": "2026-10-30T10:00:00+01:00"
+     * }
+     * @response 200 scenario="Demande déjà en attente" {"message": "...", "reference": "RH-7K4QF2", "expires_at": "..."}
+     * @response 404 scenario="Matricule inconnu" {"message": "Aucun compte n'est associé à ce matricule. Contactez les Ressources Humaines."}
+     * @response 409 scenario="Compte non activé" {"message": "Ce compte n'a jamais été activé. Utilisez l'écran d'activation."}
+     * @response 422 scenario="Calcul incorrect" {"message": "Le résultat du calcul est incorrect.", "captcha": {"id": "Qw27Zp...", "question": "15 - 6 = ?"}}
+     */
+    public function requestPasswordReset(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'matricule' => ['required', 'string'],
+            'captcha_id' => ['required', 'string', 'size:32', 'alpha_num'],
+            'captcha_answer' => ['required', 'integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Données invalides.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $matricule = trim((string) $request->matricule);
+        $binding = $this->passwordResetCaptchaBinding($matricule);
+
+        $captcha = Cache::pull($this->captchaKey($request->captcha_id));
+
+        $captchaOk = $captcha
+            && hash_equals((string) $captcha['token'], $binding)
+            && (int) $captcha['answer'] === (int) $request->captcha_answer;
+
+        if (!$captchaOk) {
+            return response()->json([
+                'message' => 'Le résultat du calcul est incorrect.',
+                'captcha' => $this->makeCaptcha($binding),
+            ], 422);
+        }
+
+        $user = User::with('employee')->whereHas('employee', function ($query) use ($matricule) {
+            $query->where('matricule', $matricule);
+        })->first();
+
+        if (!$user || !$user->employee) {
+            return response()->json([
+                'message' => "Aucun compte n'est associé à ce matricule. Contactez les Ressources Humaines.",
+            ], 404);
+        }
+
+        // Un compte jamais ouvert n'a pas de mot de passe oublié : sa démarche est
+        // l'activation, et l'agent du Service RH n'ouvrirait rien de plus.
+        if (!$user->isActivated()) {
+            return response()->json([
+                'message' => "Ce compte n'a jamais été activé. Utilisez l'écran d'activation avec votre matricule.",
+            ], 409);
+        }
+
+        $review = AccountActivationRequest::where('user_id', $user->id)
+            ->where('type', AccountActivationRequest::TYPE_PASSWORD_RESET)
+            ->where('status', AccountActivationRequest::STATUS_PENDING)
+            ->latest('id')
+            ->first();
+
+        if (!$review) {
+            $review = AccountActivationRequest::create([
+                'reference' => AccountActivationRequest::generateReference(),
+                'user_id' => $user->id,
+                'employee_id' => $user->employee->id,
+                'matricule' => $user->employee->matricule,
+                'type' => AccountActivationRequest::TYPE_PASSWORD_RESET,
+                'status' => AccountActivationRequest::STATUS_PENDING,
+                'expires_at' => now()->addDays(AccountActivationRequest::VALIDITY_DAYS),
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Votre demande est enregistrée. Présentez-vous au Service RH avec cette référence et votre '
+                . 'matricule : après vérification de votre identité, un agent générera un nouveau mot de passe '
+                . 'temporaire que vous pourrez utiliser immédiatement.',
+            'reference' => $review->reference,
+            'expires_at' => $review->expires_at?->toIso8601String(),
+        ], $review->wasRecentlyCreated ? 201 : 200);
+    }
+
+    /**
+     * Le calcul d'une demande de réinitialisation est lié au matricule déclaré.
+     */
+    private function passwordResetCaptchaBinding(string $matricule): string
+    {
+        return 'password_reset:' . strtolower(trim($matricule));
     }
 
     // ------------------------------------------------------------------
@@ -433,9 +573,9 @@ class AuthController extends Controller
         return "activation:{$verificationToken}";
     }
 
-    private function activationCaptchaKey(string $captchaId): string
+    private function captchaKey(string $captchaId): string
     {
-        return "activation_captcha:{$captchaId}";
+        return "auth_captcha:{$captchaId}";
     }
 
     private function activationFailuresKey(User $user): string
@@ -443,28 +583,106 @@ class AuthController extends Controller
         return "activation_failures:{$user->id}";
     }
 
+    private function loginFailuresKey(string $matricule): string
+    {
+        return 'login_failures:' . strtolower(trim($matricule));
+    }
+
+    /**
+     * État du compteur d'échecs : nombre de tentatives ratées dans la fenêtre en
+     * cours, et secondes restantes avant que le compte redevienne tentable.
+     */
+    private function failureState(string $key): array
+    {
+        $state = Cache::get($key);
+
+        if (!is_array($state) || !isset($state['count'], $state['until'])) {
+            return ['count' => 0, 'locked' => false, 'retry_after' => 0];
+        }
+
+        $retryAfter = max(0, $state['until'] - time());
+
+        return [
+            'count' => $state['count'],
+            'locked' => $state['count'] >= self::MAX_FAILURES && $retryAfter > 0,
+            'retry_after' => $retryAfter,
+        ];
+    }
+
+    /**
+     * Une tentative ratée de plus. La fenêtre de 45 minutes court depuis le premier
+     * échec : un attaquant ne peut pas la repousser indéfiniment en attendant.
+     */
+    private function registerFailure(string $key): array
+    {
+        $state = Cache::get($key);
+
+        if (!is_array($state) || !isset($state['count'], $state['until'])) {
+            $state = ['count' => 0, 'until' => now()->addMinutes(self::LOCK_MINUTES)->timestamp];
+        }
+
+        $state['count']++;
+
+        Cache::put($key, $state, now()->addSeconds(max(1, $state['until'] - time())));
+
+        return $this->failureState($key);
+    }
+
+    private function minutesRemaining(int $seconds): int
+    {
+        return (int) ceil($seconds / 60);
+    }
+
     private function activationFailureCount(User $user): int
     {
-        return (int) Cache::get($this->activationFailuresKey($user), 0);
+        return $this->failureState($this->activationFailuresKey($user))['count'];
     }
 
     private function activationLocked(User $user): bool
     {
-        return $this->activationFailureCount($user) >= self::ACTIVATION_MAX_FAILURES;
+        return $this->failureState($this->activationFailuresKey($user))['locked'];
     }
 
     private function registerActivationFailure(User $user): void
     {
-        $key = $this->activationFailuresKey($user);
-
-        Cache::add($key, 0, now()->addMinutes(self::ACTIVATION_LOCK_MINUTES));
-        Cache::increment($key);
+        $this->registerFailure($this->activationFailuresKey($user));
     }
 
-    private function activationLockedResponse()
+    private function activationLockedResponse(User $user)
+    {
+        $minutes = $this->minutesRemaining(
+            $this->failureState($this->activationFailuresKey($user))['retry_after']
+        );
+
+        return $this->lockedResponse(
+            "Trop de tentatives échouées. Réessayez dans {$minutes} minute(s) ou contactez les Ressources Humaines.",
+            $minutes
+        );
+    }
+
+    private function loginLockedResponse(array $state)
+    {
+        $minutes = $this->minutesRemaining($state['retry_after']);
+
+        return $this->lockedResponse(
+            "Trop de tentatives échouées. Ce compte est en pause pendant {$minutes} minute(s). "
+            . "Vous pouvez demander l'activation ou la réinitialisation de votre mot de passe sans attendre.",
+            $minutes
+        );
+    }
+
+    /**
+     * @param int|null $retryAfterMinutes Durée restante du blocage, quand elle est connue :
+     *                                    l'écran de connexion l'affiche en propre plutôt que
+     *                                    de la déduire du message.
+     */
+    private function lockedResponse(string $message, ?int $retryAfterMinutes = null)
     {
         return response()->json([
-            'message' => 'Trop de tentatives échouées. Réessayez dans ' . self::ACTIVATION_LOCK_MINUTES . ' minutes ou contactez les Ressources Humaines.',
+            'message' => $message,
+            'reason' => 'locked',
+            'attempts_left' => 0,
+            'retry_after_minutes' => $retryAfterMinutes,
         ], 429);
     }
 
@@ -484,21 +702,22 @@ class AuthController extends Controller
         if ($this->activationLocked($user)) {
             Cache::forget($this->activationCacheKey($verificationToken));
 
-            return $this->activationLockedResponse();
+            return $this->activationLockedResponse($user);
         }
 
         return response()->json([
             'message' => $message,
-            'remaining_attempts' => max(0, self::ACTIVATION_MAX_FAILURES - $this->activationFailureCount($user)),
-            'captcha' => $this->makeActivationCaptcha($verificationToken),
+            'remaining_attempts' => max(0, self::MAX_FAILURES - $this->activationFailureCount($user)),
+            'captcha' => $this->makeCaptcha($verificationToken),
         ], 422);
     }
 
     /**
-     * Petit calcul à usage unique, lié à la session d'activation en cours.
+     * Petit calcul à usage unique, lié à la démarche en cours : jeton de session
+     * d'activation, ou matricule pour une demande de réinitialisation.
      * La réponse n'est jamais envoyée au client : elle reste côté serveur (cache).
      */
-    private function makeActivationCaptcha(string $verificationToken): array
+    private function makeCaptcha(string $boundTo): array
     {
         $operator = ['+', '-', '×'][random_int(0, 2)];
 
@@ -519,8 +738,8 @@ class AuthController extends Controller
         $id = Str::random(32);
 
         Cache::put(
-            $this->activationCaptchaKey($id),
-            ['answer' => $answer, 'token' => $verificationToken],
+            $this->captchaKey($id),
+            ['answer' => $answer, 'token' => $boundTo],
             now()->addMinutes(10)
         );
 
@@ -553,8 +772,9 @@ class AuthController extends Controller
      *     "employee": {"id": 12, "matricule": "98240812A", "full_name": "DUPONT Jean", "photo": null}
      *   }
      * }
-     * @response 401 scenario="Identifiants incorrects" {"message": "Identifiants incorrects."}
-     * @response 403 scenario="Compte non activé" {"message": "Ce compte n'a pas encore été activé. Utilisez d'abord l'écran d'activation avec votre matricule."}
+     * @response 401 scenario="Identifiants incorrects" {"message": "Identifiants incorrects.", "reason": "invalid_credentials", "attempts_left": 3}
+     * @response 403 scenario="Compte non activé" {"message": "Ce compte n'a pas encore été activé. Utilisez d'abord l'écran d'activation avec votre matricule.", "reason": "not_activated", "attempts_left": 5}
+     * @response 429 scenario="Compte en pause après 5 échecs" {"message": "Trop de tentatives échouées. Ce compte est en pause pendant 45 minute(s). Vous pouvez demander l'activation ou la réinitialisation de votre mot de passe sans attendre.", "reason": "locked", "attempts_left": 0}
      */
     public function login(Request $request)
     {
@@ -570,19 +790,44 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::whereHas('employee', function ($query) use ($request) {
-            $query->where('matricule', $request->matricule);
+        $matricule = trim((string) $request->matricule);
+        $failuresKey = $this->loginFailuresKey($matricule);
+
+        // Le blocage est vérifié avant toute comparaison de mot de passe : un compte
+        // en pause ne doit pas être une porte de sortie pour tester des mots de passe.
+        $state = $this->failureState($failuresKey);
+
+        if ($state['locked']) {
+            return $this->loginLockedResponse($state);
+        }
+
+        $user = User::whereHas('employee', function ($query) use ($matricule) {
+            $query->where('matricule', $matricule);
         })->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
+            $state = $this->registerFailure($failuresKey);
+
+            if ($state['locked']) {
+                return $this->loginLockedResponse($state);
+            }
+
             return response()->json([
+                // Volontairement identique que le matricule existe ou non : la file
+                // d'attente du Service RH ne doit pas servir de carnet d'adresses.
                 'message' => 'Identifiants incorrects.',
+                'reason' => 'invalid_credentials',
+                'attempts_left' => max(0, self::MAX_FAILURES - $state['count']),
             ], 401);
         }
+
+        Cache::forget($failuresKey);
 
         if (!$user->isActivated()) {
             return response()->json([
                 'message' => "Ce compte n'a pas encore été activé. Utilisez d'abord l'écran d'activation avec votre matricule.",
+                'reason' => 'not_activated',
+                'attempts_left' => self::MAX_FAILURES,
             ], 403);
         }
 

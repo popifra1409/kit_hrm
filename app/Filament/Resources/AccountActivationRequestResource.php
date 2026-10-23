@@ -11,10 +11,11 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\ValidationException;
 
 /**
  * File d'attente des employés qui n'ont pas pu prouver leur date de recrutement
- * et qui se présentent au guichet avec une référence. En lecture seule : une
+ * et qui se présentent au Service RH avec une référence. En lecture seule : une
  * demande naît uniquement de l'écran d'activation.
  */
 class AccountActivationRequestResource extends Resource
@@ -80,7 +81,14 @@ class AccountActivationRequestResource extends Resource
                     ->searchable()
                     ->description(fn(AccountActivationRequest $record) => $record->matricule),
 
-                // Comparaison immédiate au guichet : ce que l'employé annonce vs la fiche.
+                // Deux démarches dans la même file : le traitement n'est pas le même.
+                Tables\Columns\TextColumn::make('type')
+                    ->label('Démarche')
+                    ->badge()
+                    ->formatStateUsing(fn(AccountActivationRequest $record) => $record->type_label)
+                    ->color(fn(AccountActivationRequest $record) => $record->isPasswordReset() ? 'info' : 'primary'),
+
+                // Comparaison immédiate au Service RH : ce que l'employé annonce vs la fiche.
                 Tables\Columns\TextColumn::make('self_declared_date')
                     ->label('Déclaré par l\'employé')
                     ->date('d/m/Y')
@@ -117,6 +125,13 @@ class AccountActivationRequestResource extends Resource
                     ->tooltip(fn(AccountActivationRequest $record) => $record->rejection_reason),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('type')
+                    ->label('Démarche')
+                    ->options([
+                        'activation' => 'Activation du compte',
+                        'password_reset' => 'Réinitialisation du mot de passe',
+                    ]),
+
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Statut')
                     ->options([
@@ -126,8 +141,8 @@ class AccountActivationRequestResource extends Resource
                     ]),
             ])
             ->actions([
-                // Ouverture du compte : la seule action qui applique le mot de passe
-                // choisi par l'employé. L'agent doit avoir vérifié l'identité en personne.
+                // La seule action qui applique un mot de passe. L'agent doit avoir
+                // vérifié l'identité de la personne en personne.
                 Tables\Actions\Action::make('validate')
                     ->label('Valider')
                     ->icon('heroicon-o-check-circle')
@@ -135,16 +150,47 @@ class AccountActivationRequestResource extends Resource
                     ->authorize('validate')
                     ->visible(fn(AccountActivationRequest $record) => $record->isValidatable()
                         && auth()->user()->can('validate_account_activations'))
-                    ->modalHeading('Valider cette demande d\'activation')
-                    ->modalDescription('Le compte sera ouvert avec le mot de passe que l\'employé a choisi lors de sa démarche, et il pourra se connecter immédiatement.')
-                    ->modalSubmitActionLabel('Ouvrir le compte')
+                    ->modalHeading(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                        ? 'Régénérer le mot de passe de cette personne'
+                        : 'Valider cette demande d\'activation')
+                    ->modalDescription(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                        ? 'Un mot de passe temporaire sera généré et affiché une seule fois : remettez-le ou lisez-le à la personne immédiatement, il n\'est conservé nulle part.'
+                        : 'Le compte sera ouvert avec le mot de passe que l\'employé a choisi lors de sa démarche, et il pourra se connecter immédiatement.')
+                    ->modalSubmitActionLabel(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                        ? 'Générer le mot de passe'
+                        : 'Ouvrir le compte')
                     ->form([
                         Forms\Components\Checkbox::make('identity_checked')
-                            ->label('J\'ai vérifié l\'identité de cette personne au guichet (pièce d\'identité ou attestation RH).')
+                            ->label('J\'ai vérifié l\'identité de cette personne au Service RH (pièce d\'identité ou attestation).')
                             ->required(),
                     ])
-                    ->action(function (AccountActivationRequest $record, array $data) {
-                        app(AccountActivationReviewService::class)->validate(auth()->user(), $record);
+                    ->action(function (AccountActivationRequest $record) {
+                        try {
+                            $temporaryPassword = app(AccountActivationReviewService::class)
+                                ->validate(auth()->user(), $record);
+                        } catch (ValidationException $e) {
+                            // Le service refuse : sans ce message visible, la fenêtre se
+                            // contente de se refermer et le clic paraît sans effet.
+                            Notification::make()
+                                ->title('Demande non traitée')
+                                ->body(collect($e->errors())->flatten()->first() ?? $e->getMessage())
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        if ($temporaryPassword) {
+                            // persistent() : rien n'expire pendant que l'agent le dicte.
+                            Notification::make()
+                                ->title('Nouveau mot de passe temporaire')
+                                ->body("À remettre sur-le-champ à {$record->employee?->full_name} : {$temporaryPassword}")
+                                ->success()
+                                ->persistent()
+                                ->send();
+
+                            return;
+                        }
 
                         Notification::make()
                             ->title('Compte activé')
@@ -171,11 +217,47 @@ class AccountActivationRequestResource extends Resource
                             ->maxLength(1000),
                     ])
                     ->action(function (AccountActivationRequest $record, array $data) {
-                        app(AccountActivationReviewService::class)->reject(auth()->user(), $record, $data['reason']);
+                        try {
+                            app(AccountActivationReviewService::class)->reject(auth()->user(), $record, $data['reason']);
+                        } catch (ValidationException $e) {
+                            Notification::make()
+                                ->title('Rejet non enregistré')
+                                ->body(collect($e->errors())->flatten()->first() ?? $e->getMessage())
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
 
                         Notification::make()
                             ->title('Demande rejetée')
                             ->success()
+                            ->send();
+                    }),
+
+                // Le mot de passe généré n'est stocké nulle part : si la personne a
+                // raccroché avant de le noter, l'agent doit pouvoir en produire un autre.
+                Tables\Actions\Action::make('regenerate')
+                    ->label('Nouveau mot de passe')
+                    ->icon('heroicon-o-key')
+                    ->color('gray')
+                    ->authorize('regenerate')
+                    ->visible(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                        && $record->status === AccountActivationRequest::STATUS_VALIDATED
+                        && auth()->user()->can('validate_account_activations'))
+                    ->requiresConfirmation()
+                    ->modalHeading('Générer un nouveau mot de passe temporaire')
+                    ->modalDescription('Le mot de passe précédent cesse de fonctionner dès ici : à dicter immédiatement à la personne.')
+                    ->modalSubmitActionLabel('Générer')
+                    ->action(function (AccountActivationRequest $record) {
+                        $temporaryPassword = app(AccountActivationReviewService::class)
+                            ->regenerateTemporaryPassword($record);
+
+                        Notification::make()
+                            ->title('Nouveau mot de passe temporaire')
+                            ->body("À remettre sur-le-champ à {$record->employee?->full_name} : {$temporaryPassword}")
+                            ->success()
+                            ->persistent()
                             ->send();
                     }),
             ])

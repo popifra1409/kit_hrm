@@ -199,7 +199,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'cancel_census_submissions', 'module' => 'employees', 'description' => 'Annuler un recensement en attente pour que l\'employé le reprenne'],
 
             // === ACTIVATION DES COMPTES EMPLOYÉS ===
-            ['name' => 'view_account_activation_requests', 'module' => 'employees', 'description' => 'Voir les demandes d\'activation vérifiées au guichet RH'],
+            ['name' => 'view_account_activation_requests', 'module' => 'employees', 'description' => 'Voir les demandes traitées par le Service RH (activation, mot de passe oublié)'],
             ['name' => 'validate_account_activations', 'module' => 'employees', 'description' => 'Valider ou rejeter une demande d\'activation après vérification d\'identité'],
 
             // === VALIDATION AYANTS DROIT & DIPLÔMES (distinct de la simple édition) ===
