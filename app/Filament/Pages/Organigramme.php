@@ -7,7 +7,7 @@ use App\Models\Direction;
 
 class Organigramme extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
     protected static string $view = 'filament.pages.organigramme';
     protected static ?string $navigationGroup = '🏢 Structure Organisationnelle';
     protected static ?int $navigationSort = 10;
@@ -114,5 +114,9 @@ class Organigramme extends Page
             'orgData' => $orgData,
             'rawData' => $orgData,
         ];
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_employees') ?? false;
     }
 }

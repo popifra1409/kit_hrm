@@ -22,10 +22,11 @@ class AccountActivationRequestResource extends Resource
     protected static ?string $model = AccountActivationRequest::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-key';
+    protected static ?string $navigationLabel = 'Demandes d’activation RH';
 
-    protected static ?string $navigationGroup = '👥 Gestion du Personnel';
+    protected static ?string $navigationGroup = '🗂️ Recensement & Activation';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 3;
 
     public static function getModelLabel(): string
     {

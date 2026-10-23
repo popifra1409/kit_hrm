@@ -15,10 +15,10 @@ class ImportEmployees extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-tray';
-    protected static ?string $navigationLabel = 'Importer Employés';
+    protected static ?string $navigationLabel = 'Importer des employés';
     protected static ?string $title = 'Importer des Employés depuis Excel';
     protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 6;
 
     protected static string $view = 'filament.pages.import-employees';
 
@@ -56,5 +56,9 @@ class ImportEmployees extends Page implements HasForms
                 ->body('Erreur: ' . $e->getMessage())
                 ->send();
         }
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('create_employees') ?? false;
     }
 }

@@ -16,7 +16,8 @@ class DependentResource extends Resource
 {
     protected static ?string $model = Dependent::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static ?string $navigationIcon = 'heroicon-o-user-circle';
+    protected static ?string $navigationLabel = 'Ayants droit & assurance';
 
     public static function getModelLabel(): string
     {

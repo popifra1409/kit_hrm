@@ -100,32 +100,26 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make('🏢 Structure Organisationnelle')
-                    ->collapsed(true),
-                NavigationGroup::make('👥 Gestion du Personnel')
-                    ->collapsed(true),
-                NavigationGroup::make('🏖️ Congés & Absences')
-                    ->collapsed(true),
-                NavigationGroup::make('📋 Contrats & Affectations')
-                    ->collapsed(true),
-                NavigationGroup::make('📚 Gestion Documentaire')
-                    ->collapsed(true),
-                NavigationGroup::make('💰 Gestion de la Paie')
-                    ->collapsed(true),
-                NavigationGroup::make('💰 Quote-Parts')
-                    ->collapsed(true),
-                NavigationGroup::make('⚙️ Paramétrage')
-                    ->collapsed(true),
-                NavigationGroup::make('🔧 Administration')
-                    ->collapsed(true),
+                // Groupes ouverts : les plus consultés au quotidien
+                NavigationGroup::make('👥 Gestion du Personnel')->collapsed(false),
+                NavigationGroup::make('🌴 Congés & Absences')->collapsed(false),
+                NavigationGroup::make('💰 Gestion de la Paie')->collapsed(false),
+                NavigationGroup::make('📈 Carrière & Avancements')->collapsed(true),
+                NavigationGroup::make('🗂️ Recensement & Activation')->collapsed(true),
+                NavigationGroup::make('🏢 Structure Organisationnelle')->collapsed(true),
+                NavigationGroup::make('📋 Contrats & Affectations')->collapsed(true),
+                NavigationGroup::make('🩺 Quote-parts médicales')->collapsed(true),
+                NavigationGroup::make('📚 Gestion Documentaire')->collapsed(true),
+                NavigationGroup::make('⚙️ Paramétrage')->collapsed(true),
+                NavigationGroup::make('🔧 Administration')->collapsed(true),
             ])
             ->navigationItems([
                 \Filament\Navigation\NavigationItem::make('Thèmes')
                     ->icon('heroicon-o-swatch')
-                    ->group('⚙️ Paramétrage')
+                    ->group('🔧 Administration')
                     ->url(fn() => route('filament.admin.pages.themes'))
                     ->visible(fn() => auth()->user()?->hasRole('super_admin'))
-                    ->sort(3),
+                    ->sort(5),
             ])
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,

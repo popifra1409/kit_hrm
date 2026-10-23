@@ -15,8 +15,9 @@ class MedicalActivityResource extends Resource
     protected static ?string $model = MedicalActivity::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationGroup = '💰 Quote-Parts';
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Activités médicales';
+    protected static ?string $navigationGroup = '🩺 Quote-parts médicales';
+    protected static ?int $navigationSort = 3;
 
     public static function getModelLabel(): string
     {

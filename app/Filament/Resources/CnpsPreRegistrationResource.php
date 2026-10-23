@@ -15,6 +15,7 @@ class CnpsPreRegistrationResource extends Resource
     protected static ?string $model = CnpsPreRegistration::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-identification';
+    protected static ?string $navigationLabel = 'Pré-immatriculations CNPS';
 
     public static function getModelLabel(): string
     {
@@ -28,12 +29,12 @@ class CnpsPreRegistrationResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '📚 Gestion Documentaire';
+        return '🗂️ Recensement & Activation';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
+        return 4;
     }
 
     public static function form(Form $form): Form

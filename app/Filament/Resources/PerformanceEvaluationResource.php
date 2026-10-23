@@ -15,6 +15,7 @@ class PerformanceEvaluationResource extends Resource
     protected static ?string $model = PerformanceEvaluation::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-star';
+    protected static ?string $navigationLabel = 'Évaluations de performance';
 
     public static function getModelLabel(): string
     {
@@ -28,12 +29,12 @@ class PerformanceEvaluationResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '📈 Carrière & Avancements';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 11;
+        return 6;
     }
 
     public static function form(Form $form): Form

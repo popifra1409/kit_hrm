@@ -16,6 +16,7 @@ class DocumentResource extends Resource
     protected static ?string $model = Document::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static ?string $navigationLabel = 'Documents';
 
     public static function getModelLabel(): string
     {
@@ -34,7 +35,7 @@ class DocumentResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 1;
     }
 
     public static function form(Form $form): Form

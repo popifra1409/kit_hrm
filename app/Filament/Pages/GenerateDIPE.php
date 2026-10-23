@@ -15,7 +15,7 @@ class GenerateDIPE extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static ?string $navigationIcon = 'heroicon-o-document-check';
     protected static ?string $navigationLabel = 'Générer DIPE CNPS';
     protected static ?string $title = 'Génération du DIPE CNPS';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
@@ -301,5 +301,9 @@ class GenerateDIPE extends Page implements HasForms
             ->count();
 
         return ['count' => $count];
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('calculate_payrolls') ?? false;
     }
 }

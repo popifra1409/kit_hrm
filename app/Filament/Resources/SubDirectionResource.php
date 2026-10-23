@@ -17,6 +17,7 @@ class SubDirectionResource extends Resource
     protected static ?string $model = SubDirection::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
+    protected static ?string $navigationLabel = 'Sous-directions';
 
     public static function getModelLabel(): string
     {

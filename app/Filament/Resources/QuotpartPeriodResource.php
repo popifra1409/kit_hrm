@@ -16,8 +16,9 @@ class QuotpartPeriodResource extends Resource
 {
     protected static ?string $model = QuotpartPeriod::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
-    protected static ?string $navigationGroup = '💰 Quote-Parts';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static ?string $navigationLabel = 'Périodes de quote-part';
+    protected static ?string $navigationGroup = '🩺 Quote-parts médicales';
     protected static ?int $navigationSort = 1;
 
     public static function getModelLabel(): string

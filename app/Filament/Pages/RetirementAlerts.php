@@ -16,10 +16,10 @@ class RetirementAlerts extends Page implements HasTable
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-bell-alert';
-    protected static ?string $navigationLabel = 'Alertes Retraites';
+    protected static ?string $navigationLabel = 'Alertes retraite';
     protected static ?string $title = 'Alertes et Suivi des Retraites';
-    protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 12;
+    protected static ?string $navigationGroup = '📈 Carrière & Avancements';
+    protected static ?int $navigationSort = 7;
 
     protected static string $view = 'filament.pages.retirement-alerts';
 

@@ -15,6 +15,7 @@ class CensusCampaignResource extends Resource
     protected static ?string $model = CensusCampaign::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+    protected static ?string $navigationLabel = 'Campagnes de recensement';
 
     public static function getModelLabel(): string
     {
@@ -28,12 +29,12 @@ class CensusCampaignResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '🗂️ Recensement & Activation';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 4;
+        return 1;
     }
 
     public static function form(Form $form): Form

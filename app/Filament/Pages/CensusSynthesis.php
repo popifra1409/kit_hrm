@@ -25,13 +25,13 @@ class CensusSynthesis extends Page implements HasTable
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationLabel = 'Point Recensement';
+    protected static ?string $navigationLabel = 'Point général du recensement';
 
     protected static ?string $title = 'Point Général du Recensement';
 
-    protected static ?string $navigationGroup = '👥 Gestion du Personnel';
+    protected static ?string $navigationGroup = '🗂️ Recensement & Activation';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 2;
 
     protected static string $view = 'filament.pages.census-synthesis';
 

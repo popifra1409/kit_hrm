@@ -16,10 +16,10 @@ class InitializeLeaveBalances extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-out';
-    protected static ?string $navigationLabel = 'Initialiser Soldes';
+    protected static ?string $navigationLabel = 'Initialiser les soldes';
     protected static ?string $title = 'Initialiser les Soldes de Congés';
-    protected static ?string $navigationGroup = '🏖️ Congés & Absences';
-    protected static ?int $navigationSort = 6;
+    protected static ?string $navigationGroup = '🌴 Congés & Absences';
+    protected static ?int $navigationSort = 7;
 
     protected static string $view = 'filament.pages.initialize-leave-balances';
 
@@ -141,5 +141,9 @@ class InitializeLeaveBalances extends Page implements HasForms
             'with_balances' => $withBalances,
             'without_balances' => $withoutBalances,
         ];
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('manage_leave_settings') ?? false;
     }
 }

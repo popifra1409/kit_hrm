@@ -17,8 +17,9 @@ class SalaryGridResource extends Resource
     protected static ?string $model = SalaryGrid::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-table-cells';
+    protected static ?string $navigationLabel = 'Grille salariale';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 4;
 
     public static function getModelLabel(): string
     {

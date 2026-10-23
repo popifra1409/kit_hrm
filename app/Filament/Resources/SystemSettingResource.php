@@ -15,6 +15,7 @@ class SystemSettingResource extends Resource
     protected static ?string $model = SystemSetting::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static ?string $navigationLabel = 'Paramètres système';
 
     public static function getModelLabel(): string
     {

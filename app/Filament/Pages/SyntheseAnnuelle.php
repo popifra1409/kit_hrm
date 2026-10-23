@@ -16,7 +16,7 @@ class SyntheseAnnuelle extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar';
-    protected static ?string $navigationLabel = 'Synthèse Annuelle';
+    protected static ?string $navigationLabel = 'Synthèse annuelle';
     protected static ?string $title = 'Synthèse Annuelle des Retenues sur Salaires';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
     protected static ?int $navigationSort = 9;
@@ -170,5 +170,9 @@ class SyntheseAnnuelle extends Page implements HasForms
             new AnnualSummaryExport($this->year, $employeeId),
             $filename
         );
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_reports') ?? false;
     }
 }

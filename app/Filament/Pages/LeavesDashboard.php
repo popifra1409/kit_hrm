@@ -19,9 +19,9 @@ class LeavesDashboard extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-presentation-chart-bar';
-    protected static ?string $navigationLabel = 'Tableau de Bord Congés';
+    protected static ?string $navigationLabel = 'Tableau de bord congés';
     protected static ?string $title = 'Tableau de Bord - Gestion des Congés';
-    protected static ?string $navigationGroup = '🏖️ Congés & Absences';
+    protected static ?string $navigationGroup = '🌴 Congés & Absences';
     protected static ?int $navigationSort = 1;
 
     protected static string $view = 'filament.pages.leaves-dashboard';

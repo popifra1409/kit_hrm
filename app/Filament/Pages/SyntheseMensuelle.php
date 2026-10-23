@@ -16,7 +16,7 @@ class SyntheseMensuelle extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
-    protected static ?string $navigationLabel = 'Synthèse Mensuelle';
+    protected static ?string $navigationLabel = 'Synthèse mensuelle';
     protected static ?string $title = 'Synthèse Mensuelle des Salaires';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
     protected static ?int $navigationSort = 8;
@@ -141,5 +141,9 @@ class SyntheseMensuelle extends Page implements HasForms
             new MonthlySummaryExport($this->month, $this->year),
             $filename
         );
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_reports') ?? false;
     }
 }

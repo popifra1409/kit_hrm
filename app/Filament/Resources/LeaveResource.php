@@ -20,7 +20,7 @@ class LeaveResource extends Resource
 {
     protected static ?string $model = Leave::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
     public static function form(Form $form): Form
     {
@@ -554,7 +554,7 @@ class LeaveResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'Demandes de Congés';
+        return 'Demandes de congés';
     }
 
     public static function getPluralModelLabel(): string
@@ -564,7 +564,7 @@ class LeaveResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '🏖️ Congés & Absences';
+        return '🌴 Congés & Absences';
     }
 
     public static function getNavigationSort(): ?int

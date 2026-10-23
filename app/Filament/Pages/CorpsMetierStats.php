@@ -16,11 +16,11 @@ class CorpsMetierStats extends Page implements HasForms
     protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
     protected static string $view = 'filament.pages.corps-metier-stats';
     protected static ?string $navigationGroup = '🏢 Structure Organisationnelle';
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 11;
 
     public static function getNavigationLabel(): string
     {
-        return 'Effectifs par Corps de Métier';
+        return 'Effectifs par corps de métier';
     }
 
     public function getTitle(): string
@@ -128,5 +128,9 @@ class CorpsMetierStats extends Page implements HasForms
             'unassigned' => $unassigned,
             'activeOnly' => $this->activeOnly,
         ];
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_employees') ?? false;
     }
 }

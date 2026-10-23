@@ -17,7 +17,7 @@ class AdvancementResource extends Resource
 {
     protected static ?string $model = Advancement::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-up';
 
     public static function form(Form $form): Form
     {
@@ -242,12 +242,12 @@ class AdvancementResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '📈 Carrière & Avancements';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 1;
     }
 
     public static function getNavigationIcon(): ?string

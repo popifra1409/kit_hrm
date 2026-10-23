@@ -14,7 +14,8 @@ class LeaveApprovalStepResource extends Resource
 {
     protected static ?string $model = LeaveApprovalStep::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
+    protected static ?string $navigationIcon = 'heroicon-o-queue-list';
+    protected static ?string $navigationLabel = 'Circuit de validation des congés';
 
     public static function getModelLabel(): string
     {
@@ -33,7 +34,7 @@ class LeaveApprovalStepResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 11;
+        return 6;
     }
 
     public static function form(Form $form): Form

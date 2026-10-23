@@ -17,7 +17,7 @@ class EmployeeAffectationResource extends Resource
 {
     protected static ?string $model = EmployeeAffectation::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
 
     public static function form(Form $form): Form
     {
@@ -167,7 +167,7 @@ class EmployeeAffectationResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 9;
+        return 3;
     }
 
     public static function getNavigationIcon(): ?string

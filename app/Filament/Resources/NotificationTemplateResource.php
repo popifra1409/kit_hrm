@@ -14,7 +14,8 @@ class NotificationTemplateResource extends Resource
 {
     protected static ?string $model = NotificationTemplate::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static ?string $navigationIcon = 'heroicon-o-envelope';
+    protected static ?string $navigationLabel = 'Modèles de notifications';
 
     public static function getModelLabel(): string
     {
@@ -33,7 +34,7 @@ class NotificationTemplateResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 9;
     }
 
     public static function form(Form $form): Form

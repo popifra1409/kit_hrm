@@ -14,8 +14,9 @@ class RevenueDeclarationResource extends Resource
 {
     protected static ?string $model = RevenueDeclaration::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationGroup = '💰 Quote-Parts';
+    protected static ?string $navigationIcon = 'heroicon-o-receipt-percent';
+    protected static ?string $navigationLabel = 'Déclarations de recettes';
+    protected static ?string $navigationGroup = '🩺 Quote-parts médicales';
     protected static ?int $navigationSort = 2;
 
     public static function getModelLabel(): string

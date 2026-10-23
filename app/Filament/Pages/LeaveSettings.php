@@ -16,11 +16,11 @@ class LeaveSettings extends Page implements HasForms
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
     protected static string $view = 'filament.pages.leave-settings';
     protected static ?string $navigationGroup = '⚙️ Paramétrage';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 5;
 
     public static function getNavigationLabel(): string
     {
-        return 'Congés & Permissions';
+        return 'Congés & permissions';
     }
 
     public static function canAccess(): bool

@@ -36,12 +36,12 @@ class PayrollResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 3;
+        return 2;
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Bulletins de Paie';
+        return 'Bulletins de paie';
     }
 
     public static function getNavigationBadge(): ?string

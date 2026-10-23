@@ -14,7 +14,7 @@ class PayrollItemResource extends Resource
 {
     protected static ?string $model = PayrollItem::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
     public static function getModelLabel(): string
     {
@@ -33,12 +33,12 @@ class PayrollItemResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 5;
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Éléments de Paie';
+        return 'Éléments de paie';
     }
 
     public static function form(Form $form): Form

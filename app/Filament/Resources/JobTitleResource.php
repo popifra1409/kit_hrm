@@ -179,11 +179,11 @@ class JobTitleResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 6;
+        return 8;
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Titres de Postes';
+        return 'Titres de postes';
     }
 }

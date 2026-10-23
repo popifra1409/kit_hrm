@@ -10,10 +10,10 @@ use App\Models\PayrollItem;
 class PayrollDashboard extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-presentation-chart-line';
-    protected static ?string $navigationLabel = 'Tableau de Bord Paie';
+    protected static ?string $navigationLabel = 'Tableau de bord paie';
     protected static ?string $title = 'Tableau de Bord - Gestion de la Paie';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 1;
 
     protected static string $view = 'filament.pages.payroll-dashboard';
 
@@ -194,5 +194,9 @@ class PayrollDashboard extends Page
         ];
 
         return $months[$month] ?? '';
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_payrolls') ?? false;
     }
 }

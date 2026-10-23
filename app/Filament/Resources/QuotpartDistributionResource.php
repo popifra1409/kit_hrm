@@ -12,9 +12,10 @@ class QuotpartDistributionResource extends Resource
 {
     protected static ?string $model = QuotpartDistribution::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
-    protected static ?string $navigationGroup = '💰 Quote-Parts';
-    protected static ?int $navigationSort = 5;
+    protected static ?string $navigationIcon = 'heroicon-o-truck';
+    protected static ?string $navigationLabel = 'Distributions de quote-part';
+    protected static ?string $navigationGroup = '🩺 Quote-parts médicales';
+    protected static ?int $navigationSort = 4;
 
     public static function getModelLabel(): string
     {

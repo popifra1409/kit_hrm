@@ -16,7 +16,8 @@ class SectorResource extends Resource
 {
     protected static ?string $model = Sector::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
+    protected static ?string $navigationIcon = 'heroicon-o-map';
+    protected static ?string $navigationLabel = 'Secteurs & unités';
 
     public static function getModelLabel(): string
     {
@@ -35,7 +36,7 @@ class SectorResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 6;
     }
 
     public static function form(Form $form): Form

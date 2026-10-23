@@ -17,7 +17,7 @@ class MedicalDepartmentResource extends Resource
 {
     protected static ?string $model = MedicalDepartment::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-heart';
 
     public static function form(Form $form): Form
     {
@@ -112,17 +112,17 @@ class MedicalDepartmentResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 4;
     }
 
     public static function getNavigationIcon(): ?string
     {
-        return 'heroicon-o-building-office-2';
+        return 'heroicon-o-heart';
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Départements Médicaux';
+        return 'Départements médicaux';
     }
     public static function getModelLabel(): string
     {

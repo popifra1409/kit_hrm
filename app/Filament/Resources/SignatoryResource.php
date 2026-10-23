@@ -16,6 +16,7 @@ class SignatoryResource extends Resource
     protected static ?string $model = Signatory::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
+    protected static ?string $navigationLabel = 'Signataires';
 
     public static function getModelLabel(): string
     {
@@ -34,7 +35,7 @@ class SignatoryResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 3;
     }
 
     public static function form(Form $form): Form

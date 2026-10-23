@@ -18,10 +18,10 @@ class CalculateAdvancements extends Page implements HasTable
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-calculator';
-    protected static ?string $navigationLabel = 'Calculer Avancements';
+    protected static ?string $navigationLabel = 'Calculer les avancements';
     protected static ?string $title = 'Calculer les Avancements Automatiques';
-    protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 6;
+    protected static ?string $navigationGroup = '📈 Carrière & Avancements';
+    protected static ?int $navigationSort = 2;
 
     protected static string $view = 'filament.pages.calculate-advancements';
 
@@ -171,5 +171,9 @@ class CalculateAdvancements extends Page implements HasTable
             ->success()
             ->body("{$count} avancements automatiques ont été créés.")
             ->send();
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('edit_employees') ?? false;
     }
 }

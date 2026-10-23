@@ -17,11 +17,11 @@ class GeneratePayrolls extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-calculator';
-    protected static ?string $navigationLabel = 'Générer Bulletins';
+    protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    protected static ?string $navigationLabel = 'Générer les bulletins';
     protected static ?string $title = 'Générer les Bulletins de Paie';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     protected static string $view = 'filament.pages.generate-payrolls';
 
@@ -206,5 +206,9 @@ class GeneratePayrolls extends Page implements HasForms
                 ]);
             }
         }
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('generate_payslips') ?? false;
     }
 }

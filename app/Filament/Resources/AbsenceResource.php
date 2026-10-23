@@ -15,6 +15,7 @@ class AbsenceResource extends Resource
     protected static ?string $model = Absence::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
+    protected static ?string $navigationLabel = 'Absences & permissions';
 
     public static function getModelLabel(): string
     {
@@ -28,12 +29,12 @@ class AbsenceResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '🏖️ Congés & Absences';
+        return '🌴 Congés & Absences';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 5    ;
+        return 3;
     }
 
     public static function form(Form $form): Form

@@ -17,7 +17,8 @@ class LeaveTypeResource extends Resource
 {
     protected static ?string $model = LeaveType::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-numbered-list';
+    protected static ?string $navigationLabel = 'Types de congés';
 
     public static function form(Form $form): Form
     {
@@ -164,16 +165,16 @@ class LeaveTypeResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '🏖️ Congés & Absences';
+        return '⚙️ Paramétrage';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 4;
     }
 
     public static function getNavigationIcon(): ?string
     {
-        return 'heroicon-o-clipboard-document-list';
+        return 'heroicon-o-numbered-list';
     }
 }

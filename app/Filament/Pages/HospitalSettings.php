@@ -23,12 +23,12 @@ class HospitalSettings extends Page implements HasForms, HasActions
 {
     use InteractsWithForms, InteractsWithActions;
 
-    protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationLabel = 'Configuration Hôpital';
+    protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
+    protected static ?string $navigationLabel = 'Configuration de l’hôpital';
     protected static string $view = 'filament.pages.hospital-settings';
     protected static ?string $title = 'Configuration de l\'Hôpital';
     protected static ?string $navigationGroup = '⚙️ Paramétrage';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     // Propriétés du formulaire
     public ?array $data = [];
@@ -433,5 +433,9 @@ class HospitalSettings extends Page implements HasForms, HasActions
                         ->send();
                 }),
         ];
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_settings') ?? false;
     }
 }

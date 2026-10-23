@@ -15,7 +15,7 @@ class QualificationResource extends Resource
 {
     protected static ?string $model = Qualification::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
+    protected static ?string $navigationIcon = 'heroicon-o-trophy';
 
     public static function form(Form $form): Form
     {
@@ -161,7 +161,7 @@ class QualificationResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 7;
+        return 9;
     }
 
     public static function getNavigationLabel(): string

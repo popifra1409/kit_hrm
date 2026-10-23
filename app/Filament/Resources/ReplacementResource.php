@@ -15,6 +15,7 @@ class ReplacementResource extends Resource
     protected static ?string $model = Replacement::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
+    protected static ?string $navigationLabel = 'Remplacements';
 
     public static function getModelLabel(): string
     {
@@ -28,12 +29,12 @@ class ReplacementResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '📈 Carrière & Avancements';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 8;
+        return 4;
     }
 
     public static function form(Form $form): Form

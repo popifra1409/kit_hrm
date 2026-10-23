@@ -17,7 +17,8 @@ class EmployeeAssignmentHistoryResource extends Resource
 {
     protected static ?string $model = EmployeeAssignmentHistory::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-uturn-left';
+    protected static ?string $navigationLabel = 'Historique des affectations';
 
     public static function getModelLabel(): string
     {
@@ -31,12 +32,12 @@ class EmployeeAssignmentHistoryResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '📋 Contrats & Affectations';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 6;
+        return 4;
     }
 
     public static function form(Form $form): Form

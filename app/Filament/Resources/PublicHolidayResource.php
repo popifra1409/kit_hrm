@@ -14,7 +14,8 @@ class PublicHolidayResource extends Resource
 {
     protected static ?string $model = PublicHoliday::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static ?string $navigationIcon = 'heroicon-o-gift';
+    protected static ?string $navigationLabel = 'Jours fériés';
 
     public static function getModelLabel(): string
     {
@@ -33,7 +34,7 @@ class PublicHolidayResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 12;
+        return 7;
     }
 
     public static function form(Form $form): Form

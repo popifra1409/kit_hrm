@@ -22,7 +22,7 @@ class ProfileSearch extends Page implements HasForms
 
     public static function getNavigationLabel(): string
     {
-        return 'Recherche de Profils';
+        return 'Recherche de profils';
     }
 
     public static function canAccess(): bool

@@ -16,6 +16,7 @@ class TrainingResource extends Resource
     protected static ?string $model = Training::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
+    protected static ?string $navigationLabel = 'Formations';
 
     public static function getModelLabel(): string
     {
@@ -29,12 +30,12 @@ class TrainingResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '📈 Carrière & Avancements';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 9;
+        return 5;
     }
 
     public static function form(Form $form): Form

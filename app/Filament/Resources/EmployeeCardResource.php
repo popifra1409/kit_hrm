@@ -16,6 +16,7 @@ class EmployeeCardResource extends Resource
     protected static ?string $model = EmployeeCard::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
+    protected static ?string $navigationLabel = 'Cartes professionnelles & santé';
 
     public static function getModelLabel(): string
     {

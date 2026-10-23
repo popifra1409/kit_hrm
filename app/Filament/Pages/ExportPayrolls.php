@@ -15,7 +15,7 @@ class ExportPayrolls extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-down-tray';
-    protected static ?string $navigationLabel = 'Exporter Paie';
+    protected static ?string $navigationLabel = 'Exporter la paie';
     protected static ?string $title = 'Exporter les Bulletins de Paie';
     protected static ?string $navigationGroup = '💰 Gestion de la Paie';
     protected static ?int $navigationSort = 6;
@@ -129,5 +129,9 @@ class ExportPayrolls extends Page implements HasForms
             'gross' => $gross,
             'net' => $net,
         ];
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('export_payrolls') ?? false;
     }
 }

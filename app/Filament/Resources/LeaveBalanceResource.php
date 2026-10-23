@@ -17,7 +17,7 @@ class LeaveBalanceResource extends Resource
 {
     protected static ?string $model = LeaveBalance::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
     public static function form(Form $form): Form
     {
@@ -167,12 +167,12 @@ class LeaveBalanceResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '🏖️ Congés & Absences';
+        return '🌴 Congés & Absences';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 6;
+        return 5;
     }
 
     public static function getNavigationIcon(): ?string
@@ -182,6 +182,6 @@ class LeaveBalanceResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'Soldes de Congés';
+        return 'Soldes de congés';
     }
 }

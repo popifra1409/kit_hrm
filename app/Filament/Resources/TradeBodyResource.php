@@ -159,11 +159,11 @@ class TradeBodyResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 5;
+        return 7;
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Corps de Métiers';
+        return 'Corps de métiers';
     }
 }

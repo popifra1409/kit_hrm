@@ -13,8 +13,9 @@ class AccountDeletionResource extends Resource
     protected static ?string $model = AccountDeletion::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-minus';
-    protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 20;
+    protected static ?string $navigationLabel = 'Suppressions de comptes';
+    protected static ?string $navigationGroup = '🔧 Administration';
+    protected static ?int $navigationSort = 4;
 
     public static function getModelLabel(): string
     {

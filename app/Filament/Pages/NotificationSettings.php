@@ -24,7 +24,7 @@ class NotificationSettings extends Page implements HasForms
     protected static string $view = 'filament.pages.notification-settings';
     protected static ?string $title = 'Configuration des Notifications';
     protected static ?string $navigationGroup = '⚙️ Paramétrage';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 8;
 
     public ?array $data = [];
 
@@ -384,5 +384,9 @@ class NotificationSettings extends Page implements HasForms
         }
 
         return 'notifications';
+    }
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->can('view_settings') ?? false;
     }
 }

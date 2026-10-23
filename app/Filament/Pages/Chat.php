@@ -21,7 +21,7 @@ class Chat extends Page implements HasForms
     protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
     protected static string $view = 'filament.pages.chat';
     protected static ?string $navigationGroup = '👥 Gestion du Personnel';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 5;
 
     public static function getNavigationLabel(): string
     {

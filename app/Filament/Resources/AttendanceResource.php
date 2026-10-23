@@ -14,7 +14,8 @@ class AttendanceResource extends Resource
 {
     protected static ?string $model = Attendance::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clock';
+    protected static ?string $navigationIcon = 'heroicon-o-finger-print';
+    protected static ?string $navigationLabel = 'Pointages';
 
     public static function getModelLabel(): string
     {
@@ -28,12 +29,12 @@ class AttendanceResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '🏖️ Congés & Absences';
+        return '🌴 Congés & Absences';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 6;
+        return 4;
     }
 
     public static function form(Form $form): Form

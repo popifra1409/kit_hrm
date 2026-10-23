@@ -39,7 +39,7 @@ class DepartmentResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'Départements Médicaux';
+        return 'Départements administratifs';
     }
 
     public static function form(Form $form): Form

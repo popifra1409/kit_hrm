@@ -15,7 +15,8 @@ class EmployeeAdvancementHistoryResource extends Resource
 {
     protected static ?string $model = EmployeeAdvancementHistory::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-up';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-uturn-up';
+    protected static ?string $navigationLabel = 'Historique des avancements';
 
     public static function getModelLabel(): string
     {
@@ -29,12 +30,12 @@ class EmployeeAdvancementHistoryResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return '👥 Gestion du Personnel';
+        return '📈 Carrière & Avancements';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 7;
+        return 3;
     }
 
     public static function form(Form $form): Form

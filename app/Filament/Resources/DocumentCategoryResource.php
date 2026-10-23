@@ -15,6 +15,7 @@ class DocumentCategoryResource extends Resource
     protected static ?string $model = DocumentCategory::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-folder';
+    protected static ?string $navigationLabel = 'Catégories de documents';
 
     public static function getModelLabel(): string
     {
@@ -33,7 +34,7 @@ class DocumentCategoryResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 2;
     }
 
     public static function form(Form $form): Form
