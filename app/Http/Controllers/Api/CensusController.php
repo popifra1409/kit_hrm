@@ -10,6 +10,7 @@ use App\Models\SalaryGrid;
 use App\Support\CameroonCivilServiceGrid;
 use App\Support\OrganizationalAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -189,6 +190,18 @@ class CensusController extends Controller
             return response()->json(['message' => 'Ce recensement a déjà été validé et ne peut plus être modifié.'], 403);
         }
 
+        // Quand le corps dépasse post_max_size, PHP jette TOUT : ni champs ni pièces.
+        // Le formulaire passerait alors pour un recensement vide et écraserait la
+        // soumission précédente. Un envoi portant une longueur mais sans aucun champ
+        // ne peut venir que de là.
+        if ($request->request->count() === 0 && (int) $request->headers->get('Content-Length', 0) > 0) {
+            return response()->json([
+                'message' => "Le formulaire est arrivé vide : avec les pièces jointes, ton envoi dépasse la taille "
+                    . "totale acceptée par le serveur ({$this->postLimit()}). Choisis des photos plus légères, "
+                    . "une ligne à la fois si besoin.",
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'personal' => ['required', 'array'],
             'personal.matricule_fonction_publique' => ['nullable', 'string', 'max:255'],
@@ -283,8 +296,17 @@ class CensusController extends Controller
         }
         unset($data['photo']); // traité séparément ci-dessous, pas stocké tel quel dans le payload
 
-        if ($request->hasFile('photo')) {
-            $data['photo_path'] = $request->file('photo')->store('census/profile-photos', 'public');
+        // Une pièce refusée par PHP (taille, transport coupé) n'est ni un fichier
+        // valide ni un champ présent : hasFile() la taisait et elle se perdait sans
+        // que l'employé soit prévenu. Elle est maintenant nommée et expliquée.
+        $photo = $request->file('photo');
+
+        if ($photo instanceof UploadedFile) {
+            if (! $photo->isValid()) {
+                return $this->uploadRejectedResponse($photo, 'pour ta photo');
+            }
+
+            $data['photo_path'] = $photo->store('census/profile-photos', 'public');
         }
 
         // Contrat : numéro normalisé (les espaces autour d'une saisie ne sont pas une
@@ -294,13 +316,24 @@ class CensusController extends Controller
         $contractNumber = trim((string) ($contract['contract_number'] ?? ''));
         $contract['contract_number'] = $contractNumber !== '' ? $contractNumber : null;
 
-        if ($request->hasFile('contract_document')) {
-            $contract['document_path'] = $request->file('contract_document')->store('census/contracts', 'public');
+        $contractDocument = $request->file('contract_document');
+
+        if ($contractDocument instanceof UploadedFile) {
+            if (! $contractDocument->isValid()) {
+                return $this->uploadRejectedResponse($contractDocument, 'pour ton contrat de travail');
+            }
+
+            $contract['document_path'] = $contractDocument->store('census/contracts', 'public');
         }
 
-        if ($request->hasFile('service_start_document')) {
-            $contract['service_start_document_path'] = $request->file('service_start_document')
-                ->store('census/service-start', 'public');
+        $serviceStartDocument = $request->file('service_start_document');
+
+        if ($serviceStartDocument instanceof UploadedFile) {
+            if (! $serviceStartDocument->isValid()) {
+                return $this->uploadRejectedResponse($serviceStartDocument, 'pour ton document de prise de service');
+            }
+
+            $contract['service_start_document_path'] = $serviceStartDocument->store('census/service-start', 'public');
         }
 
         $data['contract'] = $contract;
@@ -360,9 +393,28 @@ class CensusController extends Controller
         foreach ($data['dependents'] ?? [] as $index => &$dependent) {
             foreach (['photo', 'id_card', 'birth_certificate', 'marriage_certificate'] as $docKey) {
                 $file = $request->file("dependents.{$index}.{$docKey}");
-                if ($file) {
-                    $dependent['documents'][$docKey] = $file->store('census/dependents', 'public');
+
+                if (! $file instanceof UploadedFile) {
+                    // Une valeur texte à la place d'un fichier : la pièce a quitté le
+                    // formulaire sans son contenu. Sans ce test, le serveur ne pourrait
+                    // que réclamer « un acte de naissance » que l'employé croit avoir joint.
+                    $sent = $request->input("dependents.{$index}.{$docKey}");
+
+                    if (is_string($sent) && $sent !== '') {
+                        return response()->json([
+                            'message' => "La pièce « {$sent} » de {$this->dependentLabel($dependent)} n'est pas "
+                                . "arrivée sous forme de fichier. Ouvre sa ligne et reprends le document.",
+                        ], 422);
+                    }
+
+                    continue;
                 }
+
+                if (! $file->isValid()) {
+                    return $this->uploadRejectedResponse($file, "pour {$this->dependentLabel($dependent)}");
+                }
+
+                $dependent['documents'][$docKey] = $file->store('census/dependents', 'public');
             }
 
             if (in_array($dependent['relationship'] ?? '', $parentRelations, true)
@@ -386,6 +438,8 @@ class CensusController extends Controller
             : null;
 
         foreach ($data['dependents'] ?? [] as $index => &$dependent) {
+            $label = $this->dependentLabel($dependent);
+
             if (empty($dependent['existing_id'])
                 && in_array($dependent['relationship'] ?? '', $parentRelations, true)
                 && empty($dependent['documents']['birth_certificate'])) {
@@ -399,8 +453,10 @@ class CensusController extends Controller
             if (empty($dependent['existing_id']) && empty($dependent['documents']['birth_certificate'] ?? null)) {
                 return response()->json([
                     'message' => in_array($dependent['relationship'] ?? '', $parentRelations, true)
-                        ? "L'acte de naissance de l'employé est requis pour justifier la filiation (position {$index})."
-                        : "Un acte de naissance est requis pour chaque nouvel ayant droit (position {$index}).",
+                        ? "L'acte de naissance de l'employé est requis pour justifier la filiation avec {$label}. "
+                            . "Ajoute-le sur sa ligne (PDF ou photo, {$this->uploadLimit()} maximum)."
+                        : "L'acte de naissance de {$label} n'est pas arrivé au serveur. Ouvre sa ligne et sélectionne "
+                            . "à nouveau le fichier (PDF ou photo, {$this->uploadLimit()} maximum).",
                 ], 422);
             }
         }
@@ -408,13 +464,25 @@ class CensusController extends Controller
 
         foreach ($data['diplomas'] ?? [] as $index => &$diploma) {
             $file = $request->file("diplomas.{$index}.document");
-            if ($file) {
+            $sent = $request->input("diplomas.{$index}.document");
+
+            if (! $file instanceof UploadedFile) {
+                if (is_string($sent) && $sent !== '') {
+                    return response()->json([
+                        'message' => "Le justificatif « {$sent} » " . $this->diplomaLabel($diploma) . " n'est pas "
+                            . "arrivé sous forme de fichier. Sélectionne-le à nouveau.",
+                    ], 422);
+                }
+            } elseif (! $file->isValid()) {
+                return $this->uploadRejectedResponse($file, 'pour le diplôme ' . $this->diplomaLabel($diploma));
+            } else {
                 $diploma['document_path'] = $file->store('census/diplomas', 'public');
             }
 
             if (empty($diploma['existing_id']) && empty($diploma['document_path'] ?? null)) {
                 return response()->json([
-                    'message' => "Un document justificatif est requis pour chaque nouveau diplôme (position {$index}).",
+                    'message' => "Le justificatif du diplôme " . $this->diplomaLabel($diploma) . " n'est pas arrivé "
+                        . "au serveur. Sélectionne-le à nouveau (PDF ou photo, {$this->uploadLimit()} maximum).",
                 ], 422);
             }
         }
@@ -450,5 +518,75 @@ class CensusController extends Controller
             'message' => 'Recensement soumis, en attente de validation.',
             'status' => $submission->status,
         ], 201);
+    }
+
+    /**
+     * L'ayant droit tel que l'employé le reconnaît : « l'enfant « MARTIN A » », jamais
+     * « position 0 » — un numéro de ligne ne se retrouve pas sur le formulaire.
+     */
+    private function dependentLabel(array $dependent): string
+    {
+        $who = trim(($dependent['first_name'] ?? '') . ' ' . ($dependent['last_name'] ?? ''));
+
+        $relation = match ($dependent['relationship'] ?? '') {
+            'spouse' => 'conjoint(e)',
+            'child' => 'enfant',
+            'father' => 'père',
+            'mother' => 'mère',
+            default => 'ayant droit',
+        };
+
+        return $who !== '' ? "l'ayant droit « {$who} » ({$relation})" : "l'ayant droit ({$relation})";
+    }
+
+    private function diplomaLabel(array $diploma): string
+    {
+        $title = trim((string) ($diploma['title'] ?? ''));
+
+        return $title !== '' ? "« {$title} »" : '« intitulé non renseigné »';
+    }
+
+    /** Taille qu'une pièce ne doit pas dépasser, telle que le serveur la accepte vraiment. */
+    private function uploadLimit(): string
+    {
+        return $this->humanBytes(UploadedFile::getMaxFilesize());
+    }
+
+    /** Taille totale maximale d'un envoi, réglée par post_max_size. */
+    private function postLimit(): string
+    {
+        $raw = trim((string) ini_get('post_max_size'));
+        $unit = strtolower(substr($raw, -1));
+        $factor = ['g' => 1073741824, 'm' => 1048576, 'k' => 1024][$unit] ?? 1;
+
+        return $this->humanBytes(((float) $raw) * $factor);
+    }
+
+    private function humanBytes(int|float $bytes): string
+    {
+        if ($bytes >= 1048576) {
+            return rtrim(rtrim(number_format($bytes / 1048576, 1, ',', ''), '0'), ',') . ' Mo';
+        }
+
+        return round($bytes / 1024) . ' Ko';
+    }
+
+    /**
+     * Une pièce rejetée par PHP (taille, transport coupé) arrive ici sous forme de
+     * fichier invalide : sans message explicite, l'employé la croit envoyée et relance
+     * la soumission dans une boucle sans fin.
+     */
+    private function uploadRejectedResponse(UploadedFile $file, string $for)
+    {
+        $reason = match ($file->getError()) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => "dépasse la taille maximale acceptée ({$this->uploadLimit()}). Envoie une photo plus petite ou un PDF allégé.",
+            UPLOAD_ERR_PARTIAL => "n'est arrivé qu'en partie. Sélectionne-le de nouveau avant de renvoyer.",
+            UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE, UPLOAD_ERR_EXTENSION => "n'a pas pu être enregistré sur le serveur. Réessaie, et préviens les RH si cela persiste.",
+            default => "est illisible. Sélectionne-le de nouveau.",
+        };
+
+        return response()->json([
+            'message' => "Le fichier « {$file->getClientOriginalName()} » {$for} {$reason}",
+        ], 422);
     }
 }
