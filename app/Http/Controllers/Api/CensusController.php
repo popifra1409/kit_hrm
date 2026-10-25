@@ -207,6 +207,23 @@ class CensusController extends Controller
             ], 422);
         }
 
+        // PHP ne prévient pas quand un envoi dépasse max_file_uploads : il supprime
+        // les fichiers de la fin du corps, sans code d'erreur. L'ayant droit arrive
+        // donc avec son nom mais sans son acte, et l'employé ne peut pas le deviner.
+        $declaredFiles = (int) $request->input('files_sent', 0);
+        $receivedFiles = $this->countFiles($request->files->all());
+
+        if ($declaredFiles > $receivedFiles) {
+            $this->logMissingUpload($request, "corps tronqué : {$receivedFiles} pièces reçues sur {$declaredFiles} envoyées");
+
+            return response()->json([
+                'message' => "Le serveur n'a reçu que {$receivedFiles} pièces sur les {$declaredFiles} que tu as "
+                    . "jointes : il refuse silencieusement tout fichier au-delà de "
+                    . ini_get('max_file_uploads') . " par envoi. Préviens le Service RH pour que la limite "
+                    . "du serveur soit relevée, et garde ton brouillon : rien n'est perdu.",
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'personal' => ['required', 'array'],
             'personal.matricule_fonction_publique' => ['nullable', 'string', 'max:255'],
@@ -605,6 +622,20 @@ class CensusController extends Controller
             'limite_upload' => $this->uploadLimit(),
             'pieces_recues' => $this->describeFiles($request->files->all()),
         ]);
+    }
+
+    /** Combien de pièces le serveur a réellement reçues, nichées comprises. */
+    private function countFiles(mixed $value): int
+    {
+        if ($value instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
+            return 1;
+        }
+
+        if (is_array($value)) {
+            return array_sum(array_map(fn ($item) => $this->countFiles($item), $value));
+        }
+
+        return 0;
     }
 
     /**
