@@ -11,6 +11,7 @@ use App\Support\CameroonCivilServiceGrid;
 use App\Support\OrganizationalAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -193,8 +194,12 @@ class CensusController extends Controller
         // Quand le corps dépasse post_max_size, PHP jette TOUT : ni champs ni pièces.
         // Le formulaire passerait alors pour un recensement vide et écraserait la
         // soumission précédente. Un envoi portant une longueur mais sans aucun champ
-        // ne peut venir que de là.
-        if ($request->request->count() === 0 && (int) $request->headers->get('Content-Length', 0) > 0) {
+        // ni aucune pièce ne peut venir que de là.
+        if ($request->request->count() === 0
+            && $request->files->count() === 0
+            && (int) $request->headers->get('Content-Length', 0) > 0) {
+            $this->logMissingUpload($request, 'corps du formulaire');
+
             return response()->json([
                 'message' => "Le formulaire est arrivé vide : avec les pièces jointes, ton envoi dépasse la taille "
                     . "totale acceptée par le serveur ({$this->postLimit()}). Choisis des photos plus légères, "
@@ -451,6 +456,8 @@ class CensusController extends Controller
             }
 
             if (empty($dependent['existing_id']) && empty($dependent['documents']['birth_certificate'] ?? null)) {
+                $this->logMissingUpload($request, "acte de naissance de {$label}");
+
                 return response()->json([
                     'message' => in_array($dependent['relationship'] ?? '', $parentRelations, true)
                         ? "L'acte de naissance de l'employé est requis pour justifier la filiation avec {$label}. "
@@ -480,6 +487,8 @@ class CensusController extends Controller
             }
 
             if (empty($diploma['existing_id']) && empty($diploma['document_path'] ?? null)) {
+                $this->logMissingUpload($request, 'justificatif du diplôme ' . $this->diplomaLabel($diploma));
+
                 return response()->json([
                     'message' => "Le justificatif du diplôme " . $this->diplomaLabel($diploma) . " n'est pas arrivé "
                         . "au serveur. Sélectionne-le à nouveau (PDF ou photo, {$this->uploadLimit()} maximum).",
@@ -564,11 +573,62 @@ class CensusController extends Controller
 
     private function humanBytes(int|float $bytes): string
     {
-        if ($bytes >= 1048576) {
-            return rtrim(rtrim(number_format($bytes / 1048576, 1, ',', ''), '0'), ',') . ' Mo';
+        $number = static fn (int|float $value) => rtrim(rtrim(number_format($value, 1, ',', ''), '0'), ',');
+
+        if ($bytes >= 1073741824) {
+            return $number($bytes / 1073741824) . ' Go';
         }
 
-        return round($bytes / 1024) . ' Ko';
+        if ($bytes >= 1048576) {
+            return $number($bytes / 1048576) . ' Mo';
+        }
+
+        if ($bytes >= 1024) {
+            return $number($bytes / 1024) . ' Ko';
+        }
+
+        return round($bytes) . ' octets';
+    }
+
+    /**
+     * Trace du corps réellement reçu quand une pièce est déclarée absente. Côté
+     * employé la pièce est bien jointe et la limite du serveur est large : seule la
+     * structure de la requête dit si la part a quitté le navigateur, si elle est
+     * arrivée vide, ou si elle a été coupée en route.
+     */
+    private function logMissingUpload(Request $request, string $what): void
+    {
+        Log::warning("Recensement — {$what} non reçu", [
+            'user_id' => $request->user()?->id,
+            'content_length' => (int) $request->headers->get('Content-Length', 0),
+            'champs_recus' => $request->request->count(),
+            'limite_upload' => $this->uploadLimit(),
+            'pieces_recues' => $this->describeFiles($request->files->all()),
+        ]);
+    }
+
+    /**
+     * Nom et poids de chaque part envoyée. Les clés sont conservées : une clé
+     * absente signifie que la part n'a jamais atteint le serveur, une clé là mais
+     * vide signifie que le navigateur l'a envoyée sans contenu.
+     */
+    private function describeFiles(mixed $value): mixed
+    {
+        // Le sac à fichiers contient parfois l'objet de Symfony plutôt que celui de
+        // Laravel, qui en hérite : tester le parent couvre les deux.
+        if ($value instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
+            $size = $value->getError() === UPLOAD_ERR_OK
+                ? ' · ' . $this->humanBytes((int) $value->getSize())
+                : '';
+
+            return $value->getClientOriginalName() . $size . ' · erreur ' . $value->getError();
+        }
+
+        if (is_array($value)) {
+            return array_map(fn ($item) => $this->describeFiles($item), $value);
+        }
+
+        return $value === null ? 'part vide' : gettype($value);
     }
 
     /**
