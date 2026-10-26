@@ -19,12 +19,12 @@ class DepartmentResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return 'Département Médical';
+        return 'Département';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'Départements Médicaux';
+        return 'Départements';
     }
 
     public static function getNavigationGroup(): ?string
@@ -39,7 +39,7 @@ class DepartmentResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'Départements administratifs';
+        return 'Départements';
     }
 
     public static function form(Form $form): Form
