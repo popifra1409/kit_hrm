@@ -412,7 +412,14 @@ class CensusController extends Controller
         $parentRelations = ['father', 'mother'];
         $declaredActs = [];
 
-        foreach ($data['dependents'] ?? [] as $index => &$dependent) {
+        // Les lignes sont modifiées pendant le parcours (chemin des pièces stockées) :
+        // itérer « $data['dependents'] ?? [] » porterait les écritures sur une copie
+        // temporaire, le chemin serait jeté et la ligne suivante serait refusée alors
+        // que son fichier est bien arrivé.
+        $dependents = $data['dependents'] ?? [];
+        $diplomas = $data['diplomas'] ?? [];
+
+        foreach ($dependents as $index => &$dependent) {
             foreach (['photo', 'id_card', 'birth_certificate', 'marriage_certificate'] as $docKey) {
                 $file = $request->file("dependents.{$index}.{$docKey}");
 
@@ -446,7 +453,7 @@ class CensusController extends Controller
         }
         unset($dependent);
 
-        $needInheritedAct = collect($data['dependents'] ?? [])->contains(
+        $needInheritedAct = collect($dependents)->contains(
             fn(array $d) => empty($d['existing_id'])
                 && in_array($d['relationship'] ?? '', $parentRelations, true)
                 && empty($d['documents']['birth_certificate'])
@@ -459,7 +466,7 @@ class CensusController extends Controller
                 ->value('birth_certificate_path')
             : null;
 
-        foreach ($data['dependents'] ?? [] as $index => &$dependent) {
+        foreach ($dependents as $index => &$dependent) {
             $label = $this->dependentLabel($dependent);
 
             if (empty($dependent['existing_id'])
@@ -486,7 +493,7 @@ class CensusController extends Controller
         }
         unset($dependent);
 
-        foreach ($data['diplomas'] ?? [] as $index => &$diploma) {
+        foreach ($diplomas as $index => &$diploma) {
             $file = $request->file("diplomas.{$index}.document");
             $sent = $request->input("diplomas.{$index}.document");
 
@@ -513,6 +520,9 @@ class CensusController extends Controller
             }
         }
         unset($diploma);
+
+        $data['dependents'] = $dependents;
+        $data['diplomas'] = $diplomas;
 
         $submission = CensusSubmission::updateOrCreate(
             ['census_campaign_id' => $campaign->id, 'employee_id' => $employee->id],
@@ -620,8 +630,41 @@ class CensusController extends Controller
             'content_length' => (int) $request->headers->get('Content-Length', 0),
             'champs_recus' => $request->request->count(),
             'limite_upload' => $this->uploadLimit(),
+            'pieces_declarees' => $request->input('files_sent'),
+            'lignes_ayants_droit' => $this->describeDependents($request),
             'pieces_recues' => $this->describeFiles($request->files->all()),
         ]);
+    }
+
+    /**
+     * Chaque ligne d'ayant droit telle que le serveur la lit, avec le sort de son
+     * acte. Le nombre de lignes textuelles et leur index sont la seule façon de
+     * distinguer « cette part n'a jamais été envoyée » (le navigateur n'avait pas
+     * le fichier) de « elle a été envoyée puis perdue » (le serveur l'a coupée).
+     */
+    private function describeDependents(Request $request): array
+    {
+        $rows = $request->input('dependents');
+
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($rows as $index => $row) {
+            $act = $request->file("dependents.{$index}.birth_certificate");
+            $name = trim(($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? ''));
+
+            $out[] = $index . ' · ' . ($name !== '' ? $name : 'sans nom')
+                . ' · ' . ($row['relationship'] ?? '?')
+                . ' · ' . (empty($row['existing_id']) ? 'nouveau' : 'déjà connu ' . $row['existing_id'])
+                . ' · acte : ' . ($act instanceof UploadedFile
+                    ? $act->getClientOriginalName()
+                    : ($act === null ? 'absent' : 'pas un fichier'));
+        }
+
+        return $out;
     }
 
     /** Combien de pièces le serveur a réellement reçues, nichées comprises. */
