@@ -198,7 +198,7 @@ class CensusController extends Controller
         if ($request->request->count() === 0
             && $request->files->count() === 0
             && (int) $request->headers->get('Content-Length', 0) > 0) {
-            $this->logMissingUpload($request, 'corps du formulaire');
+            $this->logMissingUpload($request, 'corps du formulaire arrivé vide');
 
             return response()->json([
                 'message' => "Le formulaire est arrivé vide : avec les pièces jointes, ton envoi dépasse la taille "
@@ -473,7 +473,7 @@ class CensusController extends Controller
             }
 
             if (empty($dependent['existing_id']) && empty($dependent['documents']['birth_certificate'] ?? null)) {
-                $this->logMissingUpload($request, "acte de naissance de {$label}");
+                $this->logMissingUpload($request, "acte de naissance de {$label} absent de la requête");
 
                 return response()->json([
                     'message' => in_array($dependent['relationship'] ?? '', $parentRelations, true)
@@ -504,7 +504,7 @@ class CensusController extends Controller
             }
 
             if (empty($diploma['existing_id']) && empty($diploma['document_path'] ?? null)) {
-                $this->logMissingUpload($request, 'justificatif du diplôme ' . $this->diplomaLabel($diploma));
+                $this->logMissingUpload($request, 'justificatif du diplôme ' . $this->diplomaLabel($diploma) . ' absent de la requête');
 
                 return response()->json([
                     'message' => "Le justificatif du diplôme " . $this->diplomaLabel($diploma) . " n'est pas arrivé "
@@ -615,7 +615,7 @@ class CensusController extends Controller
      */
     private function logMissingUpload(Request $request, string $what): void
     {
-        Log::warning("Recensement — {$what} non reçu", [
+        Log::warning("Recensement — {$what}", [
             'user_id' => $request->user()?->id,
             'content_length' => (int) $request->headers->get('Content-Length', 0),
             'champs_recus' => $request->request->count(),
