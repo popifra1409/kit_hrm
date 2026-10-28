@@ -21,6 +21,18 @@ use Illuminate\Support\Facades\Validator;
 class CensusController extends Controller
 {
     /**
+     * Formats et taille d'une pièce jointe : la promesse faite à l'écran (« PDF, JPG ou
+     * PNG — 4 Mo maximum ») est exactement la limite appliquée ici, sinon l'employé
+     * croit sa pièce jointe et la soumission échoue sans explication reconnaissable.
+     */
+    private const DOCUMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];
+
+    /** Une photo ne se livre pas en PDF. */
+    private const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png'];
+
+    /** 4 Mio, comme la règle « max:4096 » des champs validés. */
+    private const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
+    /**
      * État actuel du recensement pour l'employé connecté.
      */
     public function current(Request $request)
@@ -224,7 +236,7 @@ class CensusController extends Controller
             ], 422);
         }
 
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'personal' => ['required', 'array'],
             'personal.matricule_fonction_publique' => ['nullable', 'string', 'max:255'],
             'personal.category_number' => ['nullable', 'string', 'max:255'],
@@ -297,10 +309,39 @@ class CensusController extends Controller
             'diplomas.*.title' => ['required_with:diplomas', 'string', 'max:255'],
             'diplomas.*.institution' => ['required_with:diplomas', 'string', 'max:255'],
             'diplomas.*.year_obtained' => ['required_with:diplomas', 'integer', 'min:1950', 'max:' . now()->format('Y')],
-        ]);
+        ];
+
+        // Les messages reprennent ces noms : « le champ dependents.0.birth_date » ne se
+        // retrouve pas sur le formulaire, « la date de naissance de l'ayant droit
+        // « MARTIN A » (enfant) » oui.
+        $validator = Validator::make($request->all(), $rules, [], $this->validationAttributes($request, $rules));
 
         if ($validator->fails()) {
-            return response()->json(['message' => 'Données invalides.', 'errors' => $validator->errors()], 422);
+            $raw = $validator->errors()->all();
+
+            // La mention « … est obligatoire quand tes ayants droit est présent » ne veut
+            // rien dire pour l'employé : la ligne est là, c'est bien son champ qui manque.
+            $problems = array_map(
+                static fn (string $p): string => (string) preg_replace('/ quand .+$/iu', '', $p),
+                $raw
+            );
+
+            // Trace côté serveur : sans elle, un employé qui décrit « Données invalides »
+            // ne peut pas être aiguillé, et le champ fautif peut avoir été effacé du
+            // brouillon entre-temps.
+            Log::warning('Recensement — soumission refusée pour données invalides', [
+                'user_id' => $request->user()?->id,
+                'champs' => $validator->errors()->keys(),
+                'messages' => $raw,
+            ]);
+
+            return response()->json([
+                'message' => count($problems) === 1
+                    ? 'Un champ bloque encore l\'envoi : ' . $problems[0]
+                    : count($problems) . ' champs bloquent l\'envoi : ' . implode(' · ', array_slice($problems, 0, 4))
+                        . (count($problems) > 4 ? ' · …' : ''),
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         $data = $validator->validated();
@@ -443,6 +484,16 @@ class CensusController extends Controller
                     return $this->uploadRejectedResponse($file, "pour {$this->dependentLabel($dependent)}");
                 }
 
+                $refusal = $this->documentRefusal(
+                    $file,
+                    "de {$this->dependentLabel($dependent)}",
+                    $docKey === 'photo' ? self::PHOTO_EXTENSIONS : self::DOCUMENT_EXTENSIONS
+                );
+
+                if ($refusal !== null) {
+                    return $refusal;
+                }
+
                 $dependent['documents'][$docKey] = $file->store('census/dependents', 'public');
             }
 
@@ -485,9 +536,9 @@ class CensusController extends Controller
                 return response()->json([
                     'message' => in_array($dependent['relationship'] ?? '', $parentRelations, true)
                         ? "L'acte de naissance de l'employé est requis pour justifier la filiation avec {$label}. "
-                            . "Ajoute-le sur sa ligne (PDF ou photo, {$this->uploadLimit()} maximum)."
+                            . "Ajoute-le sur sa ligne ({$this->documentAdvice()})."
                         : "L'acte de naissance de {$label} n'est pas arrivé au serveur. Ouvre sa ligne et sélectionne "
-                            . "à nouveau le fichier (PDF ou photo, {$this->uploadLimit()} maximum).",
+                            . "à nouveau le fichier ({$this->documentAdvice()}).",
                 ], 422);
             }
         }
@@ -507,6 +558,12 @@ class CensusController extends Controller
             } elseif (! $file->isValid()) {
                 return $this->uploadRejectedResponse($file, 'pour le diplôme ' . $this->diplomaLabel($diploma));
             } else {
+                $refusal = $this->documentRefusal($file, "justificatif du diplôme {$this->diplomaLabel($diploma)}");
+
+                if ($refusal !== null) {
+                    return $refusal;
+                }
+
                 $diploma['document_path'] = $file->store('census/diplomas', 'public');
             }
 
@@ -515,7 +572,7 @@ class CensusController extends Controller
 
                 return response()->json([
                     'message' => "Le justificatif du diplôme " . $this->diplomaLabel($diploma) . " n'est pas arrivé "
-                        . "au serveur. Sélectionne-le à nouveau (PDF ou photo, {$this->uploadLimit()} maximum).",
+                        . "au serveur. Sélectionne-le à nouveau ({$this->documentAdvice()}).",
                 ], 422);
             }
         }
@@ -554,6 +611,70 @@ class CensusController extends Controller
             'message' => 'Recensement soumis, en attente de validation.',
             'status' => $submission->status,
         ], 201);
+    }
+
+    /**
+     * Noms français des champs validés, donnés au validateur pour qu'il les reprenne
+     * dans ses messages. Les libellés viennent du catalogue que les RH utilisent déjà
+     * pour renvoyer une fiche (CensusSubmission::correctableFields()), pour que l'agent
+     * et l'employé nomment la même ligne ; les champs propres aux lignes d'ayant droit
+     * et de diplôme, absents de ce catalogue, sont nommés ici.
+     *
+     * @return array<string, string> clé de règle => nom
+     */
+    private function validationAttributes(Request $request, array $rules): array
+    {
+        // Noms courts, car ils seront suivis de « de l'ayant droit … » / « du diplôme … ».
+        $rowFields = [
+            'relationship' => 'lien de parenté',
+            'birth_place' => 'lieu de naissance',
+            'existing_id' => 'référence déjà au dossier',
+            'type' => 'type',
+            'title' => 'intitulé',
+            'institution' => 'établissement',
+            'year_obtained' => 'année d\'obtention',
+        ];
+
+        // Le catalogue ne couvre pas les groupes ni les pièces : nommés ici.
+        $singles = [
+            'personal' => 'tes informations personnelles',
+            'contract' => 'ton contrat de travail',
+            'organizational' => 'ton affectation',
+            'dependents' => 'tes ayants droit',
+            'diplomas' => 'tes diplômes',
+            'bank_change_acknowledged' => 'ta reconnaissance de l\'avertissement bancaire',
+            'photo' => 'ta photo',
+            'contract_document' => 'ton contrat de travail en pièce jointe',
+            'service_start_document' => 'ton document de prise de service',
+        ];
+
+        $dependents = $request->input('dependents');
+        $diplomas = $request->input('diplomas');
+
+        $attributes = [];
+
+        foreach (array_keys($rules) as $key) {
+            $segments = explode('.', $key);
+            $leaf = end($segments);
+            $row = (int) ($segments[1] ?? 0);
+
+            $attributes[$key] = match (true) {
+                isset($singles[$key]) => $singles[$key],
+                str_starts_with($key, 'dependents.') => ($rowFields[$leaf] ?? $this->lowerFirst(CensusSubmission::fieldLabel($leaf)))
+                    . ' de ' . $this->dependentLabel($dependents[$row] ?? []),
+                str_starts_with($key, 'diplomas.') => ($rowFields[$leaf] ?? $this->lowerFirst(CensusSubmission::fieldLabel($leaf)))
+                    . ' du diplôme ' . $this->diplomaLabel($diplomas[$row] ?? []),
+                default => $this->lowerFirst(CensusSubmission::fieldLabel($leaf)),
+            };
+        }
+
+        return $attributes;
+    }
+
+    /** Un libellé de catalogue en début de phrase : « Adresse email » -> « adresse email ». */
+    private function lowerFirst(string $label): string
+    {
+        return mb_strtolower(mb_substr($label, 0, 1)) . mb_substr($label, 1);
     }
 
     /**
@@ -722,5 +843,54 @@ class CensusController extends Controller
         return response()->json([
             'message' => "Le fichier « {$file->getClientOriginalName()} » {$for} {$reason}",
         ], 422);
+    }
+
+    /**
+     * Refus d'une pièce pourtant bien arrivée : format non annoncé ou taille annoncée
+     * dépassée. Les pièces des ayants droit et des diplômes ne passent par aucune règle
+     * de validation, c'est donc ici que la limite promise à l'écran est appliquée.
+     * Renvoie la réponse 422 à servir, ou null quand la pièce passe.
+     */
+    private function documentRefusal(UploadedFile $file, string $for, array $extensions = self::DOCUMENT_EXTENSIONS)
+    {
+        $formats = $this->formatsLabel($extensions);
+
+        if (! in_array(strtolower($file->getClientOriginalExtension()), $extensions, true)) {
+            return response()->json([
+                'message' => "Le fichier « {$file->getClientOriginalName()} » {$for} n'est pas un format accepté. "
+                    . "Envoie-le au format {$formats}.",
+            ], 422);
+        }
+
+        if ($file->getSize() > self::MAX_DOCUMENT_BYTES) {
+            return response()->json([
+                'message' => "Le fichier « {$file->getClientOriginalName()} » {$for} pèse "
+                    . "{$this->humanBytes((int) $file->getSize())} : la limite est "
+                    . "{$this->humanBytes(self::MAX_DOCUMENT_BYTES)}. Reprends le scan en qualité réduite, "
+                    . 'en noir et blanc, ou envoie une page à la fois.',
+            ], 422);
+        }
+
+        return null;
+    }
+
+    /** « pdf, jpg, jpeg, png » se lit « PDF, JPG ou PNG » : JPEG n'est pas un format à part. */
+    private function formatsLabel(array $extensions): string
+    {
+        // Le doublon JPEG se retire après la conversion, sinon « JPG » apparaît deux fois.
+        $named = array_values(array_unique(array_map(
+            static fn (string $ext): string => strtoupper($ext === 'jpeg' ? 'jpg' : $ext),
+            $extensions
+        )));
+
+        $last = array_pop($named);
+
+        return $named === [] ? $last : implode(', ', $named) . ' ou ' . $last;
+    }
+
+    /** Le rappel de ce qui est accepté, tel qu'affiché sous chaque champ de pièce jointe. */
+    private function documentAdvice(): string
+    {
+        return $this->formatsLabel(self::DOCUMENT_EXTENSIONS) . ', ' . $this->humanBytes(self::MAX_DOCUMENT_BYTES) . ' maximum';
     }
 }
