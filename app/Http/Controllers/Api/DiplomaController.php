@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CensusSubmission;
 use App\Models\EmployeeDiploma;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -67,6 +68,7 @@ class DiplomaController extends Controller
      *
      * @response 201 scenario="Créé" {"message": "Diplôme déclaré, en attente de validation par les RH.", "diploma": {"...": "..."}}
      * @response 409 scenario="Doublon" {"message": "Vous avez déjà un diplôme de recrutement en attente ou validé. Modifiez-le ou attendez son traitement."}
+     * @response 409 scenario="Recensement en cours" {"message": "Tant que la campagne « Recensement Annuel 2026 » est ouverte et que ton recensement n'est pas validé, tes diplômes se déclarent dans le recensement.", "census_locked": true}
      * @response 422 scenario="Validation échouée" {"message": "Données invalides.", "errors": {"document": ["Ce champ est obligatoire."]}}
      */
     public function store(Request $request)
@@ -77,6 +79,18 @@ class DiplomaController extends Controller
             return response()->json([
                 'message' => "Aucune fiche employé n'est liée à ce compte.",
             ], 404);
+        }
+
+        // Comme pour les ayants droit : pendant le recensement, une ligne ajoutée ici
+        // échapperait à la déclaration et aux pièces que les RH sont en train de vérifier.
+        $blocker = CensusSubmission::blockingCampaignFor($employee->id);
+
+        if ($blocker) {
+            return response()->json([
+                'message' => "Tant que la campagne « {$blocker->name} » est ouverte et que ton recensement "
+                    . "n'est pas validé, tes diplômes se déclarent dans le recensement.",
+                'census_locked' => true,
+            ], 409);
         }
 
         $validator = Validator::make($request->all(), [

@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/leaves/{id}', [LeaveController::class, 'show']);
 
         // Recensement
+        Route::get('/census/state', [CensusController::class, 'state']);
         Route::get('/census/current', [CensusController::class, 'current']);
         Route::post('/census/{campaignId}/submit', [CensusController::class, 'submit']);
     });

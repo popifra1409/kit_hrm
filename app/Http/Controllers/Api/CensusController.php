@@ -179,6 +179,34 @@ class CensusController extends Controller
     }
 
     /**
+     * État minimal du recensement : « locked » dit si l'ajout direct d'un ayant droit
+     * ou d'un diplôme est coupé. La SPA en a besoin sur n'importe quelle page, et
+     * /current est trop lourd pour ça (grille salariale, options d'organisation,
+     * pré-remplissage complet).
+     */
+    public function state(Request $request)
+    {
+        $employee = $request->user()->employee;
+
+        if (!$employee) {
+            return response()->json(['message' => "Aucune fiche employé n'est liée à ce compte."], 404);
+        }
+
+        [$campaign, $submission] = CensusSubmission::campaignAndSubmissionFor($employee->id);
+
+        return response()->json([
+            'campaign' => $campaign ? [
+                'id' => $campaign->id,
+                'name' => $campaign->name,
+                'ends_at' => $campaign->ends_at?->toIso8601String(),
+            ] : null,
+            'submission_status' => $submission?->status,
+            'stage_label' => $submission?->stage_label,
+            'locked' => CensusSubmission::locksDirectEntry($campaign, $submission),
+        ]);
+    }
+
+    /**
      * Soumettre (ou re-soumettre) le recensement complet.
      */
     public function submit(Request $request, int $campaignId)

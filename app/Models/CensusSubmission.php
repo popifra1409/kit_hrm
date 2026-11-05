@@ -155,6 +155,47 @@ class CensusSubmission extends Model
         return $this->status !== self::STATUS_VALIDATED;
     }
 
+    /**
+     * Campagne ouverte et soumission de l'employé, cherchées ensemble : le verrou et
+     * l'écran en ont besoin tous les deux, et les lire séparément laisserait la règle
+     * s'écrire à deux endroits.
+     *
+     * @return array{0: ?CensusCampaign, 1: ?CensusSubmission}
+     */
+    public static function campaignAndSubmissionFor(int $employeeId): array
+    {
+        $campaign = CensusCampaign::currentlyOpen();
+
+        $submission = $campaign
+            ? static::query()
+                ->where('census_campaign_id', $campaign->id)
+                ->where('employee_id', $employeeId)
+                ->first()
+            : null;
+
+        return [$campaign, $submission];
+    }
+
+    /**
+     * Verrou du recensement : pendant une campagne ouverte, tant que la déclaration
+     * n'est pas appliquée à la fiche, ajouter un ayant droit ou un diplôme hors
+     * formulaire créerait une ligne que le recensement n'a ni annoncée ni justifiée par
+     * ses actes. Rien ne bloque hors campagne, ni après la validation finale.
+     */
+    public static function locksDirectEntry(?CensusCampaign $campaign, ?CensusSubmission $submission): bool
+    {
+        // Aucune soumission : le recensement reste à faire, et lui seul demande les pièces.
+        return $campaign !== null && ($submission === null || $submission->canBeResubmitted());
+    }
+
+    /** La campagne qui verrouille l'ajout direct, ou null quand l'employé a les mains libres. */
+    public static function blockingCampaignFor(int $employeeId): ?CensusCampaign
+    {
+        [$campaign, $submission] = static::campaignAndSubmissionFor($employeeId);
+
+        return static::locksDirectEntry($campaign, $submission) ? $campaign : null;
+    }
+
     public function getRejectionReasonForEmployeeAttribute(): ?string
     {
         return match ($this->status) {

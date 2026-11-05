@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CensusSubmission;
 use App\Models\Dependent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -89,6 +90,7 @@ class DependentController extends Controller
      * @bodyParam marriage_certificate_path file Acte de mariage — requis si relationship = spouse.
      *
      * @response 201 scenario="Créé" {"message": "Ayant droit déclaré, en attente de validation par les RH.", "dependent": {"...": "..."}}
+     * @response 409 scenario="Recensement en cours" {"message": "Tant que la campagne « Recensement Annuel 2026 » est ouverte et que ton recensement n'est pas validé, tes ayants droit se déclarent dans le recensement.", "census_locked": true}
      * @response 422 scenario="Validation échouée" {"message": "Données invalides.", "errors": {"birth_certificate_path": ["Ce champ est obligatoire."]}}
      */
     public function store(Request $request)
@@ -99,6 +101,18 @@ class DependentController extends Controller
             return response()->json([
                 'message' => "Aucune fiche employé n'est liée à ce compte.",
             ], 404);
+        }
+
+        // Le recensement est seul à demander les actes de filiation : une ligne ajoutée
+        // pendant qu'il court arriverait à dossier sans que personne ne l'ait vérifiée.
+        $blocker = CensusSubmission::blockingCampaignFor($employee->id);
+
+        if ($blocker) {
+            return response()->json([
+                'message' => "Tant que la campagne « {$blocker->name} » est ouverte et que ton recensement "
+                    . "n'est pas validé, tes ayants droit se déclarent dans le recensement.",
+                'census_locked' => true,
+            ], 409);
         }
 
         $validator = Validator::make($request->all(), [
