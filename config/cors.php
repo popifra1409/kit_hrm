@@ -8,6 +8,7 @@ return [
 
     'allowed_origins' => [
         'http://localhost:5173',
+        'http://localhost:5176', // le temps de la vérification i18n : 5173-5175 sont occupés par d'autres serveurs vite
         'https://kithrm.hopitalgeneraldeyaounde.cm',
     ],
 
