@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class EmployeeAffectationResource extends Resource
 {
@@ -136,7 +137,7 @@ class EmployeeAffectationResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

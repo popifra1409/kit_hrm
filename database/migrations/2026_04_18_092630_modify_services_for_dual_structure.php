@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -40,20 +41,25 @@ return new class extends Migration
         });
 
         // Contrainte : un service doit appartenir SOIT à un department SOIT à une sub_direction
-        DB::statement("
-            ALTER TABLE services
-            ADD CONSTRAINT check_parent
-            CHECK (
-                (department_id IS NOT NULL AND sub_direction_id IS NULL) OR 
-                (department_id IS NULL AND sub_direction_id IS NOT NULL)
-            )
-            NOT VALID
-        ");
+        // CHECK ... NOT VALID : syntaxe PostgreSQL ; les tests (sqlite) n'en ont pas besoin.
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                ALTER TABLE services
+                ADD CONSTRAINT check_parent
+                CHECK (
+                    (department_id IS NOT NULL AND sub_direction_id IS NULL) OR 
+                    (department_id IS NULL AND sub_direction_id IS NOT NULL)
+                )
+                NOT VALID
+            ");
+        }
     }
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE services DROP CONSTRAINT IF EXISTS check_parent');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE services DROP CONSTRAINT IF EXISTS check_parent');
+        }
 
         Schema::table('services', function (Blueprint $table) {
             $table->dropForeign(['sub_direction_id']);

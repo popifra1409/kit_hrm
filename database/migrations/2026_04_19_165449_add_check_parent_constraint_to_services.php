@@ -7,6 +7,11 @@ return new class extends Migration
 {
     public function up()
     {
+        // Bloc DO $$ / pg_constraint : PostgreSQL uniquement.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement("
         DO $$
         BEGIN
@@ -40,6 +45,10 @@ return new class extends Migration
 
     public function down()
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement("
         DO $$
         BEGIN

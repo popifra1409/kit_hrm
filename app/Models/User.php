@@ -35,6 +35,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
             'activated_at' => 'datetime',
+            'preferences' => 'array',
         ];
     }
 

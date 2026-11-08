@@ -12,6 +12,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Tables\Enums\ActionsPosition;
 
 /**
  * Point général du recensement : l'état de toutes les fiches agents, triées sur ce
@@ -126,7 +127,7 @@ class CensusSynthesis extends Page implements HasTable
                     ->color('gray')
                     ->url(fn(Employee $record) => EmployeeResource::getUrl('view', ['record' => $record]))
                     ->openUrlInNewTab(),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->defaultSort('missing_count', 'desc')
             ->paginated([25, 50, 100]);
     }

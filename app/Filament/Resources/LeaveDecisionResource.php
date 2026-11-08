@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class LeaveDecisionResource extends Resource
 {
@@ -170,22 +171,24 @@ class LeaveDecisionResource extends Resource
                     ->label('Signé par'),
             ])
             ->actions([
-                Tables\Actions\Action::make('sign')
-                    ->label('Signer')
-                    ->icon('heroicon-o-pencil')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'draft')
-                    ->action(function ($record) {
-                        $record->sign(auth()->user());
-                        \Filament\Notifications\Notification::make()
-                            ->title('Décision signée')
-                            ->success()
-                            ->send();
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('sign')
+                        ->label('Signer')
+                        ->icon('heroicon-o-pencil')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'draft')
+                        ->action(function ($record) {
+                            $record->sign(auth()->user());
+                            \Filament\Notifications\Notification::make()
+                                ->title('Décision signée')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-            ]);
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make()
+                ]),
+            ], position: ActionsPosition::BeforeColumns);
     }
 
     public static function getPages(): array

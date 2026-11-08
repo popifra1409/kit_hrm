@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\CensusSubmission;
 use App\Models\Dependent;
+use App\Services\ActivityLogger;
+use App\Support\PublicFileUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -108,6 +111,14 @@ class DependentController extends Controller
         $blocker = CensusSubmission::blockingCampaignFor($employee->id);
 
         if ($blocker) {
+            ActivityLogger::record(
+                action: 'direct_entry_blocked',
+                status: ActivityLog::STATUS_BLOCKED,
+                subject: $employee,
+                reason: "Ajout d’un ayant droit hors recensement refusé tant que la campagne « {$blocker->name} » court.",
+                context: ActivityLog::CONTEXT_API,
+            );
+
             return response()->json([
                 'message' => "Tant que la campagne « {$blocker->name} » est ouverte et que ton recensement "
                     . "n'est pas validé, tes ayants droit se déclarent dans le recensement.",
@@ -279,7 +290,7 @@ class DependentController extends Controller
             'validation_status' => $dependent->validation_status,
             'validation_status_label' => $dependent->validation_status_label,
             'rejection_reason' => $dependent->rejection_reason,
-            'photo_url' => $dependent->photo_path ? Storage::disk('public')->url($dependent->photo_path) : null,
+            'photo_url' => $dependent->photo_path ? PublicFileUrl::path($dependent->photo_path) : null,
         ];
 
         if ($full) {
@@ -294,9 +305,9 @@ class DependentController extends Controller
                 'card_issued' => $dependent->card_issued,
                 'card_active' => $dependent->card_active,
                 'documents' => [
-                    'id_card' => $dependent->id_card_path ? Storage::disk('public')->url($dependent->id_card_path) : null,
-                    'birth_certificate' => $dependent->birth_certificate_path ? Storage::disk('public')->url($dependent->birth_certificate_path) : null,
-                    'marriage_certificate' => $dependent->marriage_certificate_path ? Storage::disk('public')->url($dependent->marriage_certificate_path) : null,
+                    'id_card' => $dependent->id_card_path ? PublicFileUrl::path($dependent->id_card_path) : null,
+                    'birth_certificate' => $dependent->birth_certificate_path ? PublicFileUrl::path($dependent->birth_certificate_path) : null,
+                    'marriage_certificate' => $dependent->marriage_certificate_path ? PublicFileUrl::path($dependent->marriage_certificate_path) : null,
                 ],
             ];
         }

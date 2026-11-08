@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class AbsenceResource extends Resource
 {
@@ -281,44 +282,46 @@ class AbsenceResource extends Resource
                     ->falseLabel('Non payées'),
             ])
             ->actions([
-                Tables\Actions\Action::make('approve')
-                    ->label('Approuver')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'pending')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->approve())
-                    ->after(function ($record) {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Absence approuvée')
-                            ->success()
-                            ->send();
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('approve')
+                        ->label('Approuver')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'pending')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->approve())
+                        ->after(function ($record) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Absence approuvée')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('reject')
-                    ->label('Rejeter')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn($record) => $record->status === 'pending')
-                    ->form([
-                        Forms\Components\Textarea::make('rejection_reason')
-                            ->label('Motif du rejet')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->reject($data['rejection_reason']);
+                    Tables\Actions\Action::make('reject')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn($record) => $record->status === 'pending')
+                        ->form([
+                            Forms\Components\Textarea::make('rejection_reason')
+                                ->label('Motif du rejet')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->reject($data['rejection_reason']);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Absence rejetée')
-                            ->danger()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Absence rejetée')
+                                ->danger()
+                                ->send();
+                        }),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

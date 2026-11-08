@@ -7,6 +7,7 @@ use App\Models\QuotpartDistribution;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class QuotpartDistributionResource extends Resource
 {
@@ -99,7 +100,7 @@ class QuotpartDistributionResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 //
             ])

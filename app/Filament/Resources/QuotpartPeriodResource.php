@@ -11,6 +11,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use App\Services\QuotpartCalculationService;
+use Filament\Tables\Enums\ActionsPosition;
 
 class QuotpartPeriodResource extends Resource
 {
@@ -331,7 +332,7 @@ class QuotpartPeriodResource extends Resource
 
                     Tables\Actions\DeleteAction::make(),
                 ]),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

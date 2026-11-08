@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class CnpsPreRegistrationResource extends Resource
 {
@@ -404,79 +405,81 @@ class CnpsPreRegistrationResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\Action::make('validate')
-                    ->label('Valider')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'draft')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->validate())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande validée')
-                            ->success()
-                            ->send();
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'draft')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->validate())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Demande validée')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('submit')
-                    ->label('Soumettre à CNPS')
-                    ->icon('heroicon-o-paper-airplane')
-                    ->color('primary')
-                    ->visible(fn($record) => $record->status === 'pending')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->submit())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande soumise à la CNPS')
-                            ->success()
-                            ->send();
-                    }),
+                    Tables\Actions\Action::make('submit')
+                        ->label('Soumettre à CNPS')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('primary')
+                        ->visible(fn($record) => $record->status === 'pending')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->submit())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Demande soumise à la CNPS')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('approve')
-                    ->label('Approuver')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'submitted')
-                    ->form([
-                        Forms\Components\TextInput::make('cnps_number')
-                            ->label('Numéro CNPS')
-                            ->required()
-                            ->maxLength(255),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->approve($data['cnps_number']);
+                    Tables\Actions\Action::make('approve')
+                        ->label('Approuver')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'submitted')
+                        ->form([
+                            Forms\Components\TextInput::make('cnps_number')
+                                ->label('Numéro CNPS')
+                                ->required()
+                                ->maxLength(255),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->approve($data['cnps_number']);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Immatriculation approuvée')
-                            ->success()
-                            ->body('N° CNPS: ' . $data['cnps_number'])
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Immatriculation approuvée')
+                                ->success()
+                                ->body('N° CNPS: ' . $data['cnps_number'])
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('reject')
-                    ->label('Rejeter')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn($record) => in_array($record->status, ['pending', 'submitted']))
-                    ->form([
-                        Forms\Components\Textarea::make('rejection_reason')
-                            ->label('Motif du Rejet')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->reject($data['rejection_reason']);
+                    Tables\Actions\Action::make('reject')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn($record) => in_array($record->status, ['pending', 'submitted']))
+                        ->form([
+                            Forms\Components\Textarea::make('rejection_reason')
+                                ->label('Motif du Rejet')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->reject($data['rejection_reason']);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Demande rejetée')
-                            ->danger()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Demande rejetée')
+                                ->danger()
+                                ->send();
+                        }),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

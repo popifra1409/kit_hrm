@@ -26,6 +26,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // btrim / UPDATE ... RETURNING : dialecte PostgreSQL. Sur une base vide il n'y a
+        // aucun matricule à normaliser, donc rien à faire sous les autres pilotes.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::transaction(function () {
             $blockedIds = array_map(
                 fn($row) => $row->id,

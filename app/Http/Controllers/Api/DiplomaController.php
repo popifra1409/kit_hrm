@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\CensusSubmission;
 use App\Models\EmployeeDiploma;
+use App\Services\ActivityLogger;
+use App\Support\PublicFileUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -86,6 +89,14 @@ class DiplomaController extends Controller
         $blocker = CensusSubmission::blockingCampaignFor($employee->id);
 
         if ($blocker) {
+            ActivityLogger::record(
+                action: 'direct_entry_blocked',
+                status: ActivityLog::STATUS_BLOCKED,
+                subject: $employee,
+                reason: "Ajout d’un diplôme hors recensement refusé tant que la campagne « {$blocker->name} » court.",
+                context: ActivityLog::CONTEXT_API,
+            );
+
             return response()->json([
                 'message' => "Tant que la campagne « {$blocker->name} » est ouverte et que ton recensement "
                     . "n'est pas validé, tes diplômes se déclarent dans le recensement.",
@@ -255,7 +266,7 @@ class DiplomaController extends Controller
             'validation_status' => $diploma->validation_status,
             'validation_status_label' => $diploma->validation_status_label,
             'rejection_reason' => $diploma->rejection_reason,
-            'document_url' => $diploma->document_path ? Storage::disk('public')->url($diploma->document_path) : null,
+            'document_url' => $diploma->document_path ? PublicFileUrl::path($diploma->document_path) : null,
         ];
     }
 }

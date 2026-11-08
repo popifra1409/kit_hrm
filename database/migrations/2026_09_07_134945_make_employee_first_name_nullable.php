@@ -11,6 +11,10 @@ return new class extends Migration
         // définition de colonne (type inclus), ce que Postgres refuse ici car
         // la colonne générée "full_name" dépend de "first_name".
         // Un ALTER ciblé sur la contrainte NOT NULL uniquement fonctionne.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE employees ALTER COLUMN first_name DROP NOT NULL');
     }
 
@@ -18,6 +22,10 @@ return new class extends Migration
     {
         // ⚠️ N'annule que si aucun employé n'a first_name à null,
         // sinon échouera volontairement pour éviter de perdre des données.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE employees ALTER COLUMN first_name SET NOT NULL');
     }
 };

@@ -7,6 +7,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // ARRAY[]::text[] / DROP CONSTRAINT : PostgreSQL uniquement.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE directions DROP CONSTRAINT IF EXISTS directions_type_check');
 
         DB::statement("
@@ -18,6 +23,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE directions DROP CONSTRAINT IF EXISTS directions_type_check');
 
         // Revient à l'ancienne contrainte (attention : échouera si des lignes

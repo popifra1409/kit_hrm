@@ -12,6 +12,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class CensusSubmissionResource extends Resource
 {
@@ -90,39 +91,41 @@ class CensusSubmissionResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\Action::make('review')
-                    ->label('Examiner')
-                    ->icon('heroicon-o-magnifying-glass')
-                    ->url(fn(CensusSubmission $record) => static::getUrl('review', ['record' => $record])),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('review')
+                        ->label('Examiner')
+                        ->icon('heroicon-o-magnifying-glass')
+                        ->url(fn(CensusSubmission $record) => static::getUrl('review', ['record' => $record])),
 
-                // Annulation RH : seul moyen de rendre la main à l'employé sans passer
-                // par un rejet (qui, lui, reste un constat négatif avec motif d'étape).
-                Tables\Actions\Action::make('cancel')
-                    ->label('Annuler')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->authorize('cancel')
-                    ->visible(fn(CensusSubmission $record) => $record->isCancelable() && auth()->user()->can('cancel_census_submissions'))
-                    ->modalHeading('Annuler ce recensement')
-                    ->modalDescription('Le circuit de validation est remis à zéro et l\'employé reprend son recensement depuis le début. Rien n\'a été appliqué à sa fiche : les données ne sont écrites qu\'à la validation finale.')
-                    ->modalSubmitActionLabel('Annuler le recensement')
-                    ->form([
-                        Forms\Components\Textarea::make('reason')
-                            ->label('Motif (affiché à l\'employé)')
-                            ->required()
-                            ->rows(3)
-                            ->maxLength(1000),
-                    ])
-                    ->action(function (CensusSubmission $record, array $data) {
-                        app(CensusValidationService::class)->cancel($record, auth()->id(), $data['reason']);
+                    // Annulation RH : seul moyen de rendre la main à l'employé sans passer
+                    // par un rejet (qui, lui, reste un constat négatif avec motif d'étape).
+                    Tables\Actions\Action::make('cancel')
+                        ->label('Annuler')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->authorize('cancel')
+                        ->visible(fn(CensusSubmission $record) => $record->isCancelable() && auth()->user()->can('cancel_census_submissions'))
+                        ->modalHeading('Annuler ce recensement')
+                        ->modalDescription('Le circuit de validation est remis à zéro et l\'employé reprend son recensement depuis le début. Rien n\'a été appliqué à sa fiche : les données ne sont écrites qu\'à la validation finale.')
+                        ->modalSubmitActionLabel('Annuler le recensement')
+                        ->form([
+                            Forms\Components\Textarea::make('reason')
+                                ->label('Motif (affiché à l\'employé)')
+                                ->required()
+                                ->rows(3)
+                                ->maxLength(1000),
+                        ])
+                        ->action(function (CensusSubmission $record, array $data) {
+                            app(CensusValidationService::class)->cancel($record, auth()->id(), $data['reason']);
 
-                        Notification::make()
-                            ->title('Recensement annulé')
-                            ->body("L'employé peut reprendre son recensement.")
-                            ->success()
-                            ->send();
-                    }),
-            ])
+                            Notification::make()
+                                ->title('Recensement annulé')
+                                ->body("L'employé peut reprendre son recensement.")
+                                ->success()
+                                ->send();
+                        })
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->defaultSort('submitted_at', 'desc');
     }
 

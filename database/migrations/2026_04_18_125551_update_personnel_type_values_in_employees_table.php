@@ -9,6 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Dialecte PostgreSQL uniquement ; sur une base vide il n'y a pas de valeurs à convertir.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Supprimer l'ancienne contrainte si elle existe
         DB::statement("ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_personnel_type_check");
 
@@ -38,6 +43,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement("ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_personnel_type_check");
 
         DB::statement("

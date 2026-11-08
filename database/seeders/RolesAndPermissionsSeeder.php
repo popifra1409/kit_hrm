@@ -202,6 +202,9 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'view_account_activation_requests', 'module' => 'employees', 'description' => 'Voir les demandes traitées par le Service RH (activation, mot de passe oublié)'],
             ['name' => 'validate_account_activations', 'module' => 'employees', 'description' => 'Valider ou rejeter une demande d\'activation après vérification d\'identité'],
 
+            // === JOURNAL D'AUDIT ===
+            ['name' => 'view_activity_logs', 'module' => 'system', 'description' => 'Lire le journal d\'activité (opérations, échecs, blocages) et ses archives'],
+
             // === VALIDATION AYANTS DROIT & DIPLÔMES (distinct de la simple édition) ===
             ['name' => 'validate_dependents', 'module' => 'health', 'description' => 'Valider un ayant droit après vérification des documents'],
             ['name' => 'reject_dependents', 'module' => 'health', 'description' => 'Rejeter un ayant droit'],
@@ -255,6 +258,8 @@ class RolesAndPermissionsSeeder extends Seeder
             // Utilisateurs (lecture seule)
             'view_users',
             'delete_user_accounts',
+            // Journal d'audit : le DRH rend compte des opérations et des tentatives
+            'view_activity_logs',
             // Employés
             'view_employees',
             'create_employees',

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\CensusSubmission;
 use App\Models\Dependent;
 use App\Models\EmployeeDiploma;
@@ -22,17 +23,23 @@ class CensusValidationService
             'career_validated_by' => $validatorId,
             'career_validated_at' => now(),
         ]);
+
+        $this->audit($submission, 'census_validated', 'Étape 1 — carrière validée');
     }
 
     public function rejectCareer(CensusSubmission $submission, int $validatorId, string $reason, array $fields = []): void
     {
+        $cleaned = $this->cleanFields($fields, CensusSubmission::CORRECTABLE_CAREER_FIELDS);
+
         $submission->update([
             'status' => CensusSubmission::STATUS_CAREER_REJECTED,
             'career_validated_by' => $validatorId,
             'career_validated_at' => now(),
             'career_rejection_reason' => $reason,
-            'career_rejection_fields' => $this->cleanFields($fields, CensusSubmission::CORRECTABLE_CAREER_FIELDS),
+            'career_rejection_fields' => $cleaned,
         ]);
+
+        $this->audit($submission, 'census_rejected', 'Étape 1 — carrière renvoyée pour correction', $reason, $cleaned);
     }
 
     // ========================================
@@ -46,17 +53,23 @@ class CensusValidationService
             'solde_validated_by' => $validatorId,
             'solde_validated_at' => now(),
         ]);
+
+        $this->audit($submission, 'census_validated', 'Étape 2 — situation solde validée');
     }
 
     public function rejectSolde(CensusSubmission $submission, int $validatorId, string $reason, array $fields = []): void
     {
+        $cleaned = $this->cleanFields($fields, CensusSubmission::CORRECTABLE_SOLDE_FIELDS);
+
         $submission->update([
             'status' => CensusSubmission::STATUS_SOLDE_REJECTED,
             'solde_validated_by' => $validatorId,
             'solde_validated_at' => now(),
             'solde_rejection_reason' => $reason,
-            'solde_rejection_fields' => $this->cleanFields($fields, CensusSubmission::CORRECTABLE_SOLDE_FIELDS),
+            'solde_rejection_fields' => $cleaned,
         ]);
+
+        $this->audit($submission, 'census_rejected', 'Étape 2 — situation solde renvoyée pour correction', $reason, $cleaned);
     }
 
     // ========================================
@@ -75,7 +88,7 @@ class CensusValidationService
      */
     public function apply(CensusSubmission $submission, int $validatorId): void
     {
-        DB::transaction(function () use ($submission, $validatorId) {
+        $appliquer = function () use ($submission, $validatorId) {
             $employee = $submission->employee;
             $payload = $submission->payload;
             $personal = $payload['personal'] ?? [];
@@ -233,18 +246,41 @@ class CensusValidationService
                 'validated_by' => $validatorId,
                 'validated_at' => now(),
             ]);
-        });
+        };
+
+        // La consignation se fait hors transaction : une validation finale qui échoue
+        // (affectation devenue incohérente) doit laisser une trace, alors que ses écrits,
+        // eux, sont tous annulés.
+        try {
+            DB::transaction($appliquer);
+        } catch (\Throwable $e) {
+            ActivityLogger::record(
+                action: 'census_validated',
+                status: ActivityLog::STATUS_FAILED,
+                subject: $submission->employee ?? $submission,
+                reason: 'Validation finale interrompue, aucune donnée appliquée : ' . $e->getMessage(),
+                properties: $this->campaignProperty($submission),
+            );
+
+            throw $e;
+        }
+
+        $this->audit($submission, 'census_validated', 'Validation finale — données appliquées à la fiche employé');
     }
 
     public function reject(CensusSubmission $submission, int $validatorId, string $reason, array $fields = []): void
     {
+        $cleaned = $this->cleanFields($fields, CensusSubmission::correctableFields());
+
         $submission->update([
             'status' => CensusSubmission::STATUS_REJECTED,
             'validated_by' => $validatorId,
             'validated_at' => now(),
             'rejection_reason' => $reason,
-            'rejection_fields' => $this->cleanFields($fields, CensusSubmission::correctableFields()),
+            'rejection_fields' => $cleaned,
         ]);
+
+        $this->audit($submission, 'census_rejected', 'Contrôle final — fiche renvoyée pour correction', $reason, $cleaned);
     }
 
     /**
@@ -273,6 +309,8 @@ class CensusValidationService
      */
     public function cancel(CensusSubmission $submission, int $validatorId, string $reason): void
     {
+        $etapeAnnulee = $submission->stage_label ?? $submission->status;
+
         $submission->update([
             'status' => CensusSubmission::STATUS_CANCELED,
             'canceled_by' => $validatorId,
@@ -285,6 +323,37 @@ class CensusValidationService
             'validated_by' => null,
             'validated_at' => null,
         ]);
+
+        $this->audit($submission, 'census_canceled', "Circuit remis à zéro depuis : {$etapeAnnulee}", $reason);
+    }
+
+    /**
+     * Ligne métier du journal : le dossier concerné est la fiche employé (c'est son
+     * matricule que l'agent lit), le verbe et le motif disent ce qui vient de se passer.
+     * Les lectures ne sont jamais consignées — seules les décisions le sont.
+     */
+    private function audit(CensusSubmission $submission, string $action, string $description, ?string $reason = null, ?array $fields = null): void
+    {
+        ActivityLogger::record(
+            action: $action,
+            subject: $submission->employee ?? $submission,
+            reason: $reason,
+            properties: array_merge(
+                $this->campaignProperty($submission),
+                $fields === null ? [] : ['champs_renavoyes' => $fields],
+            ),
+            description: $description,
+        );
+    }
+
+    private function campaignProperty(CensusSubmission $submission): array
+    {
+        $campaign = $submission->campaign;
+
+        return [
+            'campagne' => $campaign?->name ?? ('#' . $submission->census_campaign_id),
+            'soumission_id' => $submission->getKey(),
+        ];
     }
 
     public function getUnaddressedDependents(CensusSubmission $submission): \Illuminate\Support\Collection

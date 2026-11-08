@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class CensusCampaignResource extends Resource
 {
@@ -115,15 +116,17 @@ class CensusCampaignResource extends Resource
                     ->placeholder('—'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()->label('Modifier'),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make()->label('Modifier'),
 
-                Tables\Actions\Action::make('view_submissions')
-                    ->label('Voir les soumissions')
-                    ->icon('heroicon-o-inbox-arrow-down')
-                    ->url(fn(CensusCampaign $record) => \App\Filament\Resources\CensusSubmissionResource::getUrl('index', [
-                        'tableFilters[census_campaign_id][value]' => $record->id,
-                    ])),
-            ])
+                    Tables\Actions\Action::make('view_submissions')
+                        ->label('Voir les soumissions')
+                        ->icon('heroicon-o-inbox-arrow-down')
+                        ->url(fn(CensusCampaign $record) => \App\Filament\Resources\CensusSubmissionResource::getUrl('index', [
+                            'tableFilters[census_campaign_id][value]' => $record->id,
+                        ]))
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->defaultSort('created_at', 'desc');
     }
 

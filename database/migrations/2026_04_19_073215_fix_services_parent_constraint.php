@@ -7,6 +7,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Réparation de données puis CHECK : dialecte PostgreSQL uniquement, et ces
+        // requêtes sont des no-ops sur une base vide.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // 1. Supprimer la contrainte existante (si elle existe)
         DB::statement("ALTER TABLE services DROP CONSTRAINT IF EXISTS check_parent");
 
@@ -88,6 +94,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement("ALTER TABLE services DROP CONSTRAINT IF EXISTS check_parent");
         echo "✅ Contrainte check_parent supprimée\n";
     }

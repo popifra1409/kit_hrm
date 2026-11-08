@@ -29,7 +29,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            // Page maison : même formulaire que Filament, plus la consignation du
+            // blocage temporaire dans le journal d'activité. C'est l'action de route
+            // que l'on remplace ici — Filament v3 n'a pas de méthode loginPage().
+            ->login(\App\Filament\Pages\Auth\Login::class)
 
             // PERSONNALISATION DU BRANDING
             ->brandName(function () {

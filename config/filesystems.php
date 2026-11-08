@@ -43,8 +43,12 @@ return [
             'root' => storage_path('app/public'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
-            'throw' => false,
-            'report' => false,
+            // Une écriture refusée (montage partagé en lecture seule, disque plein) renvoyait
+            // false sans exception ni journal : le chemin écrit en base valait alors « pièce
+            // absente » sans que l'agent ni le Service RH en soient prévenus. Le magasin de
+            // fichiers étant partagé entre deux machines, l'échec doit être une erreur.
+            'throw' => true,
+            'report' => true,
         ],
 
         's3' => [

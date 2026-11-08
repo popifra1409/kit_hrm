@@ -10,6 +10,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // CHECK / ALTER COLUMN ... TYPE : dialecte PostgreSQL uniquement. Sous sqlite (les
+        // tests repartent d'une base vide), il n'y a ni contrainte ni données à normaliser.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // 1. Supprimer l'ancienne contrainte
         DB::statement("ALTER TABLE departments DROP CONSTRAINT IF EXISTS departments_type_check");
 
@@ -39,6 +45,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Supprimer la contrainte
         DB::statement("ALTER TABLE departments DROP CONSTRAINT IF EXISTS departments_type_check");
     }

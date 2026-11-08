@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class LeaveApprovalStepResource extends Resource
 {
@@ -130,7 +131,7 @@ class LeaveApprovalStepResource extends Resource
             ->defaultSort('order')
             ->actions([
                 Tables\Actions\EditAction::make()->label('Modifier'),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

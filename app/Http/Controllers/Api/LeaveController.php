@@ -7,8 +7,8 @@ use App\Models\Leave;
 use App\Models\LeaveType;
 use App\Services\LeaveEntitlementService;
 use App\Services\LeaveWorkflowService;
+use App\Support\PublicFileUrl;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -203,7 +203,7 @@ class LeaveController extends Controller
             'reason' => $leave->reason,
             'destination' => $leave->destination,
             'address_during_leave' => $leave->address_during_leave,
-            'document_url' => $leave->document_path ? Storage::disk('public')->url($leave->document_path) : null,
+            'document_url' => $leave->document_path ? PublicFileUrl::path($leave->document_path) : null,
             'rejection_reason' => $leave->rejection_reason,
             'replacement' => $leave->replacement?->replacementEmployee?->full_name,
             'steps' => $leave->approvals->sortBy('step_order')->values()->map(fn($approval) => [

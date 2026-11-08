@@ -7,6 +7,7 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class ParticipantsRelationManager extends RelationManager
 {
@@ -92,23 +93,25 @@ class ParticipantsRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()->label('Ajouter Participant'),
             ])
             ->actions([
-                Tables\Actions\Action::make('approve')
-                    ->label('Approuver')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->registration_status === 'pending')
-                    ->action(fn($record) => $record->approve()),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('approve')
+                        ->label('Approuver')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn($record) => $record->registration_status === 'pending')
+                        ->action(fn($record) => $record->approve()),
 
-                Tables\Actions\Action::make('mark_present')
-                    ->label('Présent')
-                    ->icon('heroicon-o-check')
-                    ->color('success')
-                    ->visible(fn($record) => $record->registration_status === 'approved')
-                    ->action(fn($record) => $record->markPresent()),
+                    Tables\Actions\Action::make('mark_present')
+                        ->label('Présent')
+                        ->icon('heroicon-o-check')
+                        ->color('success')
+                        ->visible(fn($record) => $record->registration_status === 'approved')
+                        ->action(fn($record) => $record->markPresent()),
 
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Retirer'),
-            ])
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Retirer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Retirer'),

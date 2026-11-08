@@ -3,16 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\CensusCampaign;
 use App\Models\CensusSubmission;
 use App\Models\Dependent;
 use App\Models\SalaryGrid;
 use App\Support\CameroonCivilServiceGrid;
 use App\Support\OrganizationalAssignment;
+use App\Services\ActivityLogger;
+use App\Support\PublicFileUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -78,7 +80,7 @@ class CensusController extends Controller
             'cancellation_reason' => $submission?->cancellation_reason,
             'current_data' => [
                 'personal' => [
-                    'photo_url' => $employee->photo ? Storage::url($employee->photo) : null,
+                    'photo_url' => $employee->photo ? PublicFileUrl::path($employee->photo) : null,
                     'matricule_fonction_publique' => $employee->matricule_fonction_publique,
                     'first_name' => $employee->first_name,
                     'last_name' => $employee->last_name,
@@ -105,10 +107,10 @@ class CensusController extends Controller
                     'contract_number' => $employee->contract_number,
                     'contract_type' => $employee->contractType?->name,
                     'contract_document_url' => $employee->contract_document_path
-                        ? Storage::url($employee->contract_document_path)
+                        ? PublicFileUrl::path($employee->contract_document_path)
                         : null,
                     'service_start_document_url' => $employee->service_start_document_path
-                        ? Storage::url($employee->service_start_document_path)
+                        ? PublicFileUrl::path($employee->service_start_document_path)
                         : null,
                 ],
 
@@ -228,6 +230,15 @@ class CensusController extends Controller
             ->first();
 
         if ($existing && !$existing->canBeResubmitted()) {
+            ActivityLogger::record(
+                action: 'census_submitted',
+                status: ActivityLog::STATUS_BLOCKED,
+                subject: $employee,
+                reason: 'La fiche a déjà été validée : nouvel envoi refusé.',
+                properties: ['campagne' => $campaign->name],
+                context: ActivityLog::CONTEXT_API,
+            );
+
             return response()->json(['message' => 'Ce recensement a déjà été validé et ne peut plus être modifié.'], 403);
         }
 
@@ -635,6 +646,22 @@ class CensusController extends Controller
             ]
         );
 
+        // Le détail technique (octets reçus, pièces manquantes) reste dans laravel.log ;
+        // le journal, lui, garde ce qu'un agent relit dans six mois : qui a déposé quoi.
+        ActivityLogger::record(
+            action: 'census_submitted',
+            subject: $employee,
+            description: $submission->wasRecentlyCreated
+                ? 'Recensement déposé depuis son espace employé.'
+                : 'Recensement redéposé après renvoi ou annulation.',
+            properties: [
+                'campagne' => $campaign->name,
+                'ayants_droit' => count($dependents),
+                'diplomes' => count($diplomas),
+            ],
+            context: ActivityLog::CONTEXT_API,
+        );
+
         return response()->json([
             'message' => 'Recensement soumis, en attente de validation.',
             'status' => $submission->status,
@@ -774,6 +801,18 @@ class CensusController extends Controller
      */
     private function logMissingUpload(Request $request, string $what): void
     {
+        ActivityLogger::record(
+            action: 'census_submitted',
+            status: ActivityLog::STATUS_FAILED,
+            subject: $request->user()?->employee,
+            reason: "Envoi refusé — {$what}",
+            properties: [
+                'champs_recus' => $request->request->count(),
+                'pieces_declarees' => $request->input('files_sent'),
+            ],
+            context: ActivityLog::CONTEXT_API,
+        );
+
         Log::warning("Recensement — {$what}", [
             'user_id' => $request->user()?->id,
             'content_length' => (int) $request->headers->get('Content-Length', 0),

@@ -11,6 +11,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use App\Filament\Traits\HasAuthorization;
+use Filament\Tables\Enums\ActionsPosition;
 
 class ContractResource extends Resource
 {
@@ -485,7 +486,7 @@ class ContractResource extends Resource
 
                     Tables\Actions\DeleteAction::make()->visible(fn($record) => static::can('delete', $record)),
                 ]),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

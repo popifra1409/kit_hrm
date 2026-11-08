@@ -12,7 +12,9 @@ return new class extends Migration
         // Élargit la colonne status (initialement limitée à submitted/validated/rejected)
         // pour accueillir les nouveaux statuts intermédiaires. Fonctionne que la colonne
         // soit déjà un varchar ou un vrai type ENUM Postgres.
-        DB::statement('ALTER TABLE census_submissions ALTER COLUMN status TYPE VARCHAR(30)');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE census_submissions ALTER COLUMN status TYPE VARCHAR(30)');
+        }
 
         Schema::table('census_submissions', function (Blueprint $table) {
             $table->foreignId('career_validated_by')->nullable()->after('status')->constrained('users')->nullOnDelete();

@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class AttendanceResource extends Resource
 {
@@ -290,24 +291,26 @@ class AttendanceResource extends Resource
                     ->label('Validé'),
             ])
             ->actions([
-                Tables\Actions\Action::make('validate')
-                    ->label('Valider')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('success')
-                    ->visible(fn($record) => !$record->is_validated)
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->validate())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Pointage validé')
-                            ->success()
-                            ->send();
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->visible(fn($record) => !$record->is_validated)
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->validate())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Pointage validé')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\BulkAction::make('validate')

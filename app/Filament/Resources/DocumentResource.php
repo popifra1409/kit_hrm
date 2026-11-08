@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Storage;
+use Filament\Tables\Enums\ActionsPosition;
 
 class DocumentResource extends Resource
 {
@@ -310,19 +311,21 @@ class DocumentResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\Action::make('download')
-                    ->label('Télécharger')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->color('success')
-                    ->action(function ($record) {
-                        $record->incrementDownloadCount();
-                        return Storage::download($record->file_path, $record->file_name);
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('download')
+                        ->label('Télécharger')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->color('success')
+                        ->action(function ($record) {
+                            $record->incrementDownloadCount();
+                            return Storage::download($record->file_path, $record->file_name);
+                        }),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

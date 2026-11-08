@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Validation\ValidationException;
+use Filament\Tables\Enums\ActionsPosition;
 
 /**
  * File d'attente des employés qui n'ont pas pu prouver leur date de recrutement
@@ -141,126 +142,128 @@ class AccountActivationRequestResource extends Resource
                     ]),
             ])
             ->actions([
-                // La seule action qui applique un mot de passe. L'agent doit avoir
-                // vérifié l'identité de la personne en personne.
-                Tables\Actions\Action::make('validate')
-                    ->label('Valider')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->authorize('validate')
-                    ->visible(fn(AccountActivationRequest $record) => $record->isValidatable()
-                        && auth()->user()->can('validate_account_activations'))
-                    ->modalHeading(fn(AccountActivationRequest $record) => $record->isPasswordReset()
-                        ? 'Régénérer le mot de passe de cette personne'
-                        : 'Valider cette demande d\'activation')
-                    ->modalDescription(fn(AccountActivationRequest $record) => $record->isPasswordReset()
-                        ? 'Un mot de passe temporaire sera généré et affiché une seule fois : remettez-le ou lisez-le à la personne immédiatement, il n\'est conservé nulle part.'
-                        : 'Le compte sera ouvert avec le mot de passe que l\'employé a choisi lors de sa démarche, et il pourra se connecter immédiatement.')
-                    ->modalSubmitActionLabel(fn(AccountActivationRequest $record) => $record->isPasswordReset()
-                        ? 'Générer le mot de passe'
-                        : 'Ouvrir le compte')
-                    ->form([
-                        Forms\Components\Checkbox::make('identity_checked')
-                            ->label('J\'ai vérifié l\'identité de cette personne au Service RH (pièce d\'identité ou attestation).')
-                            ->required(),
-                    ])
-                    ->action(function (AccountActivationRequest $record) {
-                        try {
-                            $temporaryPassword = app(AccountActivationReviewService::class)
-                                ->validate(auth()->user(), $record);
-                        } catch (ValidationException $e) {
-                            // Le service refuse : sans ce message visible, la fenêtre se
-                            // contente de se refermer et le clic paraît sans effet.
+                Tables\Actions\ActionGroup::make([
+                    // La seule action qui applique un mot de passe. L'agent doit avoir
+                    // vérifié l'identité de la personne en personne.
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->authorize('validate')
+                        ->visible(fn(AccountActivationRequest $record) => $record->isValidatable()
+                            && auth()->user()->can('validate_account_activations'))
+                        ->modalHeading(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                            ? 'Régénérer le mot de passe de cette personne'
+                            : 'Valider cette demande d\'activation')
+                        ->modalDescription(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                            ? 'Un mot de passe temporaire sera généré et affiché une seule fois : remettez-le ou lisez-le à la personne immédiatement, il n\'est conservé nulle part.'
+                            : 'Le compte sera ouvert avec le mot de passe que l\'employé a choisi lors de sa démarche, et il pourra se connecter immédiatement.')
+                        ->modalSubmitActionLabel(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                            ? 'Générer le mot de passe'
+                            : 'Ouvrir le compte')
+                        ->form([
+                            Forms\Components\Checkbox::make('identity_checked')
+                                ->label('J\'ai vérifié l\'identité de cette personne au Service RH (pièce d\'identité ou attestation).')
+                                ->required(),
+                        ])
+                        ->action(function (AccountActivationRequest $record) {
+                            try {
+                                $temporaryPassword = app(AccountActivationReviewService::class)
+                                    ->validate(auth()->user(), $record);
+                            } catch (ValidationException $e) {
+                                // Le service refuse : sans ce message visible, la fenêtre se
+                                // contente de se refermer et le clic paraît sans effet.
+                                Notification::make()
+                                    ->title('Demande non traitée')
+                                    ->body(collect($e->errors())->flatten()->first() ?? $e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            if ($temporaryPassword) {
+                                // persistent() : rien n'expire pendant que l'agent le dicte.
+                                Notification::make()
+                                    ->title('Nouveau mot de passe temporaire')
+                                    ->body("À remettre sur-le-champ à {$record->employee?->full_name} : {$temporaryPassword}")
+                                    ->success()
+                                    ->persistent()
+                                    ->send();
+
+                                return;
+                            }
+
                             Notification::make()
-                                ->title('Demande non traitée')
-                                ->body(collect($e->errors())->flatten()->first() ?? $e->getMessage())
-                                ->danger()
+                                ->title('Compte activé')
+                                ->body("{$record->employee?->full_name} peut maintenant se connecter.")
+                                ->success()
                                 ->send();
+                        }),
 
-                            return;
-                        }
+                    Tables\Actions\Action::make('reject')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->authorize('reject')
+                        ->visible(fn(AccountActivationRequest $record) => $record->isPending()
+                            && auth()->user()->can('validate_account_activations'))
+                        ->modalHeading('Rejeter cette demande')
+                        ->modalDescription('Le compte reste fermé et le mot de passe temporaire conserve son effet. La personne peut relancer une demande après coup.')
+                        ->modalSubmitActionLabel('Rejeter la demande')
+                        ->form([
+                            Forms\Components\Textarea::make('reason')
+                                ->label('Motif (identités non correspondantes, personne non connue…)')
+                                ->required()
+                                ->rows(3)
+                                ->maxLength(1000),
+                        ])
+                        ->action(function (AccountActivationRequest $record, array $data) {
+                            try {
+                                app(AccountActivationReviewService::class)->reject(auth()->user(), $record, $data['reason']);
+                            } catch (ValidationException $e) {
+                                Notification::make()
+                                    ->title('Rejet non enregistré')
+                                    ->body(collect($e->errors())->flatten()->first() ?? $e->getMessage())
+                                    ->danger()
+                                    ->send();
 
-                        if ($temporaryPassword) {
-                            // persistent() : rien n'expire pendant que l'agent le dicte.
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('Demande rejetée')
+                                ->success()
+                                ->send();
+                        }),
+
+                    // Le mot de passe généré n'est stocké nulle part : si la personne a
+                    // raccroché avant de le noter, l'agent doit pouvoir en produire un autre.
+                    Tables\Actions\Action::make('regenerate')
+                        ->label('Nouveau mot de passe')
+                        ->icon('heroicon-o-key')
+                        ->color('gray')
+                        ->authorize('regenerate')
+                        ->visible(fn(AccountActivationRequest $record) => $record->isPasswordReset()
+                            && $record->status === AccountActivationRequest::STATUS_VALIDATED
+                            && auth()->user()->can('validate_account_activations'))
+                        ->requiresConfirmation()
+                        ->modalHeading('Générer un nouveau mot de passe temporaire')
+                        ->modalDescription('Le mot de passe précédent cesse de fonctionner dès ici : à dicter immédiatement à la personne.')
+                        ->modalSubmitActionLabel('Générer')
+                        ->action(function (AccountActivationRequest $record) {
+                            $temporaryPassword = app(AccountActivationReviewService::class)
+                                ->regenerateTemporaryPassword($record);
+
                             Notification::make()
                                 ->title('Nouveau mot de passe temporaire')
                                 ->body("À remettre sur-le-champ à {$record->employee?->full_name} : {$temporaryPassword}")
                                 ->success()
                                 ->persistent()
                                 ->send();
-
-                            return;
-                        }
-
-                        Notification::make()
-                            ->title('Compte activé')
-                            ->body("{$record->employee?->full_name} peut maintenant se connecter.")
-                            ->success()
-                            ->send();
-                    }),
-
-                Tables\Actions\Action::make('reject')
-                    ->label('Rejeter')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->authorize('reject')
-                    ->visible(fn(AccountActivationRequest $record) => $record->isPending()
-                        && auth()->user()->can('validate_account_activations'))
-                    ->modalHeading('Rejeter cette demande')
-                    ->modalDescription('Le compte reste fermé et le mot de passe temporaire conserve son effet. La personne peut relancer une demande après coup.')
-                    ->modalSubmitActionLabel('Rejeter la demande')
-                    ->form([
-                        Forms\Components\Textarea::make('reason')
-                            ->label('Motif (identités non correspondantes, personne non connue…)')
-                            ->required()
-                            ->rows(3)
-                            ->maxLength(1000),
-                    ])
-                    ->action(function (AccountActivationRequest $record, array $data) {
-                        try {
-                            app(AccountActivationReviewService::class)->reject(auth()->user(), $record, $data['reason']);
-                        } catch (ValidationException $e) {
-                            Notification::make()
-                                ->title('Rejet non enregistré')
-                                ->body(collect($e->errors())->flatten()->first() ?? $e->getMessage())
-                                ->danger()
-                                ->send();
-
-                            return;
-                        }
-
-                        Notification::make()
-                            ->title('Demande rejetée')
-                            ->success()
-                            ->send();
-                    }),
-
-                // Le mot de passe généré n'est stocké nulle part : si la personne a
-                // raccroché avant de le noter, l'agent doit pouvoir en produire un autre.
-                Tables\Actions\Action::make('regenerate')
-                    ->label('Nouveau mot de passe')
-                    ->icon('heroicon-o-key')
-                    ->color('gray')
-                    ->authorize('regenerate')
-                    ->visible(fn(AccountActivationRequest $record) => $record->isPasswordReset()
-                        && $record->status === AccountActivationRequest::STATUS_VALIDATED
-                        && auth()->user()->can('validate_account_activations'))
-                    ->requiresConfirmation()
-                    ->modalHeading('Générer un nouveau mot de passe temporaire')
-                    ->modalDescription('Le mot de passe précédent cesse de fonctionner dès ici : à dicter immédiatement à la personne.')
-                    ->modalSubmitActionLabel('Générer')
-                    ->action(function (AccountActivationRequest $record) {
-                        $temporaryPassword = app(AccountActivationReviewService::class)
-                            ->regenerateTemporaryPassword($record);
-
-                        Notification::make()
-                            ->title('Nouveau mot de passe temporaire')
-                            ->body("À remettre sur-le-champ à {$record->employee?->full_name} : {$temporaryPassword}")
-                            ->success()
-                            ->persistent()
-                            ->send();
-                    }),
-            ])
+                        })
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->defaultSort('created_at', 'desc');
     }
 

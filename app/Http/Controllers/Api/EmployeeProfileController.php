@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\PublicFileUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -154,7 +155,7 @@ class EmployeeProfileController extends Controller
 
         return response()->json([
             'message' => 'Photo mise à jour.',
-            'photo_url' => Storage::disk('public')->url($path),
+            'photo_url' => PublicFileUrl::path($path),
         ]);
     }
 
@@ -177,7 +178,7 @@ class EmployeeProfileController extends Controller
             'last_name' => $employee->last_name,
             'gender' => $employee->gender,
             'birth_date' => $employee->birth_date?->format('Y-m-d'),
-            'photo_url' => $employee->photo ? Storage::disk('public')->url($employee->photo) : null,
+            'photo_url' => $employee->photo ? PublicFileUrl::path($employee->photo) : null,
 
             // Coordonnées (modifiables par l'employé)
             'phone' => $employee->phone,

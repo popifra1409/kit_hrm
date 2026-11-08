@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PayrollResource extends Resource
 {
@@ -307,35 +308,37 @@ class PayrollResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
 
-                Tables\Actions\Action::make('validate')
-                    ->label('Valider')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'draft')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'validated',
-                            'validated_by' => auth()->id(),
-                            'validated_at' => now(),
-                        ]);
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'draft')
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => 'validated',
+                                'validated_by' => auth()->id(),
+                                'validated_at' => now(),
+                            ]);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Bulletin validé')
-                            ->success()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Bulletin validé')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('download_pdf')
-                    ->label('Télécharger PDF')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('primary')
-                    ->url(fn($record) => route('payroll.pdf', $record))
-                    ->openUrlInNewTab(),
-            ])
+                    Tables\Actions\Action::make('download_pdf')
+                        ->label('Télécharger PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('primary')
+                        ->url(fn($record) => route('payroll.pdf', $record))
+                        ->openUrlInNewTab()
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

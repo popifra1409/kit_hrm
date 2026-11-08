@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
+use App\Support\PublicFileUrl;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -20,8 +21,8 @@ class AppInfoController extends Controller
      * @response 200 {
      *   "hospital_name": "Hôpital Général de Yaoundé",
      *   "hospital_short_name": "HGY",
-     *   "logo_url": "https://.../storage/hospital/logo.png",
-     *   "favicon_url": "https://.../storage/hospital/favicon.png"
+     *   "logo_url": "/storage/hospital/logo.png",
+     *   "favicon_url": "/storage/hospital/favicon.png"
      * }
      */
     public function show()
@@ -37,8 +38,8 @@ class AppInfoController extends Controller
     }
 
     /**
-     * Chemin d'une pièce « Infos de la structure » → URL publique, ou null si
-     * inexploitable. La page de réglages stocke une chaîne ou un tableau (FileUpload),
+     * Chemin d'une pièce « Infos de la structure » → URL relative à l'application, ou null
+     * si inexploitable. La page de réglages stocke une chaîne ou un tableau (FileUpload),
      * et une valeur héritée d'un ancien téléversement peut être un chemin local
      * absent du disque : dans ce cas l'écran retombe sur son logo par défaut.
      */
@@ -46,10 +47,10 @@ class AppInfoController extends Controller
     {
         $path = is_array($path) ? ($path[0] ?? null) : $path;
 
-        if (!is_string($path) || $path === '' || !Storage::disk('public')->exists($path)) {
+        if (!is_string($path) || trim($path) === '' || !Storage::disk('public')->exists($path)) {
             return null;
         }
 
-        return Storage::disk('public')->url($path);
+        return PublicFileUrl::path($path);
     }
 }

@@ -12,11 +12,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('salary_grids', function (Blueprint $table) {
-            // PostgreSQL : Utiliser du SQL brut pour changer le type de colonne
-            DB::statement('ALTER TABLE salary_grids ALTER COLUMN category TYPE varchar(10)');
-            DB::statement('ALTER TABLE salary_grids ALTER COLUMN echelon TYPE varchar(10)');
-        });
+        // ALTER COLUMN ... TYPE : PostgreSQL uniquement. Le schéma de création suffit aux
+        // autres pilotes (les tests tournent sur sqlite).
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::statement('ALTER TABLE salary_grids ALTER COLUMN category TYPE varchar(10)');
+        DB::statement('ALTER TABLE salary_grids ALTER COLUMN echelon TYPE varchar(10)');
 
         echo "✅ Colonnes category et echelon converties en varchar(10)\n";
     }
@@ -26,11 +29,13 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('salary_grids', function (Blueprint $table) {
-            // Revenir au type integer
-            DB::statement('ALTER TABLE salary_grids ALTER COLUMN category TYPE integer USING (category::integer)');
-            DB::statement('ALTER TABLE salary_grids ALTER COLUMN echelon TYPE integer USING (echelon::integer)');
-        });
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        // Revenir au type integer
+        DB::statement('ALTER TABLE salary_grids ALTER COLUMN category TYPE integer USING (category::integer)');
+        DB::statement('ALTER TABLE salary_grids ALTER COLUMN echelon TYPE integer USING (echelon::integer)');
 
         echo "✅ Colonnes category et echelon reconverties en integer\n";
     }

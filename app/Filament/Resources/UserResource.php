@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Models\AccountDeletion;
 use App\Services\AccountDeletionService;
+use Filament\Tables\Enums\ActionsPosition;
 
 class UserResource extends Resource
 {
@@ -129,7 +130,6 @@ class UserResource extends Resource
                     }),
             ])
             ->actionsColumnLabel('Actions')
-            ->actionsPosition(Tables\Enums\ActionsPosition::BeforeCells)
             ->actions([
                 // Un seul bouton « ⋮ » en tête de ligne : la ligne reste lisible et le
                 // groupement accueille les actions sans tout décaler à droite.
@@ -178,7 +178,7 @@ class UserResource extends Resource
                             }
                         }),
                 ]),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

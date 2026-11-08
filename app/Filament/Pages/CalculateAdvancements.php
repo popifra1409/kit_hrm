@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Enums\ActionsPosition;
 
 class CalculateAdvancements extends Page implements HasTable
 {
@@ -93,7 +94,7 @@ class CalculateAdvancements extends Page implements HasTable
                     ->action(function ($record) {
                         $this->createAdvancement($record);
                     }),
-            ]);
+            ], position: ActionsPosition::BeforeColumns);
     }
 
     protected function getEligibleEmployeesQuery()

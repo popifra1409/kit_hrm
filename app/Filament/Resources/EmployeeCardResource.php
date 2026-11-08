@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Storage;
+use Filament\Tables\Enums\ActionsPosition;
 
 class EmployeeCardResource extends Resource
 {
@@ -261,95 +262,97 @@ class EmployeeCardResource extends Resource
                     ->label('Active'),
             ])
             ->actions([
-                Tables\Actions\Action::make('generate_qr')
-                    ->label('Générer QR')
-                    ->icon('heroicon-o-qr-code')
-                    ->color('info')
-                    ->visible(fn($record) => !$record->qr_code_path)
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        if (!$record->card_number) {
-                            $record->generateCardNumber();
-                        }
-                        $record->generateQrCode();
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('generate_qr')
+                        ->label('Générer QR')
+                        ->icon('heroicon-o-qr-code')
+                        ->color('info')
+                        ->visible(fn($record) => !$record->qr_code_path)
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            if (!$record->card_number) {
+                                $record->generateCardNumber();
+                            }
+                            $record->generateQrCode();
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('QR Code généré')
-                            ->success()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('QR Code généré')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('activate')
-                    ->label('Activer')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => !$record->is_active && $record->qr_code_path)
-                    ->requiresConfirmation()
-                    ->modalHeading('Activer la carte')
-                    ->modalDescription('Confirmer l\'activation de cette carte ?')
-                    ->action(function ($record) {
-                        $record->activate();
+                    Tables\Actions\Action::make('activate')
+                        ->label('Activer')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn($record) => !$record->is_active && $record->qr_code_path)
+                        ->requiresConfirmation()
+                        ->modalHeading('Activer la carte')
+                        ->modalDescription('Confirmer l\'activation de cette carte ?')
+                        ->action(function ($record) {
+                            $record->activate();
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Carte activée')
-                            ->success()
-                            ->body('La carte ' . $record->card_number . ' est maintenant active')
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Carte activée')
+                                ->success()
+                                ->body('La carte ' . $record->card_number . ' est maintenant active')
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('revoke')
-                    ->label('Révoquer')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn($record) => $record->is_active)
-                    ->requiresConfirmation()
-                    ->form([
-                        Forms\Components\Textarea::make('revocation_reason')
-                            ->label('Raison de la révocation')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->revoke($data['revocation_reason']);
+                    Tables\Actions\Action::make('revoke')
+                        ->label('Révoquer')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn($record) => $record->is_active)
+                        ->requiresConfirmation()
+                        ->form([
+                            Forms\Components\Textarea::make('revocation_reason')
+                                ->label('Raison de la révocation')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->revoke($data['revocation_reason']);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Carte révoquée')
-                            ->warning()
-                            ->body('La carte a été révoquée')
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Carte révoquée')
+                                ->warning()
+                                ->body('La carte a été révoquée')
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('generate_pdf')
-                    ->label('Générer PDF')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->visible(fn($record) => !$record->card_pdf_path && $record->qr_code_path)
-                    ->action(function ($record) {
-                        $pdfService = new \App\Services\CardPdfService();
+                    Tables\Actions\Action::make('generate_pdf')
+                        ->label('Générer PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('success')
+                        ->visible(fn($record) => !$record->card_pdf_path && $record->qr_code_path)
+                        ->action(function ($record) {
+                            $pdfService = new \App\Services\CardPdfService();
 
-                        if ($record->card_type === 'professional') {
-                            $pdfPath = $pdfService->generateProfessionalCard($record);
-                        } else {
-                            $pdfPath = $pdfService->generateHealthCard($record);
-                        }
+                            if ($record->card_type === 'professional') {
+                                $pdfPath = $pdfService->generateProfessionalCard($record);
+                            } else {
+                                $pdfPath = $pdfService->generateHealthCard($record);
+                            }
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('PDF généré')
-                            ->success()
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('download_pdf')
-                    ->label('PDF')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('info')
-                    ->visible(fn($record) => $record->card_pdf_path)
-                    ->url(fn($record) => Storage::url($record->card_pdf_path))
-                    ->openUrlInNewTab(),
+                            \Filament\Notifications\Notification::make()
+                                ->title('PDF généré')
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('download_pdf')
+                        ->label('PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('info')
+                        ->visible(fn($record) => $record->card_pdf_path)
+                        ->url(fn($record) => Storage::url($record->card_pdf_path))
+                        ->openUrlInNewTab(),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

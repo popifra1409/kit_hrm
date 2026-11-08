@@ -8,6 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // sqlite refuse de.dropColumn sur une colonne portée par une FK inline : sous ce
+        // pilote les trois colonnes redondantes restent en place, ce qui ne gêne ni
+        // l'application ni les tests.
+        if (Schema::getConnection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         Schema::table('services', function (Blueprint $table) {
             // Supprimer les colonnes redondantes (elles existent toutes!)
             if (Schema::hasColumn('services', 'head_of_service_id')) {

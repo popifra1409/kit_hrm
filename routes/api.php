@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\AppInfoController;
 use App\Http\Controllers\Api\CensusController;
+use App\Http\Controllers\Api\PreferenceController;
 use Illuminate\Support\Facades\Route;
 
 // ========================================
@@ -47,6 +48,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::delete('/auth/account', [AuthController::class, 'deleteAccount']);
     Route::put('/auth/password', [AuthController::class, 'changePassword']);
+
+    // Réglages de l'agent (langue, apparence, police), synchronisés par compte. Ni « auth » ni
+    // « employee » : c'est une colonne de `users`, et rien d'autre.
+    Route::get('/preferences', [PreferenceController::class, 'show']);
+    Route::put('/preferences', [PreferenceController::class, 'update']);
 
     Route::prefix('employee')->group(function () {
         // Profil

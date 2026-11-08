@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class ReplacementResource extends Resource
 {
@@ -311,52 +312,54 @@ class ReplacementResource extends Resource
                     ->label('Actif'),
             ])
             ->actions([
-                Tables\Actions\Action::make('approve')
-                    ->label('Approuver')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'pending')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->approve())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Remplacement approuvé')
-                            ->success()
-                            ->send();
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('approve')
+                        ->label('Approuver')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'pending')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->approve())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Remplacement approuvé')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('reject')
-                    ->label('Rejeter')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn($record) => $record->status === 'pending')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->reject())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Remplacement rejeté')
-                            ->danger()
-                            ->send();
-                    }),
+                    Tables\Actions\Action::make('reject')
+                        ->label('Rejeter')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn($record) => $record->status === 'pending')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->reject())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Remplacement rejeté')
+                                ->danger()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('complete')
-                    ->label('Terminer')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('gray')
-                    ->visible(fn($record) => $record->status === 'approved' && $record->is_active)
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->complete())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Remplacement terminé')
-                            ->success()
-                            ->send();
-                    }),
+                    Tables\Actions\Action::make('complete')
+                        ->label('Terminer')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('gray')
+                        ->visible(fn($record) => $record->status === 'approved' && $record->is_active)
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->complete())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Remplacement terminé')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

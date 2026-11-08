@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AccountActivationRequest;
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -69,6 +70,16 @@ class AccountActivationReviewService
             'validated_at' => now(),
         ])->save();
 
+        ActivityLogger::record(
+            action: $request->isPasswordReset() ? 'password_reset_done' : 'activation_validated',
+            subject: $user,
+            description: ($request->isPasswordReset()
+                ? 'Réinitialisation traitée par le Service RH ('
+                : 'Activation traitée par le Service RH (') . $request->reference . ').',
+            actor: $agent,
+            actorMatricule: $agent->employee?->matricule,
+        );
+
         return $temporaryPassword;
     }
 
@@ -97,6 +108,12 @@ class AccountActivationReviewService
 
         $user->forceFill(['password' => Hash::make($temporaryPassword)])->save();
 
+        ActivityLogger::record(
+            action: 'password_reset_done',
+            subject: $user,
+            description: 'Nouveau mot de passe temporaire généré (' . $request->reference . ') : le précédent ne fonctionne plus.',
+        );
+
         return $temporaryPassword;
     }
 
@@ -114,6 +131,15 @@ class AccountActivationReviewService
             'validated_by' => $agent->id,
             'validated_at' => now(),
         ])->save();
+
+        ActivityLogger::record(
+            action: 'activation_rejected',
+            subject: $request->user ?? $request,
+            reason: $reason,
+            description: 'Demande ' . $request->reference . ' rejetée par le Service RH.',
+            actor: $agent,
+            actorMatricule: $agent->employee?->matricule,
+        );
     }
 
     /**

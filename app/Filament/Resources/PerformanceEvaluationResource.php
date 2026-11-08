@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PerformanceEvaluationResource extends Resource
 {
@@ -375,40 +376,42 @@ class PerformanceEvaluationResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\Action::make('sign_evaluator')
-                    ->label('Signer (Évaluateur)')
-                    ->icon('heroicon-o-pencil-square')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'draft' && auth()->id() === $record->evaluator_id)
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->signByEvaluator())
-                    ->after(function () {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Évaluation signée')
-                            ->success()
-                            ->send();
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('sign_evaluator')
+                        ->label('Signer (Évaluateur)')
+                        ->icon('heroicon-o-pencil-square')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'draft' && auth()->id() === $record->evaluator_id)
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->signByEvaluator())
+                        ->after(function () {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Évaluation signée')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('sign_employee')
-                    ->label('Signer (Employé)')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('primary')
-                    ->visible(fn($record) => $record->status === 'pending_employee')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->signByEmployee()),
+                    Tables\Actions\Action::make('sign_employee')
+                        ->label('Signer (Employé)')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('primary')
+                        ->visible(fn($record) => $record->status === 'pending_employee')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->signByEmployee()),
 
-                Tables\Actions\Action::make('validate')
-                    ->label('Valider')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'pending_validator')
-                    ->requiresConfirmation()
-                    ->action(fn($record) => $record->validateByValidator()),
+                    Tables\Actions\Action::make('validate')
+                        ->label('Valider')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->visible(fn($record) => $record->status === 'pending_validator')
+                        ->requiresConfirmation()
+                        ->action(fn($record) => $record->validateByValidator()),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

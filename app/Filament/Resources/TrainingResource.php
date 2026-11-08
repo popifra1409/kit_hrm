@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class TrainingResource extends Resource
 {
@@ -387,16 +388,18 @@ class TrainingResource extends Resource
                     ->query(fn($query) => $query->where('start_date', '>=', now())),
             ])
             ->actions([
-                // Tables\Actions\Action::make('participants')
-                //     ->label('Participants')
-                //     ->icon('heroicon-o-users')
-                //     ->url(fn($record) => route('filament.admin.resources.trainings.participants', $record))
-                //     ->color('primary'),
+                Tables\Actions\ActionGroup::make([
+                    // Tables\Actions\Action::make('participants')
+                    //     ->label('Participants')
+                    //     ->icon('heroicon-o-users')
+                    //     ->url(fn($record) => route('filament.admin.resources.trainings.participants', $record))
+                    //     ->color('primary'),
 
-                Tables\Actions\ViewAction::make()->label('Voir'),
-                Tables\Actions\EditAction::make()->label('Modifier'),
-                Tables\Actions\DeleteAction::make()->label('Supprimer'),
-            ])
+                    Tables\Actions\ViewAction::make()->label('Voir'),
+                    Tables\Actions\EditAction::make()->label('Modifier'),
+                    Tables\Actions\DeleteAction::make()->label('Supprimer')
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()->label('Supprimer'),

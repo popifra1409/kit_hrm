@@ -15,6 +15,7 @@ use App\Models\Service;
 use App\Models\SubDirection;
 use App\Models\TradeBody;
 use App\Support\OrganizationalAssignment;
+use App\Services\ActivityLogger;
 use App\Services\CensusValidationService;
 use Filament\Actions;
 use Filament\Forms;
@@ -325,19 +326,36 @@ class ReviewCensusSubmission extends Page implements HasForms
     {
         $formState = $this->form->getState();
 
-        // Log temporaire de diagnostic — à retirer une fois le problème confirmé résolu.
-        \Illuminate\Support\Facades\Log::info('CensusSubmission — état du formulaire avant enregistrement', [
-            'submission_id' => $this->record->id,
-            'form_state' => $formState,
+        $avant = $this->record->payload ?? [];
+
+        $nouveau = array_merge($avant, [
+            'personal' => array_merge($avant['personal'] ?? [], $formState['personal'] ?? []),
+            'organizational' => $this->mergeOrganizational($formState['organizational'] ?? []),
+            'contract' => array_merge($avant['contract'] ?? [], $formState['contract'] ?? []),
         ]);
 
-        $this->record->update([
-            'payload' => array_merge($this->record->payload ?? [], [
-                'personal' => array_merge($this->record->payload['personal'] ?? [], $formState['personal'] ?? []),
-                'organizational' => $this->mergeOrganizational($formState['organizational'] ?? []),
-                'contract' => array_merge($this->record->payload['contract'] ?? [], $formState['contract'] ?? []),
-            ]),
-        ]);
+        $this->record->update(['payload' => $nouveau]);
+
+        // Le payload est un JSON : aucune colonne ne « change » aux yeux de l'observer,
+        // donc les corrections du Service RH ne laisseraient aucune trace sans cette ligne.
+        $modifies = [];
+
+        foreach (['personal', 'organizational', 'contract'] as $groupe) {
+            foreach (($nouveau[$groupe] ?? []) as $cle => $valeur) {
+                if (($avant[$groupe][$cle] ?? null) != $valeur) {
+                    $modifies[] = "{$groupe}.{$cle}";
+                }
+            }
+        }
+
+        if ($modifies !== []) {
+            ActivityLogger::record(
+                action: 'census_corrected',
+                subject: $this->record->employee,
+                description: 'Corrections saisies par le Service RH sur l\'écran de revue.',
+                properties: ['champs_modifies' => array_values($modifies)],
+            );
+        }
 
         $this->record->refresh();
     }

@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 use App\Models\AccountActivationRequest;
 use App\Models\AccountDeletion;
 use App\Services\AccountDeletionService;
+use App\Services\ActivityLogger;
+use App\Support\PublicFileUrl;
 
 
 /**
@@ -100,6 +102,12 @@ class AuthController extends Controller
         }
 
         if (!Hash::check($request->temporary_password, $user->password)) {
+            ActivityLogger::recordAttempt(
+                'activation_failed',
+                $user->employee?->matricule ?? $request->matricule,
+                'Mot de passe temporaire incorrect.'
+            );
+
             return response()->json([
                 'message' => 'Mot de passe temporaire incorrect.',
             ], 401);
@@ -122,6 +130,14 @@ class AuthController extends Controller
                 'password_hash' => Hash::make($request->password),
             ],
             now()->addMinutes(self::ACTIVATION_SESSION_MINUTES)
+        );
+
+        ActivityLogger::record(
+            action: 'activation_started',
+            subject: $user,
+            description: 'Mot de passe temporaire accepté, en attente de la seconde vérification.',
+            actorMatricule: $user->employee?->matricule,
+            context: \App\Models\ActivityLog::CONTEXT_API,
         );
 
         return response()->json([
@@ -302,6 +318,14 @@ class AuthController extends Controller
         Cache::forget($sessionKey);
         Cache::forget($this->activationFailuresKey($user));
 
+        ActivityLogger::record(
+            action: 'activation_validated',
+            subject: $user,
+            description: 'Compte activé par l’employé lui-même (vérification automatique).',
+            actorMatricule: $user->employee?->matricule,
+            context: \App\Models\ActivityLog::CONTEXT_API,
+        );
+
         $token = $user->createToken('mobile-app')->plainTextToken;
 
         return response()->json([
@@ -387,6 +411,12 @@ class AuthController extends Controller
         if (!$captchaOk) {
             // Aucun échec comptabilisé : cette route n'ouvre rien, elle enregistre juste
             // une demande qu'un agent devra refuser ou confirmer.
+            ActivityLogger::recordAttempt(
+                'activation_failed',
+                $user->employee?->matricule,
+                'Calcul incorrect sur la demande de vérification au Service RH.'
+            );
+
             return response()->json([
                 'message' => 'Le résultat du calcul est incorrect.',
                 'captcha' => $this->makeCaptcha($request->verification_token),
@@ -420,6 +450,15 @@ class AuthController extends Controller
                 'expires_at' => now()->addDays(AccountActivationRequest::VALIDITY_DAYS),
             ]);
         }
+
+        ActivityLogger::record(
+            action: 'activation_requested',
+            subject: $review,
+            description: ($review->wasRecentlyCreated ? 'Demande enregistrée ' : 'Demande renouvelée ')
+                . $review->reference . ' — date déclarée par l’agent : ' . ($review->self_declared_date ?? 'aucune'),
+            actorMatricule: $user->employee?->matricule,
+            context: \App\Models\ActivityLog::CONTEXT_API,
+        );
 
         return response()->json([
             'message' => 'Votre demande est enregistrée. Présentez-vous au Service RH avec cette référence '
@@ -516,6 +555,12 @@ class AuthController extends Controller
         })->first();
 
         if (!$user || !$user->employee) {
+            ActivityLogger::recordAttempt(
+                'password_reset_requested',
+                $matricule,
+                'Aucun compte pour ce matricule.'
+            );
+
             return response()->json([
                 'message' => "Aucun compte n'est associé à ce matricule. Contactez les Ressources Humaines.",
             ], 404);
@@ -546,6 +591,14 @@ class AuthController extends Controller
                 'expires_at' => now()->addDays(AccountActivationRequest::VALIDITY_DAYS),
             ]);
         }
+
+        ActivityLogger::recordAttempt(
+            'password_reset_requested',
+            $matricule,
+            'Demande de réinitialisation enregistrée (' . $review->reference . ').',
+            ['reference' => $review->reference],
+            \App\Models\ActivityLog::STATUS_SUCCESS,
+        );
 
         return response()->json([
             'message' => 'Votre demande est enregistrée. Présentez-vous au Service RH avec cette référence et votre '
@@ -654,15 +707,33 @@ class AuthController extends Controller
             $this->failureState($this->activationFailuresKey($user))['retry_after']
         );
 
+        ActivityLogger::recordAttempt(
+            'activation_locked',
+            $user->employee?->matricule,
+            'Démarche d’activation mise en pause après ' . self::MAX_FAILURES . ' vérifications échouées.',
+            ['retry_after_minutes' => $minutes]
+        );
+
         return $this->lockedResponse(
             "Trop de tentatives échouées. Réessayez dans {$minutes} minute(s) ou contactez les Ressources Humaines.",
             $minutes
         );
     }
 
-    private function loginLockedResponse(array $state)
+    private function loginLockedResponse(array $state, ?string $matricule = null)
     {
         $minutes = $this->minutesRemaining($state['retry_after']);
+
+        ActivityLogger::record(
+            action: 'login_locked',
+            // Le même statut que le blocage du formulaire du back-office : ce refus-là
+            // n'est pas un mot de passe erroné de plus, il se filtre à part.
+            status: \App\Models\ActivityLog::STATUS_BLOCKED,
+            reason: 'Compte mis en pause après ' . self::MAX_FAILURES . ' tentatives échouées.',
+            properties: ['retry_after_minutes' => $minutes],
+            actorMatricule: $matricule,
+            context: \App\Models\ActivityLog::CONTEXT_API,
+        );
 
         return $this->lockedResponse(
             "Trop de tentatives échouées. Ce compte est en pause pendant {$minutes} minute(s). "
@@ -699,6 +770,13 @@ class AuthController extends Controller
      */
     private function activationFailureResponse(string $message, string $verificationToken, User $user)
     {
+        ActivityLogger::recordAttempt(
+            'activation_failed',
+            $user->employee?->matricule,
+            $message,
+            ['tentatives_consommees' => $this->activationFailureCount($user)]
+        );
+
         if ($this->activationLocked($user)) {
             Cache::forget($this->activationCacheKey($verificationToken));
 
@@ -798,7 +876,7 @@ class AuthController extends Controller
         $state = $this->failureState($failuresKey);
 
         if ($state['locked']) {
-            return $this->loginLockedResponse($state);
+            return $this->loginLockedResponse($state, $matricule);
         }
 
         $user = User::whereHas('employee', function ($query) use ($matricule) {
@@ -808,8 +886,14 @@ class AuthController extends Controller
         if (!$user || !Hash::check($request->password, $user->password)) {
             $state = $this->registerFailure($failuresKey);
 
+            ActivityLogger::recordAttempt(
+                'login_failed',
+                $matricule,
+                $user ? 'Mot de passe incorrect.' : 'Matricule inconnu dans le système.'
+            );
+
             if ($state['locked']) {
-                return $this->loginLockedResponse($state);
+                return $this->loginLockedResponse($state, $matricule);
             }
 
             return response()->json([
@@ -824,12 +908,27 @@ class AuthController extends Controller
         Cache::forget($failuresKey);
 
         if (!$user->isActivated()) {
+            ActivityLogger::recordAttempt(
+                'login_failed',
+                $matricule,
+                'Mot de passe correct, mais le compte n’est pas encore activé.',
+                [],
+                \App\Models\ActivityLog::STATUS_BLOCKED,
+            );
+
             return response()->json([
                 'message' => "Ce compte n'a pas encore été activé. Utilisez d'abord l'écran d'activation avec votre matricule.",
                 'reason' => 'not_activated',
                 'attempts_left' => self::MAX_FAILURES,
             ], 403);
         }
+
+        ActivityLogger::record(
+            action: 'login_success',
+            subject: $user,
+            actorMatricule: $matricule,
+            context: \App\Models\ActivityLog::CONTEXT_API,
+        );
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
@@ -872,7 +971,10 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        $user->currentAccessToken()->delete();
+
+        ActivityLogger::record(action: 'logout', subject: $user);
 
         return response()->json([
             'message' => 'Déconnecté avec succès.',
@@ -910,6 +1012,13 @@ class AuthController extends Controller
         $user = $request->user();
 
         if (!Hash::check($request->current_password, $user->password)) {
+            ActivityLogger::record(
+                action: 'password_changed',
+                status: \App\Models\ActivityLog::STATUS_FAILED,
+                subject: $user,
+                reason: 'Le mot de passe actuel saisi est incorrect.'
+            );
+
             return response()->json([
                 'message' => 'Le mot de passe actuel est incorrect.',
             ], 401);
@@ -917,6 +1026,12 @@ class AuthController extends Controller
 
         $user->password = $request->password;
         $user->save();
+
+        ActivityLogger::record(
+            action: 'password_changed',
+            subject: $user,
+            description: 'Mot de passe modifié depuis l’espace employé.'
+        );
 
         return response()->json([
             'message' => 'Mot de passe mis à jour avec succès.',
@@ -952,6 +1067,13 @@ class AuthController extends Controller
         $user = $request->user();
 
         if (!Hash::check($request->password, $user->password)) {
+            ActivityLogger::record(
+                action: 'account_deletion_requested',
+                status: \App\Models\ActivityLog::STATUS_FAILED,
+                subject: $user,
+                reason: 'Confirmation par le mot de passe actuel refusée.'
+            );
+
             return response()->json(['message' => 'Mot de passe incorrect.'], 422);
         }
 
@@ -963,8 +1085,23 @@ class AuthController extends Controller
                 initiatedBy: 'self',
             );
         } catch (\RuntimeException $e) {
+            ActivityLogger::record(
+                action: 'account_deletion_requested',
+                status: \App\Models\ActivityLog::STATUS_BLOCKED,
+                subject: $user,
+                reason: $e->getMessage(),
+                properties: ['motif_declare' => $request->reason]
+            );
+
             return response()->json(['message' => $e->getMessage()], 403);
         }
+
+        ActivityLogger::record(
+            action: 'account_deletion_requested',
+            subject: $user,
+            description: 'Suppression demandée par l’employé lui-même.',
+            properties: ['motif_declare' => $request->reason]
+        );
 
         return response()->json(['message' => 'Votre compte a été supprimé.']);
     }
@@ -986,7 +1123,7 @@ class AuthController extends Controller
                 // Chemin relatif → URL publique, sinon le <img> de la SPA casse ;
                 // et certains enregistrements pointent vers un fichier supprimé.
                 'photo' => ($employee->photo && Storage::disk('public')->exists($employee->photo))
-                    ? Storage::disk('public')->url($employee->photo)
+                    ? PublicFileUrl::path($employee->photo)
                     : null,
                 'job_title' => $employee->jobTitle?->name,
                 'department' => $employee->department?->name,
