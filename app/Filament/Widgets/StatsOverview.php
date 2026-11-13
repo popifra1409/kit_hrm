@@ -7,37 +7,37 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Service;
+use App\Support\OrganizationalAssignment;
 
 class StatsOverview extends BaseWidget
 {
+    /**
+     * Une tuile par catégorie, avec l'aide qui va bien : la répartition n'est plus
+     * « soignant / non soignant », et le nombre de cases suit la nomenclature
+     * toute seule quand on y ajoute une catégorie.
+     */
     protected function getStats(): array
     {
-        $soignantCount = Employee::where('personnel_type', 'soignant')->count();
-        $paramedicalCount = Employee::where('personnel_type', 'paramedical')->count();
-        $nonSoignantCount = Employee::where('personnel_type', 'non_soignant')->count();
-        $autresCount = Employee::where('personnel_type', 'autres')->count();
+        $counts = Employee::whereIn('personnel_type', array_keys(OrganizationalAssignment::personnelTypeOptions()))
+            ->selectRaw('personnel_type, count(*) aggregate')
+            ->groupBy('personnel_type')
+            ->pluck('aggregate', 'personnel_type');
 
-        return [
-            Stat::make('Personnel Soignant', $soignantCount)
-                ->description('Médecins, Chirurgiens')
-                ->descriptionIcon('heroicon-o-user-circle')
-                ->color('success'),
+        $stats = [];
 
-            Stat::make('Personnel Paramédical', $paramedicalCount)
-                ->description('Infirmiers, Aides-soignants')
-                ->descriptionIcon('heroicon-o-heart')
-                ->color('info'),
+        foreach (OrganizationalAssignment::PERSONNEL_TYPES as $type => $label) {
+            $stats[] = Stat::make($label, (int) $counts->get($type, 0))
+                ->description(OrganizationalAssignment::PERSONNEL_TYPE_GUIDES[$type])
+                ->color(OrganizationalAssignment::personnelTypeColor($type));
+        }
 
-            Stat::make('Personnel Non-Soignant', $nonSoignantCount)
-                ->description('Administratif, Technique, Support')
-                ->descriptionIcon('heroicon-o-building-office')
-                ->color('warning'),
+        $toReclassify = Employee::whereIn('personnel_type', array_keys(OrganizationalAssignment::LEGACY_PERSONNEL_TYPES))->count();
 
-            Stat::make('Autres', $autresCount)
-                ->description('Autres catégories')
-                ->descriptionIcon('heroicon-o-ellipsis-horizontal')
-                ->color('gray'),
-        ];
+        $stats[] = Stat::make('À reclasser', $toReclassify)
+            ->description('Fiches encore sur l\'ancienne nomenclature')
+            ->color($toReclassify > 0 ? 'danger' : 'gray');
+
+        return $stats;
     }
 
     protected static ?int $sort = 1;

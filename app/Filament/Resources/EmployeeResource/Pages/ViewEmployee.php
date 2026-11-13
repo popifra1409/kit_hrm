@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
+use App\Support\OrganizationalAssignment;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Pages\ViewRecord;
@@ -229,13 +230,8 @@ class ViewEmployee extends ViewRecord
 
                         Infolists\Components\TextEntry::make('personnel_type')
                             ->label('Type de Personnel')
-                            ->formatStateUsing(fn($state) => match ($state) {
-                                'soignant' => '👨‍⚕️ Soignant',
-                                'non_soignant' => '💼 Non-Soignant',
-                                'paramedical' => '🩺 Paramédical',
-                                'autres' => '🔧 Autres',
-                                default => $state,
-                            })
+                            ->formatStateUsing(fn(?string $state): string => OrganizationalAssignment::personnelTypeLabel($state) ?: $state)
+                            ->color(fn(?string $state): string => OrganizationalAssignment::personnelTypeColor($state))
                             ->badge(),
 
                         Infolists\Components\TextEntry::make('recruitment_date')

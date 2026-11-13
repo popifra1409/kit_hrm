@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QuotpartParameterResource\Pages;
 use App\Models\QuotpartParameter;
+use App\Support\OrganizationalAssignment;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -86,13 +87,7 @@ class QuotpartParameterResource extends Resource
 
                                 Forms\Components\Select::make('applies_to')
                                     ->label('S\'applique à')
-                                    ->options([
-                                        'all' => '👥 Tous',
-                                        'soignant' => '👨‍⚕️ Personnel Soignant',
-                                        'non_soignant' => '💼 Personnel Non-Soignant',
-                                        'paramedical' => '🩺 Personnel Paramédical',
-                                        'management' => '👔 Personnel d\'Encadrement',
-                                    ])
+                                    ->options(OrganizationalAssignment::appliesToOptions())
                                     ->default('all')
                                     ->native(false),
 
@@ -221,21 +216,8 @@ class QuotpartParameterResource extends Resource
 
                 Tables\Columns\BadgeColumn::make('applies_to')
                     ->label('S\'applique à')
-                    ->formatStateUsing(fn($state) => match ($state) {
-                        'all' => '👥 Tous',
-                        'soignant' => '👨‍⚕️ Soignant',
-                        'non_soignant' => '💼 Non-Soignant',
-                        'paramedical' => '🩺 Paramédical',
-                        'management' => '👔 Encadrement',
-                        default => $state,
-                    })
-                    ->colors([
-                        'primary' => 'all',
-                        'success' => 'soignant',
-                        'info' => 'non_soignant',
-                        'warning' => 'paramedical',
-                        'danger' => 'management',
-                    ]),
+                    ->formatStateUsing(fn(?string $state): string => OrganizationalAssignment::appliesToLabel($state))
+                    ->color(fn(?string $state): string => OrganizationalAssignment::appliesToColor($state)),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Actif')
@@ -260,13 +242,7 @@ class QuotpartParameterResource extends Resource
 
                 Tables\Filters\SelectFilter::make('applies_to')
                     ->label('S\'applique à')
-                    ->options([
-                        'all' => 'Tous',
-                        'soignant' => 'Personnel Soignant',
-                        'non_soignant' => 'Personnel Non-Soignant',
-                        'paramedical' => 'Personnel Paramédical',
-                        'management' => 'Personnel d\'Encadrement',
-                    ]),
+                    ->options(OrganizationalAssignment::appliesToOptions()),
 
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Actif'),

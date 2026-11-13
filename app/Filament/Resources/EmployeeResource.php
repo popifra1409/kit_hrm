@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Enums\ActionsPosition;
 use App\Filament\Traits\HasAuthorization;
+use App\Support\OrganizationalAssignment;
 
 class EmployeeResource extends Resource
 {
@@ -125,19 +126,8 @@ class EmployeeResource extends Resource
                 Tables\Columns\TextColumn::make('personnel_type')
                     ->label('Type Personnel')
                     ->badge()
-                    ->colors([
-                        'success' => 'soignant',
-                        'info' => 'paramedical',
-                        'warning' => 'non_soignant',
-                        'gray' => 'autres',
-                    ])
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'soignant' => '👨‍⚕️ Soignant',
-                        'non_soignant' => '💼 Non-Soignant',
-                        'paramedical' => '🩺 Paramédical',
-                        'autres' => '🛠️ Autres',
-                        default => $state,
-                    })
+                    ->color(fn(?string $state): string => OrganizationalAssignment::personnelTypeColor($state))
+                    ->formatStateUsing(fn(?string $state): string => OrganizationalAssignment::personnelTypeLabel($state) ?: $state)
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('classification')
@@ -246,12 +236,7 @@ class EmployeeResource extends Resource
 
                 Tables\Filters\SelectFilter::make('personnel_type')
                     ->label('Type de Personnel')
-                    ->options([
-                        'soignant' => 'Personnel Soignant',
-                        'non_soignant' => 'Personnel Non-Soignant',
-                        'paramedical' => 'Personnel Paramédical',
-                        'autres' => 'Autres',
-                    ])
+                    ->options(OrganizationalAssignment::personnelTypeOptions())
                     ->multiple(),
 
                 Tables\Filters\SelectFilter::make('status')

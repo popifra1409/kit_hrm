@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\EvaluationCriterionResource\Pages;
 use App\Models\EvaluationCriterion;
+use App\Support\OrganizationalAssignment;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -94,12 +95,7 @@ class EvaluationCriterionResource extends Resource
 
                                 Forms\Components\Select::make('applies_to')
                                     ->label('S\'applique à')
-                                    ->options([
-                                        'all' => '👥 Tous',
-                                        'soignant' => '👨‍⚕️ Personnel Soignant',
-                                        'non_soignant' => '💼 Personnel Non-Soignant',
-                                        'paramedical' => '🩺 Personnel Paramédical',
-                                    ])
+                                    ->options(OrganizationalAssignment::appliesToOptions())
                                     ->default('all')
                                     ->native(false),
 
@@ -197,19 +193,8 @@ class EvaluationCriterionResource extends Resource
 
                 Tables\Columns\BadgeColumn::make('applies_to')
                     ->label('S\'applique à')
-                    ->formatStateUsing(fn($state) => match ($state) {
-                        'all' => '👥 Tous',
-                        'soignant' => '👨‍⚕️ Soignant',
-                        'non_soignant' => '💼 Non-Soignant',
-                        'paramedical' => '🩺 Paramédical',
-                        default => $state,
-                    })
-                    ->colors([
-                        'primary' => 'all',
-                        'success' => 'soignant',
-                        'info' => 'non_soignant',
-                        'warning' => 'paramedical',
-                    ]),
+                    ->formatStateUsing(fn(?string $state): string => OrganizationalAssignment::appliesToLabel($state))
+                    ->color(fn(?string $state): string => OrganizationalAssignment::appliesToColor($state)),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Actif')
@@ -228,12 +213,7 @@ class EvaluationCriterionResource extends Resource
 
                 Tables\Filters\SelectFilter::make('applies_to')
                     ->label('S\'applique à')
-                    ->options([
-                        'all' => 'Tous',
-                        'soignant' => 'Personnel Soignant',
-                        'non_soignant' => 'Personnel Non-Soignant',
-                        'paramedical' => 'Personnel Paramédical',
-                    ]),
+                    ->options(OrganizationalAssignment::appliesToOptions()),
 
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Actif'),

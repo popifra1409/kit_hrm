@@ -109,13 +109,7 @@ class EvaluationCriterion extends Model
      */
     public function getAppliesToLabelAttribute()
     {
-        return match ($this->applies_to) {
-            'all' => '👥 Tous',
-            'soignant' => '👨‍⚕️ Personnel Soignant',
-            'non_soignant' => '💼 Personnel Non-Soignant',
-            'paramedical' => '🩺 Personnel Paramédical',
-            default => $this->applies_to,
-        };
+        return \App\Support\OrganizationalAssignment::appliesToLabel($this->applies_to);
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Models\Sector;
 use App\Models\Service;
 use App\Models\SubDirection;
 use App\Models\TradeBody;
+use Illuminate\Support\Str;
 
 /**
  * Affectation organisationnelle d'un employé — source unique de vérité pour :
@@ -39,10 +40,93 @@ class OrganizationalAssignment
     /** Types de service rattachables à la branche administrative. */
     public const ADMINISTRATIVE_SERVICE_TYPES = ['administrative', 'support', 'technical'];
 
+    /**
+     * Catégories déclarées au recensement. La clé est stockée telle quelle dans
+     * employees.personnel_type (VARCHAR(20)) : aucune clé ne doit dépasser 20
+     * caractères — d'où 'logistique' et 'cadres' pour des libellés plus longs.
+     */
     public const PERSONNEL_TYPES = [
-        'soignant' => 'Soignant',
-        'non_soignant' => 'Non Soignant',
+        'medical' => 'Médical',
         'paramedical' => 'Paramédical',
+        'administratif' => 'Administratif',
+        'medico_technique' => 'Médico-technique',
+        'logistique' => 'Logistique et technique',
+        'cadres' => 'Cadres et Direction',
+        'en_formation' => 'En formation',
+    ];
+
+    /**
+     * À qui correspond chaque catégorie : affiché comme aide sous le menu, pour que
+     * l'employé se range lui-même plutôt que de deviner.
+     */
+    public const PERSONNEL_TYPE_GUIDES = [
+        'medical' => 'Médecins généralistes et spécialistes, chirurgiens, pharmaciens, chirurgiens-dentistes…',
+        'paramedical' => "Infirmiers d'État et diplômés, sages-femmes, aides-soignants, techniciens supérieurs de santé",
+        'administratif' => 'Secrétaires, comptables, gestionnaires, agents de recouvrement, classiers, personnel RH',
+        'medico_technique' => "Techniciens de laboratoire et d'imagerie, kinésithérapeutes, anesthésistes, techniciens de bloc",
+        'logistique' => "Entretien, lingerie, cuisine, mécaniciens, électriciens, biomédicaux, informaticiens, chauffeurs, agents de sécurité",
+        'cadres' => 'Directeur général, directeurs, surveillant général, majors, sous-directeurs, chefs de service…',
+        'en_formation' => 'Stagiaires, internes, étudiants en soins infirmiers, bénévoles…',
+    ];
+
+    /**
+     * Catégories dont les actes comptent dans les points d'activité du quotient part
+     * (voir QuotpartCalculationService). La règle de calcul se lit ici, pas dans un
+     * test de valeur isolé : élargir ou restreindre ne doit pas demander de rouvrir
+     * le service de calcul.
+     *
+     * 'soignant' y figure encore : c'est l'ancienne valeur de ces mêmes praticiens,
+     * et une fiche qui la porte encore (base sans migration, fiche re-sauvegardée
+     * depuis le back-office) ne doit pas perdre ses points d'activité.
+     */
+    public const MEDICAL_ACTIVITY_TYPES = ['medical', 'soignant', 'paramedical', 'medico_technique', 'cadres'];
+
+    /**
+     * Mots-clés de l'import Excel : l'intitulé de la qualification détermine la
+     * catégorie. L'ordre des groupes EST la priorité ('cadres' avant 'medical' :
+     * un directeur de service n'est pas un praticien) ; à l'intérieur d'un groupe,
+     * le mot le plus long d'abord ('aide-soignant' avant 'soignant').
+     */
+    public const PERSONNEL_TYPE_KEYWORDS = [
+        'cadres' => ['directeur général', 'sous-directeur', 'surveillant général', 'chef de service', 'chef de département', 'directeur', 'coordinateur', 'major'],
+        'medical' => ['chirurgien-dentiste', 'stomatologue', 'pharmacien', 'médecin', 'medecin', 'chirurgien', 'dentiste', 'pédiatre', 'cardiologue', 'radiologue', 'anesthésiste', 'généraliste'],
+        'paramedical' => ['aide-soignant', 'aide soignant', 'sage-femme', 'infirmier', 'infirmer', 'soignant'],
+        'medico_technique' => ['technicien supérieur de santé', 'technicien supérieur', 'laborantin', 'laboratoire', 'kinésithérapeute', 'kinesitherapeute', 'manipulateur', 'imagerie', 'technicien de santé'],
+        'logistique' => ['agent de sécurité', 'électricien', 'electricien', 'mécanicien', 'mecanicien', 'chauffeur', 'cuisinier', 'lingerie', 'entretien', 'biomédical', 'informaticien', 'technicien'],
+        'administratif' => ['secrétaire', 'secretaire', 'comptable', 'gestionnaire', 'agent de recouvrement', 'classier', 'archiviste', 'ressources humaines', 'juriste', 'administratif'],
+        'en_formation' => ['stagiaire', 'interne', 'étudiant', 'etudiant', 'bénévole', 'benevole'],
+    ];
+
+    /**
+     * Catégorie devinée d'après un intitulé de qualification : l'import n'a personne
+     * pour répondre du formulaire. Sans correspondance, 'administratif' — successeur
+     * du défaut d'avant ; la fiche se reclasse au recensement ou au guichet RH.
+     */
+    public static function guessPersonnelType(?string $qualificationName): string
+    {
+        $label = Str::of($qualificationName ?? '')->lower()->ascii();
+
+        foreach (self::PERSONNEL_TYPE_KEYWORDS as $type => $keywords) {
+            foreach ($keywords as $keyword) {
+                if ($label->contains(Str::of($keyword)->ascii()->toString())) {
+                    return $type;
+                }
+            }
+        }
+
+        return 'administratif';
+    }
+
+
+    /**
+     * Valeurs héritées : plus proposées au recensement, mais encore acceptées et
+     * affichées. Les brouillons enregistrés avant la bascule (localStorage côté
+     * employé) les contiennent, et 'autres' reste le sort des fiches que le
+     * reclassement automatique ne pouvait pas trancher.
+     */
+    public const LEGACY_PERSONNEL_TYPES = [
+        'soignant' => 'Soignant (à reclasser)',
+        'non_soignant' => 'Non soignant (à reclasser)',
         'autres' => 'Autres',
     ];
 
@@ -92,7 +176,7 @@ class OrganizationalAssignment
                 ->get(['id', 'name', 'trade_body_id']),
             'job_titles' => JobTitle::where('is_active', true)->orderBy('hierarchy_level')
                 ->get(['id', 'name', 'hierarchy_level']),
-            'personnel_types' => self::toOptionList(self::PERSONNEL_TYPES),
+            'personnel_types' => self::toPersonnelTypeList(),
             'administrative_statuses' => self::toOptionList(self::ADMINISTRATIVE_STATUSES),
         ];
     }
@@ -106,6 +190,104 @@ class OrganizationalAssignment
         }
 
         return $list;
+    }
+
+    /**
+     * Menu des catégories, chacune avec son guide : web et mobile n'ont qu'à
+     * afficher la description, ils ne redéfinissent aucune nomenclature.
+     */
+    private static function toPersonnelTypeList(): array
+    {
+        $list = [];
+
+        foreach (self::PERSONNEL_TYPES as $value => $label) {
+            $list[] = ['value' => $value, 'label' => $label, 'description' => self::PERSONNEL_TYPE_GUIDES[$value]];
+        }
+
+        return $list;
+    }
+
+    /**
+     * Valeurs qu'une déclaration peut contenir : les catégories en vigueur puis les
+     * héritées. Un brouillon enregistré avant la bascule porte encore l'ancienne
+     * valeur ; le refuser punirait l'employé pour un champ qu'il n'a pas touché.
+     */
+    public static function acceptedPersonnelTypes(): array
+    {
+        return array_keys(self::personnelTypeOptions());
+    }
+
+    /**
+     * Libellé d'une valeur, y compris héritée : les fiches que le reclassement
+     * automatique n'a pas tranchées doivent rester lisibles au back-office.
+     */
+    public static function personnelTypeLabel(?string $value): string
+    {
+        return self::PERSONNEL_TYPES[$value] ?? self::LEGACY_PERSONNEL_TYPES[$value] ?? '';
+    }
+
+    /** Menu du back-office : en vigueur puis héritées, pour qu'une fiche ancienne se relise sans se vider. */
+    public static function personnelTypeOptions(): array
+    {
+        return self::PERSONNEL_TYPES + self::LEGACY_PERSONNEL_TYPES;
+    }
+
+    /**
+     * Couleur de badge, commune au panneau et aux listes : Filament v3 n'accepte que
+     * gray/info/danger/warning/success/primary. Les héritées restent grises pour ne
+     * pas donner l'air d'une catégorie validée.
+     */
+    public const PERSONNEL_TYPE_COLORS = [
+        'medical' => 'success',
+        'soignant' => 'success',
+        'paramedical' => 'info',
+        'medico_technique' => 'warning',
+        'cadres' => 'primary',
+        'administratif' => 'gray',
+        'logistique' => 'gray',
+        'en_formation' => 'gray',
+        'non_soignant' => 'gray',
+        'autres' => 'gray',
+    ];
+
+    public static function personnelTypeColor(?string $value): string
+    {
+        return self::PERSONNEL_TYPE_COLORS[$value] ?? 'gray';
+    }
+
+    /**
+     * Menu « s'applique à » des critères d'évaluation et des paramètres de
+     * quotient part. Ces deux tables stockent la nomenclature du personnel : elles
+     * ne doivent pas en garder une version séparée qui aurait encore sa dichotomie.
+     *
+     * 'management' n'a jamais été une valeur de employees.personnel_type : c'est un
+     * choix propre à ces tables, dont le successeur est 'cadres'. Les lignes déjà
+     * enregistrées avec cette valeur doivent rester lisibles et modifiables.
+     */
+    public const APPLIES_TO_LABELS = [
+        'all' => 'Tous les personnels',
+        'management' => 'Encadrement (à reclasser sur « Cadres et Direction »)',
+    ];
+
+    public static function appliesToOptions(): array
+    {
+        return ['all' => self::APPLIES_TO_LABELS['all']]
+            + self::personnelTypeOptions()
+            + ['management' => self::APPLIES_TO_LABELS['management']];
+    }
+
+    public static function appliesToLabel(?string $value): string
+    {
+        return self::APPLIES_TO_LABELS[$value] ?? (self::personnelTypeLabel($value) ?: (string) $value);
+    }
+
+    public static function appliesToColor(?string $value): string
+    {
+        if ($value === 'all') {
+            return 'primary';
+        }
+
+        return $value === 'management' ? 'gray' : self::personnelTypeColor($value);
     }
 
     // ------------------------------------------------------------------

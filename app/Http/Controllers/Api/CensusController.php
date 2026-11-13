@@ -24,7 +24,7 @@ class CensusController extends Controller
 {
     /**
      * Formats et taille d'une pièce jointe : la promesse faite à l'écran (« PDF, JPG ou
-     * PNG — 4 Mo maximum ») est exactement la limite appliquée ici, sinon l'employé
+     * PNG — 2 Mo maximum ») est exactement la limite appliquée ici, sinon l'employé
      * croit sa pièce jointe et la soumission échoue sans explication reconnaissable.
      */
     private const DOCUMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];
@@ -32,8 +32,13 @@ class CensusController extends Controller
     /** Une photo ne se livre pas en PDF. */
     private const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png'];
 
-    /** 4 Mio, comme la règle « max:4096 » des champs validés. */
-    private const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
+    /**
+     * 2 Mio, la règle « max:2048 » des trois champs validés — et d'abord la mesure du
+     * serveur : `upload_max_filesize = 2M`. Une règle plus haute serait une promesse
+     * que la machine ne peut pas tenir, puisqu'un fichier au-delà de cette valeur est
+     * retiré du corps avant d'atteindre le validateur (voir `uploadLimit()`).
+     */
+    private const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
     /**
      * État actuel du recensement pour l'employé connecté.
      */
@@ -304,15 +309,19 @@ class CensusController extends Controller
             // champs change ; le serveur l'exige aussi, le client ne faisant pas foi.
             'bank_change_acknowledged' => ['nullable', 'boolean'],
 
-            'photo' => ['nullable', 'image', 'max:4096'],
+            // Une seule valeur fait la promesse et le contrôle : « max » s'exprime en Ko,
+            // tout le reste (conseil affiché, refus de documentRefusal) vient de
+            // MAX_DOCUMENT_BYTES. Écrire 2048 à la main ici est la façon de voir diverger
+            // ce que l'écran annonce et ce que le serveur refuse.
+            'photo' => ['nullable', 'image', 'max:' . intdiv(self::MAX_DOCUMENT_BYTES, 1024)],
 
             // Contrat de travail : numéro laissé libre (les RH le corrigent à la revue)
             // et pièce jointe. Le document de la prise de service accompagne la date
             // déjà déclarée dans « personal ».
             'contract' => ['nullable', 'array'],
             'contract.contract_number' => ['nullable', 'string', 'max:255'],
-            'contract_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:4096'],
-            'service_start_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:4096'],
+            'contract_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:' . intdiv(self::MAX_DOCUMENT_BYTES, 1024)],
+            'service_start_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:' . intdiv(self::MAX_DOCUMENT_BYTES, 1024)],
 
             // Affectation organisationnelle : appliquée réellement à la validation finale
             // (voir CensusValidationService). Validée par identifiant/valeur fermée, puis
@@ -327,7 +336,7 @@ class CensusController extends Controller
             'organizational.declared_job_title_id' => ['nullable', 'integer', 'exists:job_titles,id'],
             'organizational.declared_trade_body_id' => ['nullable', 'integer', 'exists:trade_bodies,id'],
             'organizational.declared_qualification_id' => ['nullable', 'integer', 'exists:qualifications,id'],
-            'organizational.declared_personnel_type' => ['nullable', 'in:soignant,non_soignant,paramedical,autres'],
+            'organizational.declared_personnel_type' => ['nullable', 'in:'.implode(',', OrganizationalAssignment::acceptedPersonnelTypes())],
             'organizational.declared_administrative_status' => ['nullable', 'in:fonctionnaire_affecte,fonctionnaire_detache,contractuel_structure'],
 
             'dependents' => ['array'],

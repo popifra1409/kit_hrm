@@ -6,6 +6,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use App\Models\Employee;
+use App\Support\OrganizationalAssignment;
 
 class RecentEmployeesTable extends BaseWidget
 {
@@ -38,14 +39,8 @@ class RecentEmployeesTable extends BaseWidget
                 Tables\Columns\TextColumn::make('personnel_type')
                     ->label('Type')
                     ->badge()
-                    ->colors([
-                        'success' => 'soignant',
-                        'warning' => 'non_soignant',
-                    ])
-                    ->formatStateUsing(
-                        fn(string $state): string =>
-                        $state === 'soignant' ? 'Soignant' : 'Non-Soignant'
-                    ),
+                    ->color(fn(?string $state): string => OrganizationalAssignment::personnelTypeColor($state))
+                    ->formatStateUsing(fn(?string $state): string => OrganizationalAssignment::personnelTypeLabel($state) ?: $state),
 
                 Tables\Columns\TextColumn::make('recruitment_date')
                     ->label('Date recrutement')

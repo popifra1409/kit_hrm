@@ -300,7 +300,8 @@ class ReviewCensusSubmission extends Page implements HasForms
 
                             Forms\Components\Select::make('organizational.declared_personnel_type')
                                 ->label('Type de personnel')
-                                ->options(OrganizationalAssignment::PERSONNEL_TYPES)
+                                ->options(OrganizationalAssignment::personnelTypeOptions())
+                                ->helperText('Une déclaration arrivée avant la bascule peut encore porter « Soignant » ou « Non soignant » : la reclasser ici.')
                                 ->native(false),
 
                             Forms\Components\Select::make('organizational.declared_administrative_status')

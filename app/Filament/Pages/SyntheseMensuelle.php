@@ -10,6 +10,7 @@ use App\Models\Payroll;
 use App\Models\PayrollItem;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MonthlySummaryExport;
+use App\Support\OrganizationalAssignment;
 
 class SyntheseMensuelle extends Page implements HasForms
 {
@@ -100,9 +101,10 @@ class SyntheseMensuelle extends Page implements HasForms
             ];
         });
 
-        // Par type de personnel
+        // Par type de personnel : les sept catégories, plus les valeurs héritées
+        // que le reclassement n'a pas encore touchées.
         $byPersonnelType = $payrolls->groupBy(function ($payroll) {
-            return $payroll->employee->personnel_type === 'soignant' ? 'Soignant' : 'Non Soignant';
+            return OrganizationalAssignment::personnelTypeLabel($payroll->employee->personnel_type) ?: 'Non renseigné';
         })->map(function ($group) {
             return [
                 'count' => $group->count(),

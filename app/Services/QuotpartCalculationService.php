@@ -9,6 +9,7 @@ use App\Models\QuotpartDeductionType;
 use App\Models\Employee;
 use App\Models\EmployeeEvaluation;
 use App\Models\MedicalActivity;
+use App\Support\OrganizationalAssignment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -162,8 +163,8 @@ class QuotpartCalculationService
             }
         }
 
-        // 3. POINTS ACTIVITÉS MÉDICALES (Personnel soignant uniquement)
-        if ($employee->personnel_type === 'soignant') {
+        // 3. POINTS ACTIVITÉS MÉDICALES (catégories qui exercent des actes)
+        if (in_array($employee->personnel_type, OrganizationalAssignment::MEDICAL_ACTIVITY_TYPES, true)) {
             $activities = MedicalActivity::where('employee_id', $employee->id)
                 ->where('period_id', $period->id)
                 ->where('is_validated', true)

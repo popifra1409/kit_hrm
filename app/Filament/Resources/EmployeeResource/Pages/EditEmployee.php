@@ -4,6 +4,7 @@ namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
 use App\Filament\Resources\EmployeeResource\Components\OrganizationalCascade;
+use App\Support\OrganizationalAssignment;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Forms;
@@ -298,13 +299,10 @@ class EditEmployee extends EditRecord
 
                                     Forms\Components\Select::make('personnel_type')
                                         ->label('Type de Personnel')
-                                        ->options([
-                                            'soignant' => 'Personnel Soignant',
-                                            'non_soignant' => 'Personnel Non-Soignant',
-                                            'paramedical' => 'Personnel Paramédical',
-                                            'autres' => 'Autres',
-                                        ])
-                                        ->native(false),
+                                        ->options(OrganizationalAssignment::personnelTypeOptions())
+                                        ->native(false)
+                                        ->required()
+                                        ->helperText('Les libellés « (à reclasser) » viennent de l\'ancienne nomenclature : à ramener sur l\'une des sept catégories.'),
 
                                     Forms\Components\Select::make('contract_type_id')
                                         ->label('Type de Contrat')
@@ -332,25 +330,27 @@ class EditEmployee extends EditRecord
                                         ->displayFormat('d/m/Y'),
                                 ]),
 
+                            // 2048 Ko, la taille que le serveur sait réellement lire (upload_max_filesize)
+                            // et celle que le recensement promet à l'employé pour ces deux mêmes pièces.
                             Forms\Components\Grid::make(2)
                                 ->schema([
                                     Forms\Components\FileUpload::make('contract_document_path')
                                         ->label('Contrat de travail (document)')
                                         ->directory('employees/contracts')
                                         ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
-                                        ->maxSize(4096)
+                                        ->maxSize(2048)
                                         ->downloadable()
                                         ->openable()
-                                        ->helperText('PDF, JPG ou PNG - Max: 4MB'),
+                                        ->helperText('PDF, JPG ou PNG - Max: 2MB'),
 
                                     Forms\Components\FileUpload::make('service_start_document_path')
                                         ->label('Attestation de prise de service')
                                         ->directory('employees/service-start')
                                         ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
-                                        ->maxSize(4096)
+                                        ->maxSize(2048)
                                         ->downloadable()
                                         ->openable()
-                                        ->helperText('PDF, JPG ou PNG - Max: 4MB'),
+                                        ->helperText('PDF, JPG ou PNG - Max: 2MB'),
                                 ]),
 
                             Forms\Components\Grid::make(3)

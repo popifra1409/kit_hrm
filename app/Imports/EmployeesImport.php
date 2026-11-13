@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\TradeBody;
 use App\Models\Qualification;
 use App\Models\ContractType;
+use App\Support\OrganizationalAssignment;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
@@ -80,16 +81,10 @@ class EmployeesImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
         // Déterminer le type de contrat (CDI par défaut)
         $contractType = ContractType::where('code', 'CDI')->first();
 
-        // Déterminer le type de personnel (soignant/non-soignant)
-        $soignantKeywords = ['INFIRMIER', 'MEDECIN', 'SAGE', 'AIDE-SOIGNANT', 'LABORAT', 'ANESTHE', 'KINE', 'RADIOL', 'PHARMAC', 'CHIRURG'];
-        $personnelType = 'non_soignant';
-
-        foreach ($soignantKeywords as $keyword) {
-            if (stripos($qualificationName, $keyword) !== false) {
-                $personnelType = 'soignant';
-                break;
-            }
-        }
+        // Catégorie devinée d'après l'intitulé de la qualification : l'import
+        // n'a personne pour répondre du formulaire. Voir
+        // OrganizationalAssignment::PERSONNEL_TYPE_KEYWORDS pour la règle.
+        $personnelType = OrganizationalAssignment::guessPersonnelType($qualificationName);
 
         // Convertir les dates
         $birthDate = $this->parseDate($row['date_de_naissance'] ?? null);

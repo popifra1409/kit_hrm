@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
+use App\Models\Employee;
+use App\Support\OrganizationalAssignment;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Components\Tab;
@@ -50,17 +52,14 @@ class ListEmployees extends ListRecords
                 ->badge(fn() => \App\Models\Employee::where('is_active', true)->count())
                 ->badgeColor('success'),
 
-            'soignant' => Tab::make('Personnel Soignant')
-                ->icon('heroicon-o-heart')
-                ->modifyQueryUsing(fn(Builder $query) => $query->where('personnel_type', 'soignant'))
-                ->badge(fn() => \App\Models\Employee::where('personnel_type', 'soignant')->count())
-                ->badgeColor('success'),
-
-            'non_soignant' => Tab::make('Personnel Non-Soignant')
-                ->icon('heroicon-o-briefcase')
-                ->modifyQueryUsing(fn(Builder $query) => $query->where('personnel_type', 'non_soignant'))
-                ->badge(fn() => \App\Models\Employee::where('personnel_type', 'non_soignant')->count())
-                ->badgeColor('primary'),
+            // Un onglet par catégorie en vigueur : la liste n'est plus
+            // « soignant / non soignant », et le code ne doit pas non plus.
+            ...collect(OrganizationalAssignment::PERSONNEL_TYPES)
+                ->map(fn(string $label, string $type) => Tab::make($label)
+                    ->modifyQueryUsing(fn(Builder $query) => $query->where('personnel_type', $type))
+                    ->badge(fn() => Employee::where('personnel_type', $type)->count())
+                    ->badgeColor(OrganizationalAssignment::personnelTypeColor($type)))
+                ->all(),
 
             'managers' => Tab::make('Cadres de Management')
                 ->icon('heroicon-o-user-group')
